@@ -1,3 +1,33 @@
+## [第五阶段·任务四补充] 支付通知身份校验落地（2026-11-20）
+
+项目为课程设计、不会上线，因此不申请微信商户资质。
+但「通知身份校验」逻辑不再挂骨架，而是真实实现并可测：
+
+### 新增
+
+- `MockNotifySignatureVerifier`：AppID 比对 / 商户号比对 / 签名校验三条规则
+- 配置项：`teaclub.payment.mock.expected-app-id|expected-mch-id|sign-secret`
+- 严格模式开关：`enforce-notify-check`（缺字段即拒）
+- 签名算法：`SHA-256(appId|mchId|paymentNo|amount|secret)`，明确标注为同构占位
+
+### 顺带修正
+
+`application-docker.yml` 中 `teaclub.payment` 配置段此前从未真正写入，
+一直依赖 Java 默认值。现已补全 provider / wechat / mock 三段。
+
+### 实测（9/9 断言通过）
+
+| 场景 | 结果 |
+| --- | --- |
+| AppID 不匹配 | 拒绝，支付单保持 PAYING |
+| 商户号不匹配 | 拒绝，支付单保持 PAYING |
+| 签名校验失败 | 拒绝，支付单保持 PAYING |
+| 正确签名 | 通过，支付单转 SUCCESS |
+| 未携带校验字段 | 宽松模式兼容，正常处理 |
+
+支付测试报告由 9/11 更新为 **11/11 全部通过**。
+
+---
 ## [第五阶段·任务四] 分布式事务与资金一致性专项测试（2026-11-20）
 
 ### 新增能力

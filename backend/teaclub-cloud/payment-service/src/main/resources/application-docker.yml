@@ -1,7 +1,7 @@
-# ============================================================
+# ======
 # 容器环境配置（profile=docker）
 # 依赖容器内的 nacos / redis / rabbitmq / mysql
-# ============================================================
+# ======
 spring:
   cloud:
     nacos:
@@ -46,7 +46,6 @@ logging:
   level:
     root: INFO
     com.teaclub.cloud: INFO
-    org.springframework.cloud.gateway: INFO
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{traceId:-}] %logger{36} - %msg%n"
 
@@ -58,5 +57,27 @@ teaclub:
     issuer: teaclub
   security:
     internal-token: ${INTERNAL_TOKEN:teaclub-internal-default-token}
-    # 仅容器联调时开启本地令牌端点（生产环境不设置该变量）
     dev-token-endpoint-enabled: ${DEV_TOKEN_ENDPOINT:false}
+
+  # ===== 支付渠道配置 =====
+  # provider=mock      课程设计使用，支付单 provider 恒为 MOCK
+  # provider=wechat-v3 真实微信支付 API v3（需商户资质，本项目不启用）
+  payment:
+    provider: ${PAYMENT_PROVIDER:mock}
+    wechat:
+      merchant-id: ${WX_MERCHANT_ID:}
+      merchant-serial-no: ${WX_MERCHANT_SERIAL_NO:}
+      api-v3-key: ${WX_API_V3_KEY:}
+      private-key-path: ${WX_PRIVATE_KEY_PATH:}
+      app-id: ${WX_APP_ID:}
+      notify-url: ${WX_NOTIFY_URL:}
+      refund-notify-url: ${WX_REFUND_NOTIFY_URL:}
+      platform-cert-path: ${WX_PLATFORM_CERT_PATH:}
+    # Mock 渠道通知身份校验：期望值来自配置而非真实商户资质，
+    # 但 AppID 比对 / 商户号比对 / 签名校验三条规则真实生效。
+    mock:
+      expected-app-id: ${PAYMENT_MOCK_APP_ID:mock-appid}
+      expected-mch-id: ${PAYMENT_MOCK_MCH_ID:mock-mchid}
+      sign-secret: ${PAYMENT_MOCK_SIGN_SECRET:mock-sign-secret}
+      # 严格模式：要求通知必须携带 appId/mchId/sign，缺一即拒
+      enforce-notify-check: ${PAYMENT_MOCK_ENFORCE:false}

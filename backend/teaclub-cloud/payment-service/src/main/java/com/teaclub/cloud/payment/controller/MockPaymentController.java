@@ -26,10 +26,13 @@ import java.util.Map;
 public class MockPaymentController {
 
     private final MockPaymentService mockPaymentService;
+    private final com.teaclub.cloud.payment.gateway.mock.MockNotifySignatureVerifier signatureVerifier;
 
     @Operation(summary = "模拟支付成功通知")
     @PostMapping("/notify")
     public Result<String> notify(@RequestBody Map<String, Object> body) {
+        // 身份校验：AppID / 商户号 / 签名。不通过则拒绝，支付单状态不变。
+        signatureVerifier.verify(body);
         String paymentNo = (String) body.get("paymentNo");
         Long amount = body.get("amount") == null ? null
                 : Long.valueOf(String.valueOf(body.get("amount")));
