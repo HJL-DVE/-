@@ -49,11 +49,28 @@ src/
 - 糖度 / 温度 / 加料存 pinia 购物车；下单请求体为 `OrderItemRequest { skuId, quantity }`
   （后端该 DTO 无 remark 字段），规格文案汇总写入订单级 `remark`。
 
-## 接口自检脚本
+## 接口自检脚本（全部只用 fetch，不含任何 mock 数据源）
 
 ```bash
-node scripts/probe-gateway.mjs     # 直连网关，逐条打印真实 http/code/message
-node scripts/probe-with-admin.mjs  # 带管理端 token 越过网关鉴权，观察下游服务真实响应
+node scripts/probe-gateway.mjs     # 会员端 20 个接口逐条打印真实 http/code/message
+node scripts/probe-shapes.mjs      # 抓取每个接口的真实响应字段形状（对齐 src/api/types.ts）
+node scripts/verify-loop.mjs       # 充值 → Mock 支付通知 → 钱包入账 → 下单 → 钱包支付 → 流水
+node scripts/verify-pages.mjs      # 契约第六节页面覆盖自检
 ```
 
-两个脚本只用 `fetch`，不含任何 mock 数据。最近一次结果见 `probe-result.json`（gitignore 中忽略）。
+最近一次结果：`probe-gateway.mjs` **20/20 PASS**，`verify-loop.mjs` **15/15 PASS**（明细见
+`probe-result.json` / `probe-loop.json`，均在 .gitignore 中忽略）。
+
+## 与后端实测对齐的字段要点
+
+| 位置 | 实测字段 | 说明 |
+| --- | --- | --- |
+| 商品列表/详情 | `spuId`、`categoryId`（不是 `id`） | 页面统一走 `spuIdOf()` / `categoryIdOf()` |
+| 商品图 | `imageUrl` | `normalize.spuImage()` |
+| SKU | `skuId` / `price`(分) / `specJson`(JSON 字符串) | |
+| `specJson` | 中文键，如 `{"杯型":"中杯","温度":"正常冰"}` | `specGroups()` 兼容中英文键，按「糖度/温度/加料/杯型/其他」分组渲染 |
+| 等级 | `upgradeThreshold` / `pointRate` / `discountRate`(万分数) | `discountLabel()` 换算折扣 |
+| 钱包流水 | `principalChange` / `giftChange` / `bizType` | bizType: RECHARGE_IN / CONSUME_OUT / REFUND_IN / RECHARGE_REFUND_OUT / ADMIN_ADJUST |
+| 充值单 | `status`: PENDING / PAID / CANCELLED；`actualAmount` = 应付金额 | 入账只由支付回调驱动 |
+| 支付单 | `status` 起始 PAYING；Native 渠道 `invokeParams` 为 null、有 `codeUrl` | |
+| 充值下单 | `POST /api/wallet/recharges` 需要 `{ planId, storeId }` | storeId 取当前门店 |
