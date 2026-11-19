@@ -196,6 +196,7 @@ services:
       DB_HOST: mysql
       DB_PORT: "3306"
       DB_USER: tc_member
+      DB_NAME: member_db
       DB_PASSWORD: ${DB_PASSWORD_MEMBER}
     ports:
       - "9002:9002"
@@ -261,6 +262,7 @@ services:
       DB_HOST: mysql
       DB_PORT: "3306"
       DB_USER: tc_order
+      DB_NAME: order_db
       DB_PASSWORD: ${DB_PASSWORD_ORDER}
     ports:
       - "9005:9005"

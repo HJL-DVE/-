@@ -9,12 +9,16 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 品牌配置内部接口（仅供其他微服务调用）。
@@ -46,6 +50,39 @@ public class BrandInternalController {
         String value = order == null ? "GIFT_FIRST" : String.valueOf(order);
         log.info("查询品牌扣款顺序: brandId={} order={}", brandId, value);
         return Result.ok(value);
+    }
+
+    @Operation(summary = "批量查询门店名称")
+    @GetMapping("/stores/names")
+    public Result<Map<Long, String>> storeNames(@RequestParam Long brandId,
+                                                 @RequestParam List<Long> storeIds) {
+        if (storeIds == null || storeIds.isEmpty()) {
+            return Result.ok(java.util.Collections.emptyMap());
+        }
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT id, store_name FROM sys_store WHERE brand_id = ? AND id IN ("
+                        + storeIds.stream().map(s -> "?").collect(Collectors.joining(","))
+                        + ")", 
+                params(brandId, storeIds));
+        Map<Long, String> result = new LinkedHashMap<>();
+        for (Map<String, Object> row : rows) {
+            Object id = row.get("id");
+            Object name = row.get("store_name");
+            if (id != null && name != null) {
+                result.put(((Number) id).longValue(), String.valueOf(name));
+            }
+        }
+        log.info("批量查询门店名称: brandId={} count={}", brandId, result.size());
+        return Result.ok(result);
+    }
+
+    private Object[] params(Long brandId, List<Long> storeIds) {
+        Object[] args = new Object[storeIds.size() + 1];
+        args[0] = brandId;
+        for (int i = 0; i < storeIds.size(); i++) {
+            args[i + 1] = storeIds.get(i);
+        }
+        return args;
     }
 
     @Operation(summary = "查询品牌基础信息")

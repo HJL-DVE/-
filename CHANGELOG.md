@@ -29,6 +29,43 @@
 
 ---
 
+## [第五阶段·任务三第三批] member-service 迁移与可见口径 B 验证（2026-11-19）
+
+### 关键改造：可见口径 B 从跨库子查询改为跨服务调用
+
+单体用一个 SQL 的 `EXISTS` 子查询同时查 `mem_member` 与 `oms_order`（同库）。
+拆分后 order_db 归 order-service，改为：
+
+```text
+member-service --Feign--> order-service: /api/order/internal/member-ids
+             本地查 register_store_id IN (授权门店)
+             两者取并集 = 可见会员集合
+```
+
+可见口径本身不变：注册门店在授权范围内 **或** 在该门店消费过。
+
+order-service 不可用时**直接失败**而非静默放行（静默放行 = 越权可见）。
+
+### 实测结果
+
+| 账号 | 授权门店 | 可见会员 |
+| --- | --- | --- |
+| mgr_xihu | 门店1 | **3 个**（含李小雨：注册门店2 但在门店1消费过） |
+| mgr_binjiang | 门店2 | **1 个** |
+| admin | 全部 | **3 个** |
+
+拦截：店长传 registerStoreId=2 → 10202；收银员改资料 → 10201；手机号脱敏 138****0001。
+钱包服务未受影响（余额 50000/8000 正常）。
+
+### 本轮修复 9 个问题
+
+- **容器内无 member 类**：只 compile 没 package，镜像 COPY 的是旧 jar
+- **分页 total 恒为 0**：MyBatis-Plus 3.5.9+ 把分页插件拆到 jsqlparser 模块
+- 跨库子查询改 Feign
+- updateStatus 签名、freezeReason 参数名、@EnableFeignClients 重复、common.annotation 包名、brand_id 列名等
+
+---
+
 ## [第五阶段·任务三第二批] auth-service 业务迁移 + 目录结构调整（2026-11-19）
 
 ### 目录结构调整

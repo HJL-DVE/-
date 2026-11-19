@@ -64,6 +64,7 @@
     <spring-cloud-alibaba.version>2025.0.0.0</spring-cloud-alibaba.version>
 
     <mybatis-plus.version>3.5.18</mybatis-plus.version>
+    <mybatis-plus-jsqlparser.version>3.5.18</mybatis-plus-jsqlparser.version>
     <jjwt.version>0.13.0</jjwt.version>
     <flyway.version>11.20.3</flyway.version>
     <springdoc.version>2.10.0</springdoc.version>

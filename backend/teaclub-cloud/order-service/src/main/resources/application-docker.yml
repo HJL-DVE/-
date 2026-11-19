@@ -15,6 +15,11 @@ spring:
         server-addr: ${NACOS_ADDR:nacos:8848}
         group: ${NACOS_GROUP:TEACLUB}
         file-extension: yaml
+  datasource:
+    url: jdbc:mysql://${DB_HOST:mysql}:${DB_PORT:3306}/${DB_NAME:order_db}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
+    username: ${DB_USER:tc_order}
+    password: ${DB_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
   data:
     redis:
       host: ${REDIS_HOST:redis}
