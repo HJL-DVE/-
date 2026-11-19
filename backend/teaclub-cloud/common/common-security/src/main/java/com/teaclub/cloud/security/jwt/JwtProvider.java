@@ -82,6 +82,29 @@ public class JwtProvider {
                 .compact();
     }
 
+    /**
+     * 签发会员端令牌。
+     *
+     * <p>与管理员令牌使用不同的 audience 与密钥，二者不能互相冒用：
+     * 管理端令牌解析要求 aud=admin，会员端要求 aud=member。
+     */
+    public String issueMemberToken(LoginUser user) {
+        Date now = new Date();
+        Date exp = new Date(now.getTime() + props.getAccessTokenExpireSeconds() * 1000L);
+        String jti = UUID.randomUUID().toString().replace("-", "");
+        return Jwts.builder()
+                .issuer(props.getIssuer())
+                .audience().add(AUD_MEMBER).and()
+                .id(jti)
+                .subject(String.valueOf(user.getMemberId()))
+                .claim("memberId", user.getMemberId())
+                .claim("brandId", user.getBrandId())
+                .issuedAt(now)
+                .expiration(exp)
+                .signWith(memberKey(), Jwts.SIG.HS256)
+                .compact();
+    }
+
     public Claims parseAdminToken(String token) {
         return Jwts.parser()
                 .verifyWith(adminKey())

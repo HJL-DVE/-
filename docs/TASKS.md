@@ -70,8 +70,9 @@ TeaClub/
 │   │   └── common-feign/     OpenFeign 基类/超时/重试/异常解码
 │   ├── gateway-service/
 │   └── 9 个业务服务
-├── teaclub-admin/        管理后台前端（原 web/）
-├── teaclub-miniprogram/  小程序前端（原 miniapp/）
+├── frontend/             前端工程（与 backend/ 平级，不放在 backend 下）
+│   ├── teaclub-admin/       管理后台（原 web/）
+│   └── teaclub-miniprogram/ 小程序（原 miniapp/）
 ├── infrastructure/       容器化部署编排（原 deploy/）
 │   └── docker/
 │       ├── docker-compose.yml

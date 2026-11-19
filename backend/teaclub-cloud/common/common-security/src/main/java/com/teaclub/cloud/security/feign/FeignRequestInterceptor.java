@@ -44,7 +44,13 @@ public class FeignRequestInterceptor implements RequestInterceptor {
 
         LoginUser user = UserContext.get();
         if (user != null) {
-            template.header(InternalHeaders.USER_ID, String.valueOf(user.getUserId()));
+            // 不能写 String.valueOf(null)：会透传字面量 "null"，下游 Long 解析直接 500
+            if (user.getUserId() != null) {
+                template.header(InternalHeaders.USER_ID, String.valueOf(user.getUserId()));
+            }
+            if (user.getMemberId() != null) {
+                template.header(InternalHeaders.MEMBER_ID, String.valueOf(user.getMemberId()));
+            }
             if (user.getUsername() != null) {
                 template.header(InternalHeaders.USERNAME, user.getUsername());
             }

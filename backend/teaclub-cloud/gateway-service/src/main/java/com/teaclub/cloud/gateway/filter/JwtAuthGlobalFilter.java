@@ -53,9 +53,19 @@ public class JwtAuthGlobalFilter implements GlobalFilter, Ordered {
             "/api/auth/register",
             "/api/admin/auth/login",
             "/api/admin/auth/register",
+            // 会员端（小程序）：登录与匿名浏览
+            "/api/auth/wx-login",
+            "/api/auth/member-login",
+            "/api/auth/member-register",
+            "/api/auth/stores",
+            "/api/auth/stores/**",
+            "/api/product/**",
             // 支付回调（第三方服务器调用，无用户令牌）
             "/api/payment/notify/**",
             "/api/payment/refund-notify/**",
+            // 本地/联调用的 Mock 渠道回调（仅在 teaclub.payment.provider=mock 时存在对应控制器）
+            // 与真实渠道回调同语义：第三方服务器调用，无用户令牌
+            "/api/payment/mock/**",
             "/api/admin/payment/notify/**",
             "/api/admin/payment/refund-notify/**",
             // 运维与文档
@@ -80,8 +90,9 @@ public class JwtAuthGlobalFilter implements GlobalFilter, Ordered {
             return unauthorized(exchange, ResultCode.UNAUTHORIZED);
         }
 
+        String token = auth.substring(7).trim();
         try {
-            Claims claims = jwtProvider.parseAdminToken(auth.substring(7).trim());
+            Claims claims = jwtProvider.parseAdminToken(token);
             ServerHttpRequest mutated = exchange.getRequest().mutate()
                     .header(InternalHeaders.USER_ID, String.valueOf(claims.getSubject()))
                     .header(InternalHeaders.USERNAME, str(claims.get("username")))
@@ -92,12 +103,42 @@ public class JwtAuthGlobalFilter implements GlobalFilter, Ordered {
                     .header(InternalHeaders.STORE_IDS, join(claims.get("storeIds")))
                     .build();
             return chain.filter(exchange.mutate().request(mutated).build());
-        } catch (ExpiredJwtException e) {
-            return unauthorized(exchange, ResultCode.TOKEN_EXPIRED);
-        } catch (JwtException | IllegalArgumentException e) {
-            log.debug("网关 JWT 校验失败 path={} msg={}", path, e.getMessage());
-            return unauthorized(exchange, ResultCode.TOKEN_INVALID);
+        } catch (ExpiredJwtException adminExpired) {
+            // 管理端密钥下解析失败：可能本就是会员令牌，继续尝试
+            return tryMemberToken(exchange, chain, token, path, ResultCode.TOKEN_EXPIRED);
+        } catch (JwtException | IllegalArgumentException adminInvalid) {
+            return tryMemberToken(exchange, chain, token, path, ResultCode.TOKEN_INVALID);
         }
+    }
+
+    /**
+     * 会员端令牌兜底解析。
+     *
+     * <p>两种令牌使用不同密钥与 audience，互不通用；只有都解析失败才判定为无效。
+     * 解析成功时注入 {@code X-Member-Id} / {@code X-Brand-Id}，不注入任何管理端权限头。
+     */
+    private Mono<Void> tryMemberToken(ServerWebExchange exchange, GatewayFilterChain chain,
+                                      String token, String path, ResultCode fallback) {
+        Claims claims;
+        try {
+            claims = jwtProvider.parseMemberToken(token);
+        } catch (ExpiredJwtException memberExpired) {
+            return unauthorized(exchange, ResultCode.TOKEN_EXPIRED);
+        } catch (JwtException | IllegalArgumentException memberInvalid) {
+            log.debug("网关 JWT 校验失败 path={} msg={}", path, memberInvalid.getMessage());
+            return unauthorized(exchange, fallback);
+        }
+
+        Object memberId = claims.get("memberId");
+        if (memberId == null) {
+            memberId = claims.getSubject();
+        }
+        ServerHttpRequest mutated = exchange.getRequest().mutate()
+                .header(InternalHeaders.MEMBER_ID, str(memberId))
+                .header(InternalHeaders.BRAND_ID, str(claims.get("brandId")))
+                .header(InternalHeaders.USER_TYPE, "MEMBER")
+                .build();
+        return chain.filter(exchange.mutate().request(mutated).build());
     }
 
     private boolean isWhiteListed(String path) {

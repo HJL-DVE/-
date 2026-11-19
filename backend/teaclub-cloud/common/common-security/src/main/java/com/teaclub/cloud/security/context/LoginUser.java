@@ -18,6 +18,9 @@ public class LoginUser {
 
     private Long userId;
     private String username;
+
+    /** 会员端身份；管理端请求为 null */
+    private Long memberId;
     private String realName;
     private Long brandId;
     private String userType;

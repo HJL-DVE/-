@@ -22,6 +22,9 @@ public final class InternalHeaders {
     public static final String ALL_STORE_ACCESS = "X-All-Store-Access";
     public static final String STORE_IDS = "X-Store-Ids";
 
+    /** 会员端身份（小程序经 Gateway 解析会员令牌后写入） */
+    public static final String MEMBER_ID = "X-Member-Id";
+
     /** 内部调用凭证，防止外部直接访问 /internal/** */
     public static final String INTERNAL_TOKEN = "X-Internal-Token";
 }

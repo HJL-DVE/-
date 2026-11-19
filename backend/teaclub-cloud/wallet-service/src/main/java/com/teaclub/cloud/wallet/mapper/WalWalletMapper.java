@@ -6,6 +6,8 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
+import java.util.Collection;
+
 @Mapper
 public interface WalWalletMapper extends BaseMapper<WalWallet> {
 
@@ -20,4 +22,52 @@ public interface WalWalletMapper extends BaseMapper<WalWallet> {
 
     @Select("SELECT * FROM wal_wallet WHERE id = #{id} FOR UPDATE")
     WalWallet selectByIdForUpdate(@Param("id") Long id);
+
+    // ===== 仪表盘统计：真实数据聚合，无硬编码 =====
+
+    /**
+     * 钱包账户数。
+     *
+     * @param memberIds 会员 ID 范围；null 表示不限（总部账号）
+     */
+    @Select("""
+            <script>
+            SELECT COUNT(*) FROM wal_wallet
+            WHERE brand_id = #{brandId}
+            <if test="memberIds != null">
+              AND member_id IN
+              <foreach collection="memberIds" item="mid" open="(" separator="," close=")">#{mid}</foreach>
+            </if>
+            </script>
+            """)
+    long countWallets(@Param("brandId") Long brandId,
+                      @Param("memberIds") Collection<Long> memberIds);
+
+    /** 实付余额合计（分）。 */
+    @Select("""
+            <script>
+            SELECT COALESCE(SUM(principal_balance), 0) FROM wal_wallet
+            WHERE brand_id = #{brandId}
+            <if test="memberIds != null">
+              AND member_id IN
+              <foreach collection="memberIds" item="mid" open="(" separator="," close=")">#{mid}</foreach>
+            </if>
+            </script>
+            """)
+    Long sumPrincipalBalance(@Param("brandId") Long brandId,
+                             @Param("memberIds") Collection<Long> memberIds);
+
+    /** 赠送余额合计（分）。 */
+    @Select("""
+            <script>
+            SELECT COALESCE(SUM(gift_balance), 0) FROM wal_wallet
+            WHERE brand_id = #{brandId}
+            <if test="memberIds != null">
+              AND member_id IN
+              <foreach collection="memberIds" item="mid" open="(" separator="," close=")">#{mid}</foreach>
+            </if>
+            </script>
+            """)
+    Long sumGiftBalance(@Param("brandId") Long brandId,
+                        @Param("memberIds") Collection<Long> memberIds);
 }

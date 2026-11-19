@@ -6,6 +6,7 @@ import com.teaclub.cloud.core.api.Result;
 import com.teaclub.cloud.member.dto.MemberQuery;
 import com.teaclub.cloud.member.dto.MemberUpdateRequest;
 import com.teaclub.cloud.member.service.MemMemberService;
+import com.teaclub.cloud.member.vo.MemberStatsVO;
 import com.teaclub.cloud.member.vo.MemberVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -36,6 +37,20 @@ public class MemMemberController {
     @PreAuthorize("hasAuthority('member:list')")
     public Result<MemberVO> byPhone(@RequestParam String phone) {
         return Result.ok(memberService.findByPhone(phone));
+    }
+
+    @Operation(summary = "按会员号查询会员（收银台扫会员码）")
+    @GetMapping("/by-code")
+    @PreAuthorize("hasAuthority('member:list')")
+    public Result<MemberVO> byCode(@RequestParam String code) {
+        return Result.ok(memberService.findByMemberNo(code));
+    }
+
+    @Operation(summary = "会员统计（仪表盘）")
+    @GetMapping("/stats")
+    @PreAuthorize("hasAuthority('member:list')")
+    public Result<MemberStatsVO> stats() {
+        return Result.ok(memberService.stats());
     }
 
     @Operation(summary = "会员详情")

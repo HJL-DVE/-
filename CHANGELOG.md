@@ -1,3 +1,60 @@
+## [第六阶段] Web 管理后台 + 微信小程序 + 会员端接口补齐（2026-11-21）
+
+### 目录调整（按需求方意见）
+
+前端从 `backend/` 迁出，收敛到与 `backend/` 平级的 `frontend/`：
+`frontend/teaclub-admin`（Vue 3 + TS + Element Plus）、`frontend/teaclub-miniprogram`（uni-app + Vue 3 + TS）。
+README / docs/TASKS / docs/06 已同步，并说明与原规划（`web/`+`miniapp/`）的差异。
+
+### 关键前提纠正（如实记录）
+
+任务书假设「后端已迁移完，不需要再开发后端」，但实际核查：
+- 钱包管理端（`/api/admin/wallet/**`）**迁移时漏搬**，单体有 3 个 controller；
+- **会员端（C 端）接口一个都不存在**，单体时代也只有管理端；
+- 无仪表盘统计、无会员码查询、无微信登录、无 `mem_member_wx` 表。
+
+为满足「禁止静态 JSON 代替真实数据」，按**薄封装**原则补齐：新 controller 只做身份识别、
+出入参适配、归属校验，业务全部复用已迁移的 service，未重写任何资金/订单逻辑。
+
+### 新增能力
+
+| 模块 | 内容 |
+| --- | --- |
+| 网关双令牌 | `JwtAuthGlobalFilter` 先解管理端再解会员端，会员令牌下发 `X-Member-Id`；白名单补 6 条会员端匿名路径 + `/api/payment/mock/**` |
+| 会员身份上下文 | `InternalHeaders.MEMBER_ID`、`LoginUser.memberId`、`UserContext.requireMemberId()`、`JwtProvider.issueMemberToken()` |
+| 钱包管理端 | 补齐 `WalletAdminController` / `RechargeAdminController` / `RechargePlanAdminController` + 查询 service/VO（16 个端点） |
+| 会员端 | auth（wx-login/register/login/me/stores）、member（profile/levels）、product（分类/列表/详情/热门）、order（quote/orders/pay-wallet）、payment（create/query）、wallet（account/transactions/plans/recharges） |
+| 统计 | `order/stats/summary`、`member/members/stats`、`wallet/stats` |
+| 会员码 | `GET /api/admin/member/members/by-code`（收银台扫码） |
+| 前端 | Web 19 个视图（13 契约页 + 收银台 + 钱包账户 + 通知日志 + 错误页 + 占位页）、小程序 19 个页面 |
+
+### 修复的真实缺陷（6 个，全部由真联调暴露）
+
+1. **会员令牌过不了网关** —— 只 `parseAdminToken` → 双令牌解析
+2. **匿名浏览被拦** —— 白名单缺会员端路径 → 补 6 条
+3. **`NumberFormatException: For input string: "null"`** —— Feign 拦截器 `String.valueOf(null)` 透传字面量 `"null"`，下游 `Long.valueOf("null")` 崩 → 两端都归一化
+4. **支付记录/退款/通知日志 `total=0` 且一次返回全表** —— payment-service 缺 `PaginationInnerInterceptor` → 补配置 + `mybatis-plus-jsqlparser` 依赖
+5. **会员查不到充值套餐（10404）** —— wallet 的 Feign 客户端指向 member-service 不存在的 5 个内部接口 → 新增 `MemberBriefInternalController`
+6. **`MemberNoAllocator` 调不存在的方法** —— 并发协作时 mapper 方法丢失 → 补 `selectMaxMemberNo`
+
+### 实测
+
+| 脚本 | 结果 |
+| --- | --- |
+| `17-phase6-smoke.mjs` | **PASS=28 FAIL=0** |
+| `18-recharge-pay-closed-loop.mjs` | **PASS=17 FAIL=0**（充值 100/10 入账、重复通知幂等、下单 17.50、钱包扣款分毫不差） |
+| `19-refund-via-gateway.mjs` | **PASS=14 FAIL=0**（重复退款被拒、退款回调、订单 REFUNDED） |
+| `12-fund-invariants.mjs` | 断裂数=0；`wallet/reconcile` → `consistent=true, inconsistentCount=0` |
+
+新增文档：docs/33 / 34 / 35 / 36；新增脚本：17 / 18 / 19。
+
+### 未完成（如实）
+
+真实微信登录与支付仍为 Mock（无商户资质，既定策略）；小程序未在微信开发者工具内跑运行时；
+8 条菜单为占位页；订单支付走 JSAPI 无 `codeUrl`（Native 需显式指定 channel）；无自动化测试；admin 主包 1.29 MB 未按需拆分。
+
+---
+
 ## [第五阶段·任务四补齐] ORDER_PAID 真实消费者 + 会员档案事件驱动（2026-11-20）
 
 把会员消费档案从「订单服务同步 Feign 调用」改成「订阅 `ORDER_PAID` 事件异步累加」，

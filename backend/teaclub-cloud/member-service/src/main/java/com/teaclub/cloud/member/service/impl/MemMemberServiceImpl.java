@@ -11,6 +11,7 @@ import com.teaclub.cloud.security.context.StoreScope;
 import com.teaclub.cloud.security.context.UserContext;
 import com.teaclub.cloud.member.client.AuthInternalClient;
 import com.teaclub.cloud.member.dto.MemberQuery;
+import com.teaclub.cloud.member.dto.MemberSelfUpdateRequest;
 import com.teaclub.cloud.member.dto.MemberUpdateRequest;
 import com.teaclub.cloud.member.entity.MemMember;
 import com.teaclub.cloud.member.entity.MemMemberLevel;
@@ -18,6 +19,7 @@ import com.teaclub.cloud.member.mapper.MemMemberLevelMapper;
 import com.teaclub.cloud.member.mapper.MemMemberMapper;
 import com.teaclub.cloud.member.service.MemMemberService;
 import com.teaclub.cloud.member.service.support.MemberVisibilityResolver;
+import com.teaclub.cloud.member.vo.MemberStatsVO;
 import com.teaclub.cloud.member.vo.MemberVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -164,6 +166,66 @@ public class MemMemberServiceImpl implements MemMemberService {
     }
 
     @Override
+    public MemberVO findByMemberNo(String memberNo) {
+        if (!StringUtils.hasText(memberNo)) {
+            throw new BizException(ResultCode.PARAM_INVALID, "会员号不能为空");
+        }
+        LoginUser current = UserContext.require();
+        StoreScope scope = StoreScope.from(current);
+
+        MemMember m = memberMapper.selectOne(Wrappers.<MemMember>lambdaQuery()
+                .eq(MemMember::getBrandId, current.getBrandId())
+                .eq(MemMember::getMemberNo, memberNo.trim())
+                .last("LIMIT 1"));
+        if (m == null) {
+            throw new BizException(ResultCode.MEMBER_NOT_FOUND, "会员不存在");
+        }
+        if (!scope.isAll()) {
+            boolean registered = m.getRegisterStoreId() != null
+                    && scope.canAccess(m.getRegisterStoreId());
+            boolean consumed = visibilityResolver
+                    .resolveVisibleMemberIds(current.getBrandId(), scope).contains(m.getId());
+            if (!registered && !consumed) {
+                throw new BizException(ResultCode.NO_STORE_PERMISSION, "没有该会员的数据权限");
+            }
+        }
+        return toVO(m, loadLevels(List.of(m)),
+                loadStoreNames(current.getBrandId(), List.of(m)), false);
+    }
+
+    @Override
+    public MemberStatsVO stats() {
+        LoginUser current = UserContext.require();
+        StoreScope scope = StoreScope.from(current);
+        Long brandId = current.getBrandId();
+
+        // null 表示不限范围（总部账号）；非总部按可见会员集合过滤
+        java.util.Collection<Long> scopeIds = null;
+        if (!scope.isAll()) {
+            List<Long> visible = visibilityResolver.resolveVisibleMemberIds(brandId, scope);
+            if (visible.isEmpty()) {
+                MemberStatsVO empty = new MemberStatsVO();
+                empty.setTotalMembers(0L);
+                empty.setNewMembers7d(0L);
+                empty.setActiveMembers30d(0L);
+                empty.setTotalPoints(0L);
+                return empty;
+            }
+            scopeIds = visible;
+        }
+
+        MemberStatsVO vo = new MemberStatsVO();
+        vo.setTotalMembers(memberMapper.countMembers(brandId, scopeIds));
+        vo.setNewMembers7d(memberMapper.countMembersCreatedSince(brandId,
+                java.time.LocalDateTime.now().minusDays(7), scopeIds));
+        vo.setActiveMembers30d(memberMapper.countMembersActiveSince(brandId,
+                java.time.LocalDateTime.now().minusDays(30), scopeIds));
+        Long points = memberMapper.sumPoints(brandId, scopeIds);
+        vo.setTotalPoints(points == null ? 0L : points);
+        return vo;
+    }
+
+    @Override
     public MemberVO detail(Long id) {
         LoginUser current = UserContext.require();
         StoreScope scope = StoreScope.from(current);
@@ -237,6 +299,37 @@ public class MemMemberServiceImpl implements MemMemberService {
         detail(id);
         memberMapper.deleteById(id);
         log.info("会员删除: id={} operator={}", id, current.getUsername());
+    }
+
+    @Override
+    public MemberVO profile(Long memberId) {
+        MemMember m = memberMapper.selectById(memberId);
+        if (m == null) {
+            throw new BizException(ResultCode.MEMBER_NOT_FOUND, "会员不存在");
+        }
+        return toVO(m, loadLevels(List.of(m)), loadStoreNames(m.getBrandId(), List.of(m)), true);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateProfile(Long memberId, MemberSelfUpdateRequest request) {
+        MemMember existing = memberMapper.selectById(memberId);
+        if (existing == null) {
+            throw new BizException(ResultCode.MEMBER_NOT_FOUND, "会员不存在");
+        }
+        MemMember patch = new MemMember();
+        patch.setId(memberId);
+        if (request.getNickname() != null) {
+            patch.setNickname(request.getNickname());
+        }
+        if (request.getAvatarUrl() != null) {
+            patch.setAvatarUrl(request.getAvatarUrl());
+        }
+        if (request.getGender() != null) {
+            patch.setGender(request.getGender());
+        }
+        memberMapper.updateById(patch);
+        log.info("会员自助修改资料: memberId={}", memberId);
     }
 
     // ==================== 内部工具 ====================

@@ -15,6 +15,78 @@ import java.util.List;
 @Mapper
 public interface OmsOrderMapper extends BaseMapper<OmsOrder> {
 
+    // ===== 仪表盘统计（只读聚合，遵守门店数据权限）=====
+
+    /**
+     * 区间内订单数。
+     *
+     * @param storeId null 表示不限门店（总部）
+     */
+    @Select("""
+            <script>
+            SELECT COUNT(*) FROM oms_order
+            WHERE brand_id = #{brandId} AND deleted = 0 AND create_time &gt;= #{since}
+            <if test="storeId != null"> AND store_id = #{storeId} </if>
+            </script>
+            """)
+    long countSince(@Param("brandId") Long brandId, @Param("storeId") Long storeId,
+                    @Param("since") java.time.LocalDateTime since);
+
+    /** 区间内已支付（含后续退款/完成态）订单数。 */
+    @Select("""
+            <script>
+            SELECT COUNT(*) FROM oms_order
+            WHERE brand_id = #{brandId} AND deleted = 0 AND create_time &gt;= #{since}
+              AND status IN ('PAID','COMPLETED','REFUNDING','REFUNDED')
+            <if test="storeId != null"> AND store_id = #{storeId} </if>
+            </script>
+            """)
+    long countPaidSince(@Param("brandId") Long brandId, @Param("storeId") Long storeId,
+                        @Param("since") java.time.LocalDateTime since);
+
+    /** 区间内成交金额（实付应付额之和）。 */
+    @Select("""
+            <script>
+            SELECT COALESCE(SUM(payable_amount), 0) FROM oms_order
+            WHERE brand_id = #{brandId} AND deleted = 0 AND create_time &gt;= #{since}
+              AND status IN ('PAID','COMPLETED','REFUNDING','REFUNDED')
+            <if test="storeId != null"> AND store_id = #{storeId} </if>
+            </script>
+            """)
+    Long sumGmvSince(@Param("brandId") Long brandId, @Param("storeId") Long storeId,
+                     @Param("since") java.time.LocalDateTime since);
+
+    /** 区间内某支付渠道的成交金额。 */
+    @Select("""
+            <script>
+            SELECT COALESCE(SUM(payable_amount), 0) FROM oms_order
+            WHERE brand_id = #{brandId} AND deleted = 0 AND create_time &gt;= #{since}
+              AND status IN ('PAID','COMPLETED','REFUNDING','REFUNDED')
+              AND pay_channel = #{payChannel}
+            <if test="storeId != null"> AND store_id = #{storeId} </if>
+            </script>
+            """)
+    Long sumGmvByChannelSince(@Param("brandId") Long brandId, @Param("storeId") Long storeId,
+                              @Param("since") java.time.LocalDateTime since,
+                              @Param("payChannel") String payChannel);
+
+    /** 按日趋势（订单数 + 成交额）。 */
+    @Select("""
+            <script>
+            SELECT DATE_FORMAT(create_time, '%Y-%m-%d') AS statDate,
+                   COUNT(*) AS orderCount,
+                   COALESCE(SUM(CASE WHEN status IN ('PAID','COMPLETED','REFUNDING','REFUNDED')
+                                     THEN payable_amount ELSE 0 END), 0) AS gmv
+            FROM oms_order
+            WHERE brand_id = #{brandId} AND deleted = 0 AND create_time &gt;= #{since}
+            <if test="storeId != null"> AND store_id = #{storeId} </if>
+            GROUP BY statDate ORDER BY statDate
+            </script>
+            """)
+    List<java.util.Map<String, Object>> dailyTrend(@Param("brandId") Long brandId,
+                                                   @Param("storeId") Long storeId,
+                                                   @Param("since") java.time.LocalDateTime since);
+
     /**
      * 按订单号查询（不加锁）。
      */

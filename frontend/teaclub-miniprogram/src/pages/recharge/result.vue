@@ -1,0 +1,193 @@
+<template>
+  <view class="page">
+    <view class="status-box" :class="paid ? 'ok' : 'pending'">
+      <view class="status-icon">{{ paid ? '✓' : '!' }}</view>
+      <view class="status-text">{{ paid ? '充值已到账' : '等待支付到账' }}</view>
+      <view class="status-sub">{{ rechargeNo }}</view>
+    </view>
+
+    <view class="card">
+      <view class="row-between kv"><text class="muted">充值单号</text><text class="small">{{ rechargeNo || '—' }}</text></view>
+      <view class="row-between kv"><text class="muted">支付单号</text><text class="small">{{ paymentNo || '—' }}</text></view>
+      <view class="row-between kv"><text class="muted">充值单状态</text><text>{{ rechargeStatus || '查询中' }}</text></view>
+      <view class="row-between kv" v-if="paymentStatus"><text class="muted">支付单状态</text><text>{{ paymentStatus }}</text></view>
+      <view class="row-between kv"><text class="muted">充值金额</text><text>¥{{ fen2yuan(recharge.rechargeAmount) }}</text></view>
+      <view class="row-between kv"><text class="muted">赠送金额</text><text>¥{{ fen2yuan(recharge.giftAmount) }}</text></view>
+      <view class="row-between kv"><text class="muted">实付金额</text><text class="price">¥{{ fen2yuan(recharge.actualAmount) }}</text></view>
+    </view>
+
+    <view class="card">
+      <view class="section-title">钱包余额（后端记账）</view>
+      <view class="row-between kv"><text class="muted">总余额</text><text class="price big">¥{{ fen2yuan(wallet.totalBalance || 0) }}</text></view>
+      <view class="row-between kv"><text class="muted">本金</text><text>¥{{ fen2yuan(wallet.principalBalance || 0) }}</text></view>
+      <view class="row-between kv"><text class="muted">赠送</text><text>¥{{ fen2yuan(wallet.giftBalance || 0) }}</text></view>
+      <view class="muted polling" v-if="polling">正在轮询到账状态（第 {{ pollCount }} 次）…</view>
+      <view class="muted polling" v-else-if="!paid">轮询已停止：{{ stopReason }}</view>
+    </view>
+
+    <view class="card">
+      <button class="btn-primary" :loading="checking" @tap="refresh">手动刷新状态</button>
+      <button class="btn-plain next" @tap="goMember">查看会员中心</button>
+    </view>
+
+    <view class="muted note">
+      前端不做任何本地加余额操作；余额变化只来自 GET /api/wallet/account 的返回值。
+    </view>
+  </view>
+</template>
+
+<script setup lang="ts">
+import { computed, ref } from 'vue'
+import { onLoad, onUnload } from '@dcloudio/uni-app'
+import * as walletApi from '@/api/wallet'
+import * as paymentApi from '@/api/payment'
+import type { RechargeOrder, WalletAccount } from '@/api/types'
+import { fen2yuan } from '@/utils/money'
+
+const PAID_VALUES = ['SUCCESS', 'PAID', 'CREDITED', 'COMPLETED']
+const MAX_POLL = 20
+const INTERVAL = 2000
+
+const rechargeNo = ref('')
+const paymentNo = ref('')
+const recharge = ref<RechargeOrder>({})
+const wallet = ref<WalletAccount>({})
+const rechargeStatus = ref('')
+const paymentStatus = ref('')
+const polling = ref(false)
+const checking = ref(false)
+const pollCount = ref(0)
+const stopReason = ref('')
+let timer: ReturnType<typeof setTimeout> | null = null
+
+const paid = computed(() => PAID_VALUES.indexOf(String(rechargeStatus.value).toUpperCase()) >= 0)
+
+onLoad((query) => {
+  rechargeNo.value = (query && query.rechargeNo ? String(query.rechargeNo) : '') || ''
+  paymentNo.value = (query && query.paymentNo ? String(query.paymentNo) : '') || ''
+  refresh()
+  scheduleNext()
+})
+
+onUnload(() => {
+  if (timer) {
+    clearTimeout(timer)
+    timer = null
+  }
+})
+
+function scheduleNext() {
+  if (paid.value || pollCount.value >= MAX_POLL) return
+  polling.value = true
+  timer = setTimeout(async () => {
+    pollCount.value += 1
+    await refresh()
+    if (paid.value) {
+      polling.value = false
+      return
+    }
+    if (pollCount.value >= MAX_POLL) {
+      polling.value = false
+      stopReason.value = '已达最大轮询次数，支付成功后余额仍由后端回调入账'
+      return
+    }
+    scheduleNext()
+  }, INTERVAL)
+}
+
+async function refresh() {
+  if (!rechargeNo.value) {
+    stopReason.value = '缺少充值单号参数 rechargeNo'
+    polling.value = false
+    return
+  }
+  checking.value = true
+  try {
+    const order = await walletApi.getRechargeOrder(rechargeNo.value)
+    if (order) {
+      recharge.value = order
+      rechargeStatus.value = order.status || ''
+    }
+  } catch (e) {
+    console.error('[wallet/recharges/{no}]', e)
+  }
+  try {
+    wallet.value = (await walletApi.getWalletAccount()) || {}
+  } catch (e) {
+    console.error('[wallet/account]', e)
+  }
+  if (paymentNo.value) {
+    try {
+      const pay = await paymentApi.getPayment(paymentNo.value)
+      paymentStatus.value = pay && pay.status ? pay.status : ''
+    } catch (e) {
+      console.error('[payment/orders]', e)
+    }
+  }
+  checking.value = false
+}
+
+function goMember() {
+  uni.navigateTo({ url: '/pages/member/index' })
+}
+</script>
+
+<style scoped>
+.status-box {
+  padding: 60rpx 32rpx;
+  text-align: center;
+  color: #ffffff;
+}
+.status-box.ok {
+  background: linear-gradient(135deg, #15803d, #4ade80);
+}
+.status-box.pending {
+  background: linear-gradient(135deg, #b45309, #f59e0b);
+}
+.status-icon {
+  width: 100rpx;
+  height: 100rpx;
+  line-height: 96rpx;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.25);
+  margin: 0 auto 20rpx;
+  font-size: 44rpx;
+}
+.status-text {
+  font-size: 34rpx;
+  font-weight: 700;
+}
+.status-sub {
+  margin-top: 10rpx;
+  font-size: 22rpx;
+  opacity: 0.9;
+}
+.section-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  margin-bottom: 12rpx;
+}
+.kv {
+  padding: 12rpx 0;
+  font-size: 26rpx;
+}
+.small {
+  font-size: 22rpx;
+}
+.price.big {
+  font-size: 36rpx;
+}
+.polling {
+  margin-top: 16rpx;
+  font-size: 22rpx;
+}
+.next {
+  margin-top: 20rpx;
+}
+.note {
+  text-align: center;
+  font-size: 22rpx;
+  padding: 10rpx 40rpx 40rpx;
+  line-height: 1.6;
+}
+</style>

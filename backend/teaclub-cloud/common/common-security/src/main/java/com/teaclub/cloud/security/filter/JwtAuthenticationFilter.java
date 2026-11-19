@@ -59,8 +59,46 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String header = request.getHeader("Authorization");
         if (header != null && header.startsWith("Bearer ")) {
             String token = header.substring(7).trim();
+            Claims claims;
+            boolean memberToken = false;
             try {
-                Claims claims = jwtProvider.parseAdminToken(token);
+                claims = jwtProvider.parseAdminToken(token);
+            } catch (ExpiredJwtException e) {
+                // 管理端密钥下已过期：仍可能是会员令牌，继续尝试
+                claims = parseMemberFallback(token);
+                if (claims == null) {
+                    writeError(response, ResultCode.TOKEN_EXPIRED);
+                    return;
+                }
+                memberToken = true;
+            } catch (JwtException | IllegalArgumentException e) {
+                claims = parseMemberFallback(token);
+                if (claims == null) {
+                    writeError(response, ResultCode.TOKEN_INVALID);
+                    return;
+                }
+                memberToken = true;
+            }
+            if (memberToken) {
+                    Long memberId = parseLong(firstNonBlank(
+                            request.getHeader(InternalHeaders.MEMBER_ID), claims.get("memberId")));
+                    if (memberId == null) {
+                        memberId = parseLong(claims.getSubject());
+                    }
+                    LoginUser member = LoginUser.builder()
+                            .memberId(memberId)
+                            .brandId(parseLong(firstNonBlank(
+                                    request.getHeader(InternalHeaders.BRAND_ID), claims.get("brandId"))))
+                            .userType("MEMBER")
+                            .roles(Set.of("MEMBER"))
+                            .permissions(Set.of())
+                            .build();
+                    UsernamePasswordAuthenticationToken memberAuth =
+                            new UsernamePasswordAuthenticationToken(member, null,
+                                    List.of(new SimpleGrantedAuthority("ROLE_MEMBER")));
+                    SecurityContextHolder.getContext().setAuthentication(memberAuth);
+                    UserContext.set(member);
+                } else {
                 Long userId = Long.valueOf(claims.getSubject());
 
                 // 优先使用 Gateway 透传的权限上下文；直连时回落到令牌内的声明
@@ -97,12 +135,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         new UsernamePasswordAuthenticationToken(user, null, authorities);
                 SecurityContextHolder.getContext().setAuthentication(auth);
                 UserContext.set(user);
-            } catch (ExpiredJwtException e) {
-                writeError(response, ResultCode.TOKEN_EXPIRED);
-                return;
-            } catch (JwtException | IllegalArgumentException e) {
-                writeError(response, ResultCode.TOKEN_INVALID);
-                return;
             }
         }
         try {
@@ -110,6 +142,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         } finally {
             UserContext.clear();
             SecurityContextHolder.clearContext();
+        }
+    }
+
+    /** 管理端解析失败（可能是会员令牌）时兜底解析；两种情况都失败返回 null。 */
+    private Claims parseMemberFallback(String token) {
+        try {
+            return jwtProvider.parseMemberToken(token);
+        } catch (ExpiredJwtException e) {
+            return null;
+        } catch (JwtException | IllegalArgumentException e) {
+            return null;
         }
     }
 

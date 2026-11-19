@@ -102,7 +102,24 @@ public class ResourceServerSecurityConfig {
         protected void doFilterInternal(HttpServletRequest request,
                                         HttpServletResponse response,
                                         FilterChain chain) throws ServletException, IOException {
-            String userId = request.getHeader(InternalHeaders.USER_ID);
+            String userId = normalize(request.getHeader(InternalHeaders.USER_ID));
+            String memberId = normalize(request.getHeader(InternalHeaders.MEMBER_ID));
+            if ((userId == null || userId.isBlank()) && memberId != null && !memberId.isBlank()) {
+                // 会员端请求：只有会员身份，角色固定 MEMBER，无管理端权限点
+                UserContext.set(LoginUser.builder()
+                        .memberId(parseLong(memberId))
+                        .brandId(parseLong(request.getHeader(InternalHeaders.BRAND_ID)))
+                        .userType("MEMBER")
+                        .roles(java.util.Set.of("MEMBER"))
+                        .permissions(java.util.Collections.emptySet())
+                        .build());
+                try {
+                    chain.doFilter(request, response);
+                } finally {
+                    UserContext.clear();
+                }
+                return;
+            }
             if (userId != null && !userId.isBlank()) {
                 LoginUser user = LoginUser.builder()
                         .userId(Long.valueOf(userId))
@@ -120,6 +137,14 @@ public class ResourceServerSecurityConfig {
             } finally {
                 UserContext.clear();
             }
+        }
+
+        /** 上游可能透传字面量 "null"（String.valueOf(null) 的历史写法），统一归一为空。 */
+        private static String normalize(String v) {
+            if (v == null || v.isBlank() || "null".equalsIgnoreCase(v.trim())) {
+                return null;
+            }
+            return v;
         }
 
         private static Long parseLong(String v) {

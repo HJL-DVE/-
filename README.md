@@ -16,8 +16,9 @@ TeaClub/
 │   │   └── common-feign/     OpenFeign 客户端基类
 │   ├── gateway-service/  统一网关
 │   └── 9 个业务服务        auth/member/product/wallet/order/payment/marketing/inventory/report
-├── teaclub-admin/        管理后台前端
-├── teaclub-miniprogram/  小程序前端
+├── frontend/              前端工程（与后端完全分离）
+│   ├── teaclub-admin/     Vue 3 + TS + Element Plus 管理后台
+│   └── teaclub-miniprogram/ uni-app + Vue 3 + TS 微信小程序
 ├── infrastructure/       容器化部署编排
 └── docs/                 设计与验收文档
 ```

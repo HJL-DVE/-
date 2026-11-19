@@ -33,6 +33,9 @@ docker compose -f docker-compose.yml --env-file .env.docker up -d
 | 14-timeout-close-events-reconcile | 超时关单 + Outbox 事件 + 跨服务对账 | docs/31 |
 | 15-order-paid-consumer | ORDER_PAID 事件驱动累加会员档案 + 重复投递幂等 | docs/32 |
 | 16-consumer-inbox-2nd-layer | 删 Redis 幂等键，验证 DB Inbox 第二层兜底 | docs/32 |
+| 17-phase6-smoke | 第六阶段冒烟：管理端/钱包管理端/统计/会员码/匿名浏览/微信登录/会员端/令牌隔离 | docs/36 |
+| 18-recharge-pay-closed-loop | 充值→支付→入账→幂等→下单→钱包支付 全闭环 | docs/36 |
+| 19-refund-via-gateway | 微信支付→申请退款→重复退款被拒→退款回调→订单 REFUNDED | docs/36 |
 
 ## 运行
 

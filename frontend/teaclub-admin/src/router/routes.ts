@@ -1,0 +1,96 @@
+import type { RouteRecordRaw } from 'vue-router'
+import type { MenuNode } from '@/api/types'
+
+type LazyView = () => Promise<unknown>
+
+/**
+ * 后端菜单只提供 component 标识（如 "member/list"），
+ * 页面组件必须在前端本地注册 —— 不假设后端菜单能自动生成组件。
+ */
+export const viewRegistry: Record<string, LazyView> = {
+  'dashboard/index': () => import('@/views/dashboard/index.vue'),
+  'store/list': () => import('@/views/store/list.vue'),
+  'system/user': () => import('@/views/system/user.vue'),
+  'member/list': () => import('@/views/member/list.vue'),
+  'member/detail': () => import('@/views/member/detail.vue'),
+  'product/spu': () => import('@/views/product/spu.vue'),
+  'product/store': () => import('@/views/product/store.vue'),
+  'order/list': () => import('@/views/order/list.vue'),
+  'wallet/recharge': () => import('@/views/wallet/recharge.vue'),
+  'wallet/transaction': () => import('@/views/wallet/transaction.vue'),
+  'wallet/account': () => import('@/views/wallet/account.vue'),
+  'payment/list': () => import('@/views/payment/list.vue'),
+  'payment/order': () => import('@/views/payment/list.vue'),
+  'payment/refund': () => import('@/views/payment/refund.vue'),
+  'payment/notify': () => import('@/views/payment/notify.vue'),
+  'cashier/index': () => import('@/views/cashier/index.vue'),
+}
+
+/** 菜单里存在、但不在 docs/33 第四节 13 页清单内的条目：显式占位，不伪造页面 */
+export const placeholderComponents = new Set<string>([
+  'brand/detail',
+  'member/level',
+  'product/category',
+  'order/statistics',
+  'wallet/plan',
+  'system/role',
+  'system/permission',
+  'system/log',
+])
+
+export function resolveView(component?: string | null): LazyView {
+  if (!component) return () => import('@/views/common/placeholder.vue')
+  const found = viewRegistry[component]
+  if (found) return found
+  return () => import('@/views/common/placeholder.vue')
+}
+
+/** 不依赖菜单的固定路由（详情页 / 工作台 / 契约别名路径） */
+export const fixedRoutes: RouteRecordRaw[] = [
+  {
+    path: '/member/detail/:id',
+    name: 'member-detail',
+    component: () => import('@/views/member/detail.vue'),
+    meta: { title: '会员详情', hidden: true },
+  },
+  {
+    path: '/cashier',
+    name: 'cashier',
+    component: () => import('@/views/cashier/index.vue'),
+    meta: { title: '收银工作台', icon: 'ShoppingCartFull' },
+  },
+  {
+    // docs/33 第四节 支付记录路由为 /payment/list，数据库菜单用 /payment/order，二者同页
+    path: '/payment/list',
+    name: 'payment-list-alias',
+    component: () => import('@/views/payment/list.vue'),
+    meta: { title: '支付记录', hidden: true },
+  },
+]
+
+export interface FlatMenu {
+  path: string
+  name: string
+  component: string
+  title: string
+  permCode: string
+  icon?: string | null
+}
+
+export function flattenMenus(nodes: MenuNode[], result: FlatMenu[] = []): FlatMenu[] {
+  nodes.forEach((node) => {
+    const isGroup = node.component === 'Layout' || (node.children && node.children.length > 0)
+    if (!isGroup && node.routePath) {
+      result.push({
+        path: node.routePath,
+        name: 'menu:' + node.routePath,
+        component: node.component,
+        title: node.permName,
+        permCode: node.permCode,
+        icon: node.icon,
+      })
+    }
+    if (node.children && node.children.length > 0) flattenMenus(node.children, result)
+  })
+  return result
+}

@@ -35,6 +35,19 @@ public class MemMemberLevelServiceImpl implements MemMemberLevelService {
                 .stream().map(this::toVO).collect(Collectors.toList());
     }
 
+    @Override
+    public List<MemberLevelVO> listForMember(Long memberId) {
+        MemMember member = memberMapper.selectById(memberId);
+        if (member == null) {
+            throw new BizException(ResultCode.MEMBER_NOT_FOUND);
+        }
+        return levelMapper.selectList(Wrappers.<MemMemberLevel>lambdaQuery()
+                        .eq(MemMemberLevel::getBrandId, member.getBrandId())
+                        .eq(MemMemberLevel::getStatus, "ENABLED")
+                        .orderByAsc(MemMemberLevel::getLevelNo))
+                .stream().map(this::toVO).collect(Collectors.toList());
+    }
+
     private MemberLevelVO toVO(MemMemberLevel l) {
         MemberLevelVO vo = new MemberLevelVO();
         vo.setId(l.getId());
