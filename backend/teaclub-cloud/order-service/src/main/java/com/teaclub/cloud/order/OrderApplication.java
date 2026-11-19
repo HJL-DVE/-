@@ -2,6 +2,7 @@ package com.teaclub.cloud.order;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableScheduling;
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
 import org.springframework.cloud.openfeign.EnableFeignClients;
@@ -13,6 +14,7 @@ import org.springframework.cloud.openfeign.EnableFeignClients;
  * <p>本服务只管理自己的数据，禁止直接访问其他服务的库。
  */
 @SpringBootApplication
+@EnableScheduling
 @MapperScan("com.teaclub.cloud.order.mapper")
 @EnableDiscoveryClient
 @EnableFeignClients(basePackages = "com.teaclub.cloud.order")

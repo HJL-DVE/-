@@ -19,6 +19,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Map;
+
 /**
  * wallet-service 内部接口（仅供其他微服务调用）。
  *
@@ -35,12 +37,95 @@ import org.springframework.web.bind.annotation.RestController;
 @Slf4j
 public class WalletInternalController {
 
+    private final com.teaclub.cloud.wallet.service.WalletReconciliationService reconciliationService;
+
+
     private final WalletService walletService;
+
+    @Operation(summary = "创建充值订单（内部调用）")
+    @PostMapping("/recharge-order")
+    public Result<String> createRechargeOrder(@RequestParam Long brandId,
+                                               @RequestParam Long memberId,
+                                               @RequestParam(required = false) Long storeId,
+                                               @RequestParam Long rechargeAmount,
+                                               @RequestParam(required = false) Long giftAmount,
+                                               @RequestParam(required = false) Integer giftExpireDays) {
+        return Result.ok(walletService.createRechargeOrder(
+                brandId, memberId, storeId, rechargeAmount, giftAmount, giftExpireDays));
+    }
+
+    @Operation(summary = "充值支付成功入账（内部调用）")
+    @PostMapping("/recharge-order/paid")
+    public Result<WalletChangeResult> rechargePaid(@RequestBody Map<String, Object> body) {
+        String rechargeNo = String.valueOf(body.get("rechargeNo"));
+        String paymentNo = body.get("paymentNo") == null ? null : String.valueOf(body.get("paymentNo"));
+        return Result.ok(walletService.processRechargePaid(rechargeNo, paymentNo));
+    }
 
     @Operation(summary = "查询充值订单（内部调用）")
     @GetMapping("/recharge-order/{rechargeNo}")
-    public Result<Object> rechargeOrder(@PathVariable("rechargeNo") String rechargeNo) {
-        return Result.ok(walletService.getRechargeOrder(rechargeNo));
+    public Result<Map<String, Object>> rechargeOrder(@PathVariable("rechargeNo") String rechargeNo) {
+        Object raw = walletService.getRechargeOrder(rechargeNo);
+        if (raw == null) {
+            return Result.ok(null);
+        }
+        com.teaclub.cloud.wallet.entity.WalRechargeOrder o =
+                (com.teaclub.cloud.wallet.entity.WalRechargeOrder) raw;
+        // 以数据库列名（snake_case）返回，供 payment-service 统一按列名读取
+        Map<String, Object> data = new java.util.LinkedHashMap<>();
+        data.put("recharge_no", o.getRechargeNo());
+        data.put("brand_id", o.getBrandId());
+        data.put("member_id", o.getMemberId());
+        data.put("store_id", o.getStoreId());
+        data.put("recharge_amount", o.getRechargeAmount());
+        data.put("gift_amount", o.getGiftAmount());
+        data.put("gift_expire_days", o.getGiftExpireDays());
+        data.put("status", o.getStatus());
+        data.put("payment_no", o.getPaymentNo());
+        return Result.ok(data);
+    }
+
+    @Operation(summary = "资金对账（内部调用）")
+    @GetMapping("/reconcile")
+    public Result<Object> reconcile() {
+        return Result.ok(reconciliationService.reconcile());
+    }
+
+    @Operation(summary = "冻结余额（内部调用，不修改账户余额）")
+    @PostMapping("/freeze")
+    public Result<Long> freeze(@RequestParam Long brandId,
+                                @RequestParam Long memberId,
+                                @RequestParam String orderNo,
+                                @RequestParam Long freezePrincipal,
+                                @RequestParam Long freezeGift,
+                                @RequestParam(required = false) Integer expireMinutes) {
+        return Result.ok(walletService.freeze(brandId, memberId, orderNo,
+                freezePrincipal, freezeGift, expireMinutes));
+    }
+
+    @Operation(summary = "查询可用余额（内部调用）")
+    @GetMapping("/available")
+    public Result<Object> available(@RequestParam Long brandId, @RequestParam Long memberId) {
+        return Result.ok(walletService.getAvailableBalance(brandId, memberId));
+    }
+
+    @Operation(summary = "确认冻结扣款（内部调用）")
+    @PostMapping("/freeze/confirm")
+    public Result<WalletChangeResult> confirmFreeze(@RequestParam Long brandId,
+                                                     @RequestParam Long memberId,
+                                                     @RequestParam String orderNo,
+                                                     @RequestParam(required = false) Long storeId,
+                                                     @RequestParam(required = false) Long operatorId) {
+        return Result.ok(walletService.confirmFreeze(brandId, memberId, orderNo, storeId, operatorId));
+    }
+
+    @Operation(summary = "释放冻结（内部调用）")
+    @PostMapping("/freeze/release")
+    public Result<Boolean> releaseFreeze(@RequestParam Long brandId,
+                                          @RequestParam Long memberId,
+                                          @RequestParam String orderNo,
+                                          @RequestParam(required = false) String reason) {
+        return Result.ok(walletService.releaseFreeze(brandId, memberId, orderNo, reason));
     }
 
     @Operation(summary = "查询钱包（内部调用）")

@@ -238,6 +238,18 @@ public class PaymentServiceImpl implements PaymentService {
         paid.put("paidAmount", payment.getAmount());
         orderClient.markPaid(payment.getBizNo(), paid);
         } else if ("RECHARGE".equals(payment.getBizType())) {
+            // 充值支付成功 -> 由 wallet-service 完成入账（含充值单状态推进）
+            // 幂等键 = 充值单号：重复通知不会重复入账
+            Map<String, Object> rechargeBody = new LinkedHashMap<>();
+            rechargeBody.put("rechargeNo", payment.getBizNo());
+            rechargeBody.put("paymentNo", paymentNo);
+            var rechargeResp = walletClient.rechargePaid(rechargeBody);
+            if (rechargeResp == null || rechargeResp.getCode() != 0) {
+                log.error("充值入账失败 rechargeNo={} resp={}", payment.getBizNo(), rechargeResp);
+                throw new BizException(ResultCode.DOWNSTREAM_UNAVAILABLE,
+                        "充值入账失败，钱包服务不可用或状态异常");
+            }
+            log.info("充值入账成功 rechargeNo={} paymentNo={}", payment.getBizNo(), paymentNo);
         } else {
             throw new BizException(ResultCode.BAD_REQUEST, "未知业务类型: " + payment.getBizType());
         }
@@ -265,10 +277,19 @@ public class PaymentServiceImpl implements PaymentService {
                     "订单状态为 " + str(ord(order, "status")) + "，不可退款");
         }
 
-        // 退款金额校验：不超过 实付 - 已退
-        long paid = toLong(ord(order, "paid_amount")) == null ? 0 : toLong(ord(order, "paid_amount"));
-        long refunded = toLong(ord(order, "refunded_amount")) == null ? 0 : toLong(ord(order, "refunded_amount"));
-        long refundable = paid - refunded;
+        // 可退金额 = 实付 - 已占用退款额
+        //
+        // 【关键】已占用退款额取自 payment_db 本地的 pay_refund_order，
+        // 而不是 order_db 的 refunded_amount —— 因为后者要等退款成功通知才更新，
+        // 期间重复申请会绕过校验。退款单与校验在同一本地事务内，天然幂等。
+        Long paidVal = toLong(ord(order, "paid_amount"));
+        long paid = paidVal == null ? 0 : paidVal;
+        Long reserved = refundMapper.sumReservedByBizNo(request.getOrderNo());
+        long refundable = paid - (reserved == null ? 0 : reserved);
+        if (refundable <= 0) {
+            throw new BizException(ResultCode.BAD_REQUEST,
+                    "该订单已无可退金额（实付 " + paid + " 分，已占用退款 " + (reserved == null ? 0 : reserved) + " 分）");
+        }
         if (request.getRefundAmount() > refundable) {
             throw new BizException(ResultCode.BAD_REQUEST,
                     "退款金额超过可退余额：可退 " + refundable + " 分，申请 " + request.getRefundAmount() + " 分");
@@ -312,7 +333,7 @@ public class PaymentServiceImpl implements PaymentService {
         refund.setStatus("CREATED");
         refundMapper.insert(refund);
 
-        // 执行退款
+        // 执行退款（退款金额已在本地退款单表占用，重复申请会被上面的校验拦截）
         executeRefund(refund, order);
         return toRefundVO(refundMapper.selectByNoForUpdate(refundNo));
     }

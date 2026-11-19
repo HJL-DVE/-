@@ -34,8 +34,51 @@ public interface WalletService {
                                          String refundNo, Long principalAmount, Long giftAmount,
                                          String remark, Long operatorId);
 
+    /**
+     * 创建充值订单（状态 PENDING，等待支付）。
+     *
+     * @return 充值单号
+     */
+    String createRechargeOrder(Long brandId, Long memberId, Long storeId,
+                               Long rechargeAmount, Long giftAmount, Integer giftExpireDays);
+
+    /**
+     * 充值支付成功入账（幂等键：充值单号）。
+     *
+     * <p>由 payment-service 在收到充值支付成功通知后调用。
+     * 内部先锁定充值单校验状态，再走 rechargeIn 写资金流水，
+     * 保证「充值单状态 + 钱包余额 + 资金流水」在同一事务内一致。
+     */
+    WalletChangeResult processRechargePaid(String rechargeNo, String paymentNo);
+
     /** 查询充值订单（供 payment-service 发起充值支付时校验）。 */
     Object getRechargeOrder(String rechargeNo);
+
+    /**
+     * 冻结余额（不修改账户余额，仅写冻结记录）。
+     *
+     * @return 冻结记录 ID
+     */
+    Long freeze(Long brandId, Long memberId, String orderNo,
+                Long freezePrincipal, Long freezeGift, Integer expireMinutes);
+
+    /** 查询可用余额 = 账户余额 - 有效冻结额。 */
+    java.util.Map<String, Object> getAvailableBalance(Long brandId, Long memberId);
+
+    /**
+     * 确认冻结扣款：释放冻结记录 + 走原有 consumeOut 写资金流水。
+     *
+     * @return 资金变动结果
+     */
+    WalletChangeResult confirmFreeze(Long brandId, Long memberId, String orderNo,
+                                     Long storeId, Long operatorId);
+
+    /**
+     * 释放冻结（失败订单/超时订单，不写流水）。
+     *
+     * @return 是否成功释放
+     */
+    boolean releaseFreeze(Long brandId, Long memberId, String orderNo, String reason);
 
     /** 人工调整（幂等键：审批单号） */
     WalletChangeResult adjust(Long brandId, Long memberId, Long storeId, String approvalNo,

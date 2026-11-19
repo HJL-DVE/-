@@ -22,6 +22,14 @@ public interface WalletInternalClient {
     @GetMapping("/recharge-order/{rechargeNo}")
     Result<Map<String, Object>> rechargeOrder(@PathVariable("rechargeNo") String rechargeNo);
 
+    /**
+     * 充值支付成功入账（幂等键：充值单号）。
+     *
+     * <p>body: { rechargeNo, paymentNo }
+     */
+    @PostMapping("/recharge-order/paid")
+    Result<Map<String, Object>> rechargePaid(@RequestBody Map<String, Object> body);
+
     /** 退款回冲（按原资金构成）。 */
     @PostMapping("/refund-in")
     Result<Map<String, Object>> refundIn(@RequestBody Map<String, Object> cmd);

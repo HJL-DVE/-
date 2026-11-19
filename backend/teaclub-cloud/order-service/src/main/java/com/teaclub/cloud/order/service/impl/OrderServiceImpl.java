@@ -50,6 +50,7 @@ public class OrderServiceImpl implements OrderService {
     private final com.teaclub.cloud.order.client.MemberInternalClient memberClient;
     private final com.teaclub.cloud.order.client.WalletInternalClient walletClient;
     private final com.teaclub.cloud.order.client.AuthInternalClient authClient;
+    private final com.teaclub.cloud.order.saga.PaymentSagaService sagaService;
 
     @Override
     public OrderQuoteVO quote(OrderQuoteRequest request) {
@@ -169,6 +170,10 @@ public class OrderServiceImpl implements OrderService {
             throw new BizException(ResultCode.BAD_REQUEST, "订单应付金额异常");
         }
 
+        // ==== Saga: 扣款前登记（独立事务，进程崩溃后可被补偿任务发现）====
+        com.teaclub.cloud.order.entity.OmsPaymentSaga saga =
+                sagaService.begin(orderNo, order.getPayableAmount());
+
         // 钱包扣款（幂等键 = 订单号）
         Map<String, Object> consumeCmd = new java.util.HashMap<>();
         consumeCmd.put("brandId", order.getBrandId());
@@ -191,19 +196,57 @@ public class OrderServiceImpl implements OrderService {
         long principalDeduct = -toLong(changeData == null ? null : changeData.get("principalChange"));
         long giftDeduct = -toLong(changeData == null ? null : changeData.get("giftChange"));
 
-        OmsOrder patch = new OmsOrder();
-        patch.setId(order.getId());
-        patch.setStatus(OrderStatus.PAID.name());
-        patch.setPayChannel("BALANCE");
-        patch.setPaidAmount(order.getPayableAmount());
-        patch.setBalancePrincipalAmount(principalDeduct);
-        patch.setBalanceGiftAmount(giftDeduct);
-        patch.setPayTime(LocalDateTime.now());
-        orderMapper.updateById(patch);
+        // 钱包已扣款成功，推进 Saga（此后若订单更新失败必须回冲）
+        sagaService.markDeducted(saga.getId(), principalDeduct, giftDeduct);
 
-        logStatus(order, OrderStatus.UNPAID, OrderStatus.PAID,
-                UserContext.currentUserId(), "STAFF",
-                "余额支付：实付金 " + principalDeduct + " 分，赠送金 " + giftDeduct + " 分");
+        try {
+            OmsOrder patch = new OmsOrder();
+            patch.setId(order.getId());
+            patch.setStatus(OrderStatus.PAID.name());
+            patch.setPayChannel("BALANCE");
+            patch.setPaidAmount(order.getPayableAmount());
+            patch.setBalancePrincipalAmount(principalDeduct);
+            patch.setBalanceGiftAmount(giftDeduct);
+            patch.setPayTime(LocalDateTime.now());
+            orderMapper.updateById(patch);
+
+            logStatus(order, OrderStatus.UNPAID, OrderStatus.PAID,
+                    UserContext.currentUserId(), "STAFF",
+                    "余额支付：实付金 " + principalDeduct + " 分，赠送金 " + giftDeduct + " 分");
+
+            // 订单已更新，Saga 完成
+            sagaService.markCompleted(saga.getId());
+        } catch (Exception e) {
+            // 【Saga 补偿】订单更新失败 / 本地事务将回滚 -> 必须把已扣资金回冲，
+            // 否则出现"钱扣了但订单永久待支付"。回冲用 COMP- 前缀保证幂等。
+            log.error("订单更新失败，触发 Saga 补偿 orderNo={} 实付={} 赠送={}",
+                    orderNo, principalDeduct, giftDeduct, e);
+            Map<String, Object> comp = new java.util.HashMap<>();
+            comp.put("brandId", order.getBrandId());
+            comp.put("memberId", order.getMemberId());
+            comp.put("storeId", order.getStoreId());
+            comp.put("refundNo", "COMP-" + orderNo);
+            comp.put("refundPrincipalAmount", principalDeduct);
+            comp.put("refundGiftAmount", giftDeduct);
+            comp.put("remark", "订单支付失败自动补偿");
+            comp.put("operatorType", "SYSTEM");
+            try {
+                var compResp = walletClient.refundIn(comp);
+                if (compResp != null && compResp.getCode() == 0) {
+                    sagaService.markCompensated(saga.getId(), "订单更新失败已回冲: " + e.getMessage());
+                    log.warn("Saga 补偿成功 orderNo={}", orderNo);
+                } else {
+                    sagaService.markFailed(saga.getId(), "回冲失败，待补偿任务处理");
+                    log.error("Saga 补偿失败 orderNo={} resp={}", orderNo, compResp);
+                }
+            } catch (Exception ce) {
+                // 回冲也失败：保留 RUNNING 状态，交给定时补偿任务重试
+                sagaService.markFailed(saga.getId(), "回冲异常: " + ce.getMessage());
+                log.error("Saga 补偿异常 orderNo={}", orderNo, ce);
+            }
+            throw e instanceof BizException ? (BizException) e
+                    : new BizException(ResultCode.SYSTEM_ERROR, "订单支付失败：" + e.getMessage());
+        }
 
         updateMemberStats(order);
         return detail(orderNo);

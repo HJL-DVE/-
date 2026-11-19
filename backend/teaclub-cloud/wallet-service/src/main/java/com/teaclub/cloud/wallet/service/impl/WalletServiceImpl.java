@@ -12,6 +12,7 @@ import com.teaclub.cloud.wallet.dto.WalletChangeResult;
 import com.teaclub.cloud.wallet.entity.WalWallet;
 import com.teaclub.cloud.wallet.entity.WalRechargeOrder;
 import com.teaclub.cloud.wallet.entity.WalWalletTransaction;
+import com.teaclub.cloud.wallet.entity.WalWalletFreeze;
 import com.teaclub.cloud.wallet.enums.DeductOrder;
 import com.teaclub.cloud.wallet.enums.WalletBizType;
 import com.teaclub.cloud.wallet.mapper.WalWalletMapper;
@@ -27,6 +28,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 
 /**
  * 钱包服务实现（由单体 backend 的 WalletServiceImpl 迁移而来）。
@@ -59,6 +61,7 @@ public class WalletServiceImpl implements WalletService {
     private final DeductOrderResolver deductOrderResolver;
     private final HotDataCache hotDataCache;
     private final com.teaclub.cloud.wallet.mapper.WalRechargeOrderMapper rechargeOrderMapper;
+    private final com.teaclub.cloud.wallet.mapper.WalWalletFreezeMapper freezeMapper;
 
     // ==================== 查询 ====================
 
@@ -376,6 +379,287 @@ public class WalletServiceImpl implements WalletService {
         return toResult(txn, false);
     }
 
+
+    // ==================== 余额冻结 / 确认 / 释放 ====================
+
+    /**
+     * 冻结余额。
+     *
+     * <p><b>不修改账户余额</b>：只写 wal_wallet_freeze 记录。
+     * 可用余额 = 账户余额 - SUM(FROZEN 冻结额)。
+     * 这样"余额 = 流水累计"不变量始终成立（冻结时钱没动，不写流水）。
+     *
+     * <p>冻结前校验：可用余额是否足够；幂等：同一 orderNo 只能冻结一次。
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Long freeze(Long brandId, Long memberId, String orderNo,
+                       Long freezePrincipal, Long freezeGift, Integer expireMinutes) {
+        validateCommon(brandId, memberId, orderNo, "订单号");
+        long fp = freezePrincipal == null ? 0L : freezePrincipal;
+        long fg = freezeGift == null ? 0L : freezeGift;
+        if (fp < 0 || fg < 0 || fp + fg <= 0) {
+            throw new BizException(ResultCode.PARAM_INVALID, "冻结金额必须大于 0");
+        }
+
+        // 幂等：同一订单号重复冻结直接返回原记录
+        WalWalletFreeze existed = freezeMapper.selectByOrderNo(orderNo);
+        if (existed != null) {
+            log.info("冻结幂等命中 orderNo={} freezeId={}", orderNo, existed.getId());
+            return existed.getId();
+        }
+
+        WalWallet wallet = walletMapper.selectOne(Wrappers.<WalWallet>lambdaQuery()
+                .eq(WalWallet::getBrandId, brandId)
+                .eq(WalWallet::getMemberId, memberId));
+        if (wallet == null) {
+            throw new BizException(ResultCode.BAD_REQUEST, "钱包不存在");
+        }
+        if (!"NORMAL".equals(wallet.getStatus())) {
+            throw new BizException(ResultCode.BAD_REQUEST, "钱包已被冻结，无法再次冻结扣款");
+        }
+
+        // 校验可用余额：账户余额 - 已冻结
+        Map<String, Object> frozen = freezeMapper.sumFrozen(wallet.getId());
+        long availP = wallet.getPrincipalBalance() - toLong(frozen.get("principal"));
+        long availG = wallet.getGiftBalance() - toLong(frozen.get("gift"));
+        if (availP < fp || availG < fg) {
+            throw new BizException(ResultCode.BAD_REQUEST,
+                    "可用余额不足：实付可用 " + availP + " 分需 " + fp
+                            + "；赠送可用 " + availG + " 分需 " + fg);
+        }
+
+        WalWalletFreeze record = new WalWalletFreeze();
+        record.setBrandId(brandId);
+        record.setWalletId(wallet.getId());
+        record.setMemberId(memberId);
+        record.setOrderNo(orderNo);
+        record.setFreezePrincipal(fp);
+        record.setFreezeGift(fg);
+        record.setStatus("FROZEN");
+        record.setExpireTime(expireMinutes == null || expireMinutes <= 0
+                ? null : LocalDateTime.now().plusMinutes(expireMinutes));
+        try {
+            freezeMapper.insert(record);
+        } catch (DuplicateKeyException e) {
+            // 并发重复冻结：唯一索引兜底
+            WalWalletFreeze concurrent = freezeMapper.selectByOrderNo(orderNo);
+            if (concurrent == null) throw e;
+            log.warn("冻结唯一键冲突，按幂等处理 orderNo={}", orderNo);
+            return concurrent.getId();
+        }
+        evictCache(brandId, memberId);
+        log.info("冻结成功 orderNo={} 实付={} 赠送={} 可用余额({},{})",
+                orderNo, fp, fg, availP - fp, availG - fg);
+        return record.getId();
+    }
+
+    @Override
+    public Map<String, Object> getAvailableBalance(Long brandId, Long memberId) {
+        WalWallet w = getWallet(brandId, memberId);
+        Map<String, Object> frozen = freezeMapper.sumFrozen(w.getId());
+        Map<String, Object> result = new java.util.LinkedHashMap<>();
+        result.put("principalBalance", w.getPrincipalBalance());
+        result.put("giftBalance", w.getGiftBalance());
+        result.put("frozenPrincipal", toLong(frozen.get("principal")));
+        result.put("frozenGift", toLong(frozen.get("gift")));
+        result.put("availablePrincipal", w.getPrincipalBalance() - toLong(frozen.get("principal")));
+        result.put("availableGift", w.getGiftBalance() - toLong(frozen.get("gift")));
+        return result;
+    }
+
+    /**
+     * 确认冻结扣款。
+     *
+     * <p>先把冻结记录标记为 CONFIRMED（防止重复确认），
+     * 再走原有的 consumeOut 写资金流水 —— 保证"钱真的动了"时才写流水。
+     * 若 consumeOut 失败，事务回滚，冻结记录恢复 FROZEN，可重试或释放。
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public WalletChangeResult confirmFreeze(Long brandId, Long memberId, String orderNo,
+                                             Long storeId, Long operatorId) {
+        WalWalletFreeze freeze = freezeMapper.selectByOrderNo(orderNo);
+        if (freeze == null) {
+            throw new BizException(ResultCode.BAD_REQUEST, "冻结记录不存在: " + orderNo);
+        }
+        if ("CONFIRMED".equals(freeze.getStatus())) {
+            // 幂等：已确认，查原流水返回
+            WalWalletTransaction txn = txnMapper.selectByBiz(WalletBizType.CONSUME_OUT.name(), orderNo);
+            if (txn != null) {
+                return toResult(txn, true);
+            }
+        }
+        if (!"FROZEN".equals(freeze.getStatus())) {
+            throw new BizException(ResultCode.BAD_REQUEST,
+                    "冻结记录状态为 " + freeze.getStatus() + "，不可确认扣款");
+        }
+
+        // 按冻结时的精确构成扣款：实付扣 freezePrincipal，赠送扣 freezeGift
+        // 不使用 consumeOut 的 deductOrder 推断 —— 冻结已经锁定了资金构成
+        WalletChangeResult result = consumeOutExact(
+                brandId, memberId, storeId, orderNo,
+                freeze.getFreezePrincipal(), freeze.getFreezeGift(), operatorId);
+
+        WalWalletFreeze patch = new WalWalletFreeze();
+        patch.setId(freeze.getId());
+        patch.setStatus("CONFIRMED");
+        patch.setConfirmedTxnNo(result.getTxnNo());
+        freezeMapper.updateById(patch);
+        evictCache(brandId, memberId);
+        log.info("冻结确认扣款成功 orderNo={} txnNo={}", orderNo, result.getTxnNo());
+        return result;
+    }
+
+    /**
+     * 释放冻结（失败订单/超时订单）。
+     *
+     * <p>仅改冻结记录状态为 RELEASED，<b>不写流水</b>（钱没动）。
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public boolean releaseFreeze(Long brandId, Long memberId, String orderNo, String reason) {
+        WalWalletFreeze freeze = freezeMapper.selectByOrderNo(orderNo);
+        if (freeze == null) {
+            log.warn("释放冻结：记录不存在 orderNo={}", orderNo);
+            return false;
+        }
+        if (!"FROZEN".equals(freeze.getStatus())) {
+            log.warn("释放冻结：状态非 FROZEN orderNo={} status={}", orderNo, freeze.getStatus());
+            return false;
+        }
+        WalWalletFreeze patch = new WalWalletFreeze();
+        patch.setId(freeze.getId());
+        patch.setStatus("RELEASED");
+        patch.setRemark(reason);
+        freezeMapper.updateById(patch);
+        evictCache(brandId, memberId);
+        log.info("冻结已释放 orderNo={} reason={}", orderNo, reason);
+        return true;
+    }
+
+    /**
+     * 按指定构成精确扣款（供冻结确认使用）。
+     *
+     * <p>与 consumeOut 共用同一套事务/行锁/幂等/流水机制，
+     * 区别仅在于扣款额由冻结记录显式指定，而非按 deductOrder 推断。
+     */
+    private WalletChangeResult consumeOutExact(Long brandId, Long memberId, Long storeId,
+                                               String orderNo, long pDeduct, long gDeduct,
+                                               Long operatorId) {
+        // 幂等前置检查
+        WalWalletTransaction existed = findTxn(WalletBizType.CONSUME_OUT, orderNo);
+        if (existed != null) {
+            return toResult(existed, true);
+        }
+
+        WalWallet wallet = lockWallet(brandId, memberId);
+        if (!"NORMAL".equals(wallet.getStatus())) {
+            throw new BizException(ResultCode.BAD_REQUEST, "钱包已被冻结，无法消费");
+        }
+        if (wallet.getPrincipalBalance() < pDeduct || wallet.getGiftBalance() < gDeduct) {
+            throw new BizException(ResultCode.BAD_REQUEST,
+                    "余额不足：实付 " + wallet.getPrincipalBalance() + " 需 " + pDeduct
+                            + "；赠送 " + wallet.getGiftBalance() + " 需 " + gDeduct);
+        }
+
+        Long pBefore = wallet.getPrincipalBalance();
+        Long gBefore = wallet.getGiftBalance();
+        Long pAfter = pBefore - pDeduct;
+        Long gAfter = gBefore - gDeduct;
+        assertNonNegative(pAfter, gAfter);
+
+        WalWalletTransaction txn = buildTxn(wallet, storeId,
+                WalletBizType.CONSUME_OUT, orderNo,
+                -pDeduct, pBefore, pAfter, -gDeduct, gBefore, gAfter);
+        txn.setOperatorId(operatorId);
+        txn.setOperatorType("STAFF");
+        txn.setRemark("冻结确认扣款（实付 " + pDeduct + " + 赠送 " + gDeduct + "）");
+        insertTxnIdempotent(txn);
+
+        wallet.setPrincipalBalance(pAfter);
+        wallet.setGiftBalance(gAfter);
+        wallet.setTotalPrincipalOut(wallet.getTotalPrincipalOut() + pDeduct);
+        wallet.setTotalGiftOut(wallet.getTotalGiftOut() + gDeduct);
+        updateWallet(wallet);
+        return toResult(txn, false);
+    }
+
+    private static long toLong(Object v) {
+        return v == null ? 0L : ((Number) v).longValue();
+    }
+
+    // ==================== 充值订单 ====================
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public String createRechargeOrder(Long brandId, Long memberId, Long storeId,
+                                      Long rechargeAmount, Long giftAmount, Integer giftExpireDays) {
+        if (brandId == null || memberId == null) {
+            throw new BizException(ResultCode.PARAM_INVALID, "品牌与会员不能为空");
+        }
+        if (rechargeAmount == null || rechargeAmount <= 0) {
+            throw new BizException(ResultCode.PARAM_INVALID, "充值金额必须大于 0");
+        }
+        long gift = giftAmount == null ? 0L : giftAmount;
+        if (gift < 0) {
+            throw new BizException(ResultCode.PARAM_INVALID, "赠送金额不能为负");
+        }
+
+        WalRechargeOrder order = new WalRechargeOrder();
+        order.setBrandId(brandId);
+        order.setRechargeNo(BizNoGenerator.rechargeNo());
+        order.setMemberId(memberId);
+        order.setStoreId(storeId);
+        order.setRechargeAmount(rechargeAmount);
+        order.setGiftAmount(gift);
+        order.setGiftExpireDays(giftExpireDays == null ? 0 : giftExpireDays);
+        order.setStatus("PENDING");
+        rechargeOrderMapper.insert(order);
+        log.info("创建充值单 rechargeNo={} 实付={} 赠送={}", order.getRechargeNo(), rechargeAmount, gift);
+        return order.getRechargeNo();
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public WalletChangeResult processRechargePaid(String rechargeNo, String paymentNo) {
+        WalRechargeOrder order = rechargeOrderMapper.selectByNoForUpdate(rechargeNo);
+        if (order == null) {
+            throw new BizException(ResultCode.NOT_FOUND, "充值单不存在: " + rechargeNo);
+        }
+
+        // 幂等：已入账直接返回原流水
+        if ("PAID".equals(order.getStatus())) {
+            WalWalletTransaction existed = findTxn(WalletBizType.RECHARGE_IN, rechargeNo);
+            log.info("充值单已入账，幂等返回 rechargeNo={}", rechargeNo);
+            return existed == null ? null : toResult(existed, true);
+        }
+        if (!"PENDING".equals(order.getStatus())) {
+            throw new BizException(ResultCode.BAD_REQUEST,
+                    "充值单状态为 " + order.getStatus() + "，不可入账");
+        }
+
+        // 入账（rechargeIn 内含幂等与行锁）
+        WalletChangeResult result = rechargeIn(RechargeInCmd.builder()
+                .brandId(order.getBrandId())
+                .memberId(order.getMemberId())
+                .storeId(order.getStoreId())
+                .rechargeNo(rechargeNo)
+                .payAmount(order.getRechargeAmount())
+                .giftAmount(order.getGiftAmount())
+                .giftExpireDays(order.getGiftExpireDays())
+                .operatorType("SYSTEM")
+                .build());
+
+        WalRechargeOrder patch = new WalRechargeOrder();
+        patch.setId(order.getId());
+        patch.setStatus("PAID");
+        patch.setPaymentNo(paymentNo);
+        patch.setPayTime(LocalDateTime.now());
+        rechargeOrderMapper.updateById(patch);
+        log.info("充值单入账完成 rechargeNo={} paymentNo={}", rechargeNo, paymentNo);
+        return result;
+    }
     @Override
     public Object getRechargeOrder(String rechargeNo) {
         return rechargeOrderMapper.selectOne(Wrappers.<WalRechargeOrder>lambdaQuery()
