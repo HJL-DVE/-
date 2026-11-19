@@ -1,0 +1,176 @@
+-- ============================================================
+-- V6: 订单域与支付域
+--
+-- 关键约束：
+--   1. oms_order.store_id 必填 —— 每笔订单必须记录所属门店
+--   2. 金额全部为分，且全部由服务端重算后落库
+--   3. pay_payment_order (biz_type, biz_no) 唯一 —— 同一业务单只能有一个有效支付单
+--   4. pay_notify_log (provider, notify_id) 唯一 —— 重复通知在数据库层被拒绝
+--   5. pay_refund_order 记录退款资金构成（实付/赠送/现金）
+-- ============================================================
+
+CREATE TABLE oms_order (
+  id                        BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  brand_id                  BIGINT UNSIGNED NOT NULL,
+  order_no                  VARCHAR(64) NOT NULL COMMENT '订单号（业务唯一）',
+  store_id                  BIGINT UNSIGNED NOT NULL COMMENT '所属门店，必填',
+  member_id                 BIGINT UNSIGNED NULL COMMENT '会员，散客可为空',
+  order_source              VARCHAR(16) NOT NULL COMMENT 'MINIAPP/POS/ADMIN',
+  total_amount              BIGINT NOT NULL DEFAULT 0 COMMENT '商品总额（分）',
+  discount_amount           BIGINT NOT NULL DEFAULT 0 COMMENT '优惠合计（分）',
+  coupon_amount             BIGINT NOT NULL DEFAULT 0 COMMENT '券优惠（分）',
+  level_discount_amount     BIGINT NOT NULL DEFAULT 0 COMMENT '等级折扣优惠（分）',
+  activity_discount_amount  BIGINT NOT NULL DEFAULT 0 COMMENT '活动优惠（分）',
+  payable_amount            BIGINT NOT NULL DEFAULT 0 COMMENT '应付金额（分）',
+  paid_amount               BIGINT NOT NULL DEFAULT 0 COMMENT '实付金额（分）',
+  refunded_amount           BIGINT NOT NULL DEFAULT 0 COMMENT '已退款金额（分）',
+  balance_principal_amount  BIGINT NOT NULL DEFAULT 0 COMMENT '余额支付中的实付金部分（分）',
+  balance_gift_amount       BIGINT NOT NULL DEFAULT 0 COMMENT '余额支付中的赠送金部分（分）',
+  status                    VARCHAR(32) NOT NULL DEFAULT 'UNPAID' COMMENT 'UNPAID/PAID/COMPLETED/CANCELLED/REFUNDING/REFUNDED',
+  pay_channel               VARCHAR(32) NULL COMMENT 'BALANCE/WECHAT_JSAPI/WECHAT_NATIVE/MOCK',
+  payment_no                VARCHAR(64) NULL,
+  member_coupon_id          BIGINT UNSIGNED NULL COMMENT '使用的会员券',
+  points_earned             BIGINT NOT NULL DEFAULT 0 COMMENT '本单获得积分',
+  pickup_no                 VARCHAR(16) NULL COMMENT '取餐号',
+  pay_time                  DATETIME(3) NULL,
+  complete_time             DATETIME(3) NULL,
+  cancel_time               DATETIME(3) NULL,
+  cancel_reason             VARCHAR(255) NULL,
+  remark                    VARCHAR(255) NULL,
+  operator_id               BIGINT UNSIGNED NULL COMMENT '收银员（POS 下单）',
+  create_time               DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  update_time               DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  deleted                   TINYINT(1) NOT NULL DEFAULT 0,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_order_no (order_no),
+  KEY idx_order_store_time (store_id, create_time),
+  KEY idx_order_member_time (member_id, create_time),
+  KEY idx_order_status_pay (status, pay_time),
+  KEY idx_order_brand_time (brand_id, create_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='订单（必含 store_id）';
+
+CREATE TABLE oms_order_item (
+  id                BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  brand_id          BIGINT UNSIGNED NOT NULL,
+  order_id          BIGINT UNSIGNED NOT NULL,
+  order_no          VARCHAR(64) NOT NULL,
+  store_id          BIGINT UNSIGNED NOT NULL,
+  spu_id            BIGINT UNSIGNED NOT NULL,
+  sku_id            BIGINT UNSIGNED NOT NULL,
+  spu_name          VARCHAR(128) NOT NULL COMMENT '商品名称快照',
+  sku_name          VARCHAR(128) NOT NULL COMMENT '规格名称快照',
+  spec_json         JSON NULL,
+  image_url         VARCHAR(512) NULL,
+  unit_price        BIGINT NOT NULL COMMENT '成交单价（分）',
+  quantity          INT NOT NULL,
+  total_amount      BIGINT NOT NULL COMMENT '行小计（分）',
+  discount_amount   BIGINT NOT NULL DEFAULT 0 COMMENT '行级优惠分摊（分）',
+  actual_amount     BIGINT NOT NULL COMMENT '行实付（分）',
+  refunded_quantity INT NOT NULL DEFAULT 0 COMMENT '已退数量',
+  create_time       DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (id),
+  KEY idx_item_order (order_id),
+  KEY idx_item_sku_time (sku_id, create_time),
+  KEY idx_item_store_time (store_id, create_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='订单明细';
+
+CREATE TABLE oms_order_status_log (
+  id            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  brand_id      BIGINT UNSIGNED NOT NULL,
+  order_id      BIGINT UNSIGNED NOT NULL,
+  order_no      VARCHAR(64) NOT NULL,
+  from_status   VARCHAR(32) NULL,
+  to_status     VARCHAR(32) NOT NULL,
+  operator_id   BIGINT UNSIGNED NULL,
+  operator_type VARCHAR(16) NOT NULL DEFAULT 'SYSTEM',
+  remark        VARCHAR(255) NULL,
+  create_time   DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (id),
+  KEY idx_status_log_order (order_id, create_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='订单状态流转日志';
+
+CREATE TABLE pay_payment_order (
+  id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  brand_id        BIGINT UNSIGNED NOT NULL,
+  payment_no      VARCHAR(64) NOT NULL COMMENT '平台支付单号（微信 out_trade_no）',
+  biz_type        VARCHAR(32) NOT NULL COMMENT 'ORDER 消费订单 / RECHARGE 充值订单',
+  biz_no          VARCHAR(64) NOT NULL COMMENT '业务单号',
+  store_id        BIGINT UNSIGNED NULL,
+  member_id       BIGINT UNSIGNED NULL,
+  channel         VARCHAR(32) NOT NULL COMMENT 'WECHAT_JSAPI/WECHAT_NATIVE/BALANCE/MOCK',
+  provider        VARCHAR(32) NOT NULL DEFAULT 'MOCK' COMMENT 'MOCK / WECHAT_V3，区分演示与真实数据',
+  amount          BIGINT NOT NULL COMMENT '支付金额（分）',
+  currency        VARCHAR(8) NOT NULL DEFAULT 'CNY',
+  status          VARCHAR(32) NOT NULL DEFAULT 'CREATED' COMMENT 'CREATED/PAYING/SUCCESS/FAILED/CLOSED/REFUNDING/REFUNDED',
+  prepay_id       VARCHAR(128) NULL,
+  transaction_id  VARCHAR(64) NULL COMMENT '微信支付订单号',
+  code_url        VARCHAR(512) NULL COMMENT 'Native 二维码链接',
+  payer_openid    VARCHAR(64) NULL,
+  success_time    DATETIME(3) NULL,
+  fail_reason     VARCHAR(512) NULL,
+  expire_time     DATETIME(3) NULL,
+  notify_received TINYINT(1) NOT NULL DEFAULT 0,
+  create_time     DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  update_time     DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_payment_no (payment_no),
+  UNIQUE KEY uk_payment_biz (biz_type, biz_no),
+  UNIQUE KEY uk_payment_txn (transaction_id),
+  KEY idx_payment_status (status, create_time),
+  KEY idx_payment_member (member_id, create_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='支付单';
+
+CREATE TABLE pay_notify_log (
+  id             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  provider       VARCHAR(32) NOT NULL DEFAULT 'WECHAT_V3',
+  notify_id      VARCHAR(128) NOT NULL COMMENT '通知 ID，幂等键',
+  notify_type    VARCHAR(32) NOT NULL COMMENT 'PAY/REFUND',
+  event_type     VARCHAR(64) NULL,
+  out_trade_no   VARCHAR(64) NULL,
+  transaction_id VARCHAR(64) NULL,
+  headers_json   JSON NULL COMMENT '仅保留验签相关头，非敏感',
+  raw_body       TEXT NULL COMMENT '原始报文',
+  decrypt_body   JSON NULL COMMENT '解密后业务 JSON',
+  verify_result  TINYINT(1) NOT NULL DEFAULT 0 COMMENT '验签结果',
+  process_status VARCHAR(32) NOT NULL DEFAULT 'RECEIVED' COMMENT 'RECEIVED/PROCESSED/IGNORED/FAILED',
+  process_msg    VARCHAR(512) NULL,
+  retry_count    INT NOT NULL DEFAULT 0,
+  create_time    DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  update_time    DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_notify_id (provider, notify_id),
+  KEY idx_notify_trade (out_trade_no),
+  KEY idx_notify_status (process_status, create_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='支付通知记录（幂等与审计）';
+
+CREATE TABLE pay_refund_order (
+  id                      BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  brand_id                BIGINT UNSIGNED NOT NULL,
+  refund_no               VARCHAR(64) NOT NULL COMMENT '退款单号（幂等键）',
+  payment_no              VARCHAR(64) NOT NULL COMMENT '原支付单号',
+  biz_type                VARCHAR(32) NOT NULL COMMENT 'ORDER/RECHARGE',
+  biz_no                  VARCHAR(64) NOT NULL,
+  store_id                BIGINT UNSIGNED NULL,
+  member_id               BIGINT UNSIGNED NULL,
+  channel                 VARCHAR(32) NOT NULL COMMENT 'WECHAT/BALANCE',
+  refund_amount           BIGINT NOT NULL COMMENT '本次退款总额（分）',
+  refund_principal_amount BIGINT NOT NULL DEFAULT 0 COMMENT '退回实付余额部分（分）',
+  refund_gift_amount      BIGINT NOT NULL DEFAULT 0 COMMENT '退回赠送余额部分（分）',
+  refund_cash_amount      BIGINT NOT NULL DEFAULT 0 COMMENT '微信原路退回现金部分（分）',
+  reason                  VARCHAR(255) NULL,
+  status                  VARCHAR(32) NOT NULL DEFAULT 'CREATED' COMMENT 'CREATED/PROCESSING/SUCCESS/FAILED/CANCELLED',
+  wx_refund_id            VARCHAR(64) NULL COMMENT '微信退款单号',
+  refund_status_wx        VARCHAR(32) NULL,
+  success_time            DATETIME(3) NULL,
+  fail_reason             VARCHAR(512) NULL,
+  apply_user_id           BIGINT UNSIGNED NULL,
+  audit_user_id           BIGINT UNSIGNED NULL,
+  audit_time              DATETIME(3) NULL,
+  create_time             DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  update_time             DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_refund_no (refund_no),
+  KEY idx_refund_payment (payment_no),
+  KEY idx_refund_status (status, create_time),
+  KEY idx_refund_biz (biz_type, biz_no)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='退款单';

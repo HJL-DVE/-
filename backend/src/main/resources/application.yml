@@ -1,0 +1,104 @@
+server:
+  port: 8080
+  servlet:
+    encoding:
+      charset: UTF-8
+      force: true
+
+spring:
+  application:
+    name: teaclub-server
+  profiles:
+    active: dev
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3306/teaclub?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false&rewriteBatchedStatements=true
+    username: ${MYSQL_USER:teaclub}
+    # 密码必须通过环境变量注入，禁止硬编码（见 .env.example）
+    password: ${MYSQL_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 0
+    validate-on-migrate: true
+    encoding: UTF-8
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      timeout: 2000ms
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: Asia/Shanghai
+    default-property-inclusion: non_null
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    banner: false
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+  mapper-locations: classpath*:/mapper/**/*.xml
+  type-aliases-package: com.teaclub
+
+teaclub:
+  jwt:
+    admin-secret: ${JWT_ADMIN_SECRET:ZGV2LWFkbWluLXNlY3JldC1kby1ub3QtdXNlLWluLXByb2R1Y3Rpb24tMDE=}
+    member-secret: ${JWT_MEMBER_SECRET:ZGV2LW1lbWJlci1zZWNyZXQtZG8tbm90LXVzZS1pbi1wcm9kdWN0aW9uLTAy}
+    access-token-expire-seconds: 7200
+    issuer: teaclub
+  security:
+    permit-urls:
+      - /api/admin/auth/login
+      - /api/payment/**
+      - /actuator/**
+      - /swagger-ui/**
+      - /swagger-ui.html
+      - /v3/api-docs/**
+      - /error
+  cache:
+    provider: ${TEACLUB_CACHE_PROVIDER:local}
+  payment:
+    provider: ${TEACLUB_PAYMENT_PROVIDER:mock}
+  wechat:
+    # 小程序凭据：仅通过环境变量注入，仓库内不出现明文
+    mini-app-id: ${WX_MINI_APP_ID:}
+    mini-app-secret: ${WX_MINI_APP_SECRET:}
+  login:
+    max-fail-count: 5
+    lock-minutes: 15
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+  health:
+    # Redis 已安装（tporadowski Redis 3.0.504，Windows 服务 Redis:6379）
+    redis:
+      enabled: true
+    diskspace:
+      enabled: false
+
+logging:
+  level:
+    root: INFO
+    com.teaclub: DEBUG
