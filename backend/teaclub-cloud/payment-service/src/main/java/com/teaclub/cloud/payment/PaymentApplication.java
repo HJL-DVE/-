@@ -2,6 +2,8 @@ package com.teaclub.cloud.payment;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.openfeign.EnableFeignClients;
+import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
 import org.springframework.cloud.openfeign.EnableFeignClients;
 
@@ -12,8 +14,9 @@ import org.springframework.cloud.openfeign.EnableFeignClients;
  * <p>本服务只管理自己的数据，禁止直接访问其他服务的库。
  */
 @SpringBootApplication
+@EnableFeignClients(basePackages = "com.teaclub.cloud.payment.client")
+@MapperScan("com.teaclub.cloud.payment.mapper")
 @EnableDiscoveryClient
-@EnableFeignClients(basePackages = "com.teaclub.cloud.payment")
 public class PaymentApplication {
 
     public static void main(String[] args) {

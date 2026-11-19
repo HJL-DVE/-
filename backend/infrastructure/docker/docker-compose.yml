@@ -286,6 +286,7 @@ services:
       DB_HOST: mysql
       DB_PORT: "3306"
       DB_USER: tc_payment
+      DB_NAME: payment_db
       DB_PASSWORD: ${DB_PASSWORD_PAYMENT}
     ports:
       - "9006:9006"

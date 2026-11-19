@@ -10,6 +10,7 @@ import com.teaclub.cloud.wallet.dto.RechargeInCmd;
 import com.teaclub.cloud.wallet.dto.RefundInCmd;
 import com.teaclub.cloud.wallet.dto.WalletChangeResult;
 import com.teaclub.cloud.wallet.entity.WalWallet;
+import com.teaclub.cloud.wallet.entity.WalRechargeOrder;
 import com.teaclub.cloud.wallet.entity.WalWalletTransaction;
 import com.teaclub.cloud.wallet.enums.DeductOrder;
 import com.teaclub.cloud.wallet.enums.WalletBizType;
@@ -57,6 +58,7 @@ public class WalletServiceImpl implements WalletService {
     private final WalWalletTransactionMapper txnMapper;
     private final DeductOrderResolver deductOrderResolver;
     private final HotDataCache hotDataCache;
+    private final com.teaclub.cloud.wallet.mapper.WalRechargeOrderMapper rechargeOrderMapper;
 
     // ==================== 查询 ====================
 
@@ -372,6 +374,12 @@ public class WalletServiceImpl implements WalletService {
         updateWallet(wallet);
         evictCache(brandId, memberId);
         return toResult(txn, false);
+    }
+
+    @Override
+    public Object getRechargeOrder(String rechargeNo) {
+        return rechargeOrderMapper.selectOne(Wrappers.<WalRechargeOrder>lambdaQuery()
+                .eq(WalRechargeOrder::getRechargeNo, rechargeNo));
     }
 
     // ==================== 内部工具 ====================

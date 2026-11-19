@@ -37,6 +37,12 @@ public class WalletInternalController {
 
     private final WalletService walletService;
 
+    @Operation(summary = "查询充值订单（内部调用）")
+    @GetMapping("/recharge-order/{rechargeNo}")
+    public Result<Object> rechargeOrder(@PathVariable("rechargeNo") String rechargeNo) {
+        return Result.ok(walletService.getRechargeOrder(rechargeNo));
+    }
+
     @Operation(summary = "查询钱包（内部调用）")
     @GetMapping("/balance")
     public Result<WalWallet> getBalance(@RequestParam Long brandId, @RequestParam Long memberId) {

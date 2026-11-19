@@ -34,6 +34,9 @@ public interface WalletService {
                                          String refundNo, Long principalAmount, Long giftAmount,
                                          String remark, Long operatorId);
 
+    /** 查询充值订单（供 payment-service 发起充值支付时校验）。 */
+    Object getRechargeOrder(String rechargeNo);
+
     /** 人工调整（幂等键：审批单号） */
     WalletChangeResult adjust(Long brandId, Long memberId, Long storeId, String approvalNo,
                               Long principalChange, Long giftChange,

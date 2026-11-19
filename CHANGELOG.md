@@ -29,6 +29,20 @@
 
 ---
 
+## [第五阶段·任务三第六批] payment-service 迁移与支付全链路（2026-11-19）
+
+### 迁移 27 个文件
+实体 3 / DTO 2 / VO 3 / Mapper 3 / Service 4 / Controller 2 / Gateway 9 / Config 1
+
+### 微信支付结构（课程设计按 Mock）
+PaymentProvider 接口 + MockPaymentProvider（当前启用）+ WechatPayV3Provider（骨架保留）。
+业务代码只依赖接口，敏感配置从环境变量读取。
+
+### 全链路实测
+订单 UNPAID → 支付单 PAYING(provider=MOCK) → Mock 通知 → 订单 PAID → 退款 PROCESSING。
+幂等：重复支付通知不重复入账；历史支付/退款记录保留。
+
+---
 ## [第五阶段·任务三第五批] order-service 迁移与跨服务交易链路（2026-11-19）
 
 ### 迁移 19 个文件
