@@ -4,6 +4,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
 import org.springframework.cloud.openfeign.EnableFeignClients;
+import org.mybatis.spring.annotation.MapperScan;
 
 /**
  * 储值：钱包/双余额/充值/扣款/退款/资金流水
@@ -13,7 +14,8 @@ import org.springframework.cloud.openfeign.EnableFeignClients;
  */
 @SpringBootApplication
 @EnableDiscoveryClient
-@EnableFeignClients(basePackages = "com.teaclub.cloud.wallet")
+@EnableFeignClients(basePackages = "com.teaclub.cloud.wallet.client")
+@MapperScan("com.teaclub.cloud.wallet.mapper")
 public class WalletApplication {
 
     public static void main(String[] args) {

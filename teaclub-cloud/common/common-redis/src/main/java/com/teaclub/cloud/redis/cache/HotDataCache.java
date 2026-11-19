@@ -2,7 +2,6 @@ package com.teaclub.cloud.redis.cache;
 
 import com.teaclub.cloud.redis.constant.RedisKeys;
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.util.Optional;
@@ -13,7 +12,6 @@ import java.util.Optional;
  * <p>统一采用「读缓存 → 未命中查库 → 回填」模式。
  * 写操作后由业务方显式调用对应 evict 方法失效缓存。
  */
-@Service
 @RequiredArgsConstructor
 public class HotDataCache {
 

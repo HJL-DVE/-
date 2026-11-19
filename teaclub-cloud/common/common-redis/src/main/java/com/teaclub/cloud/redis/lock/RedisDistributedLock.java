@@ -6,7 +6,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
-import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 import java.util.Collections;
@@ -24,7 +23,6 @@ import java.util.function.Supplier;
  *
  * <p>释放时校验 value 是否为自己持有的 token，避免误删他人锁。
  */
-@Component
 @RequiredArgsConstructor
 public class RedisDistributedLock {
 

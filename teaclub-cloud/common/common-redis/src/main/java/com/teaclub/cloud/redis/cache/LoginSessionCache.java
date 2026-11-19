@@ -2,7 +2,6 @@ package com.teaclub.cloud.redis.cache;
 
 import com.teaclub.cloud.redis.constant.RedisKeys;
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.util.Optional;
@@ -13,7 +12,6 @@ import java.util.Optional;
  * <p>存储用户登录后的会话信息，键为 token 摘要。
  * 退出登录时删除该键。
  */
-@Service
 @RequiredArgsConstructor
 public class LoginSessionCache {
 

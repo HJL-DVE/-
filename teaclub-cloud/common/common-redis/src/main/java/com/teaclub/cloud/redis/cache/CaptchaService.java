@@ -2,7 +2,6 @@ package com.teaclub.cloud.redis.cache;
 
 import com.teaclub.cloud.redis.constant.RedisKeys;
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
 import java.time.Duration;
@@ -12,7 +11,6 @@ import java.time.Duration;
  *
  * <p>图形验证码与短信验证码统一走 Redis，带 TTL 自动过期。
  */
-@Service
 @RequiredArgsConstructor
 public class CaptchaService {
 

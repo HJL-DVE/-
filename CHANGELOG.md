@@ -29,6 +29,47 @@
 
 ---
 
+## [第五阶段·任务三第一批] 数据迁移 + wallet 资金业务迁移（2026-11-19）
+
+### 数据迁移
+
+- 备份：`infrastructure/migration/backup/`（453 KB）
+- 映射：`MIGRATION-MAPPING.md`（按服务边界分库，保留历史 ID）
+- 执行器：`migrate.js`（--dry-run / --force），校验器：`verify.js`
+- 跨实例必须走 `mysqldump | mysql` 管道，不能用 INSERT...SELECT
+- **1625 行迁移完成，61 项校验全通过**
+  - 29 张表行数一致
+  - 钱包余额 255000/36338，流水/充值/订单/支付/退款金额全部一致
+  - 资金不变量 I1~I6 全部成立
+  - 历史 ID（钱包/流水/会员/SKU/订单/支付单/微信交易号）范围一致
+
+### wallet-service 资金业务迁移
+
+- 迁移 36 个文件（实体/枚举/DTO/Mapper/Service），表名列名不变
+- 跨库依赖改造：品牌扣款顺序 → Feign 调 auth-service + Redis 缓存 60s
+- MyMetaObjectHandler 迁到 common-core
+- 新增内部接口 6 个（受 X-Internal-Token 保护）
+- auth-service 新增品牌内部接口 2 个
+
+### 测试
+
+- 资金测试 11/11 通过（8 一致性 + 2 并发 + 1 装配）
+- 并发实测：10 线程各扣 1500（余额 10000）→ 成功 6 失败 4，扣 9000 剩 1000
+- 并发实测：8 线程同订单扣 3000 → 仅 1 条流水，扣 3000
+- 端到端：wallet → auth Feign 调用成功，traceId 一致，Redis 缓存生效
+
+### 重要教训
+
+资金数据不能手工 DELETE（会破坏"余额 = 流水累计"不变量）。
+测试数据必须用独立会员 ID 隔离，清理后复核不变量。
+
+### 未完成
+
+auth/member/product/order/payment 五个服务的业务代码迁移、
+Outbox/Inbox、8 类事件发布、部分金额冻结能力。
+
+---
+
 ## [第五阶段·任务三] Docker 容器化部署验证（2026-11-19）
 
 ### 环境突破

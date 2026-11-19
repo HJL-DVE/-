@@ -17,7 +17,6 @@ import org.springframework.boot.test.context.SpringBootTest;
                 "spring.datasource.url=jdbc:h2:mem:test;MODE=MySQL",
                 "spring.datasource.driver-class-name=org.h2.Driver",
                 "spring.flyway.enabled=false",
-                "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration"
         })
 class OrderApplicationTests {
 

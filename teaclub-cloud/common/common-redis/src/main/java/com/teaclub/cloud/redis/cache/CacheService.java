@@ -4,7 +4,6 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.util.Collection;
@@ -18,7 +17,6 @@ import java.util.concurrent.TimeUnit;
  * 钱包余额等资金数据的最终一致性由数据库事务与流水表保证，
  * 缓存只用于降低读放大。任何资金写入后必须主动失效缓存。
  */
-@Service
 @RequiredArgsConstructor
 public class CacheService {
 
