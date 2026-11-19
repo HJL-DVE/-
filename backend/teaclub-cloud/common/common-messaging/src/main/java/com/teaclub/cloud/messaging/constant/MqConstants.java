@@ -38,6 +38,14 @@ public final class MqConstants {
     public static final String RK_REFUND_ORDER_SUCCESS = "refund.order.success";
     /** 会员注册 */
     public static final String RK_MEMBER_REGISTERED = "member.registered";
+    /** 订单已支付（余额/微信统一） */
+    public static final String RK_ORDER_PAID = "order.paid";
+    /** 钱包已扣款 */
+    public static final String RK_WALLET_DEDUCTED = "wallet.deducted";
+    /** 钱包已冻结 */
+    public static final String RK_WALLET_FROZEN = "wallet.frozen";
+    /** 充值已支付 */
+    public static final String RK_RECHARGE_PAID = "recharge.paid";
     /** 门店状态变更 */
     public static final String RK_STORE_STATUS_CHANGED = "store.status.changed";
 
@@ -45,6 +53,8 @@ public final class MqConstants {
     public static final String Q_ORDER_PAY_SUCCESS = "teaclub.order.pay-success.queue";
     public static final String Q_WALLET_RECHARGE_SUCCESS = "teaclub.wallet.recharge-success.queue";
     public static final String Q_ORDER_REFUND_SUCCESS = "teaclub.order.refund-success.queue";
+    /** 会员服务：消费订单已支付事件（累加消费档案） */
+    public static final String Q_MEMBER_ORDER_PAID = "teaclub.member.order-paid.queue";
 
     // ===== 消息头 =====
     public static final String HEADER_EVENT_ID = "x-event-id";

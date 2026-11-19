@@ -31,6 +31,8 @@ docker compose -f docker-compose.yml --env-file .env.docker up -d
 | 12-fund-invariants | 资金不变量 I1–I6 | docs/25 |
 | 13-partial-freeze | 冻结部分确认 + 余额释放 | docs/31 |
 | 14-timeout-close-events-reconcile | 超时关单 + Outbox 事件 + 跨服务对账 | docs/31 |
+| 15-order-paid-consumer | ORDER_PAID 事件驱动累加会员档案 + 重复投递幂等 | docs/32 |
+| 16-consumer-inbox-2nd-layer | 删 Redis 幂等键，验证 DB Inbox 第二层兜底 | docs/32 |
 
 ## 运行
 

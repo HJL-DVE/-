@@ -4,6 +4,8 @@ import com.teaclub.cloud.messaging.constant.MqConstants;
 import org.springframework.amqp.core.*;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.amqp.support.converter.DefaultJackson2JavaTypeMapper;
+import org.springframework.amqp.support.converter.Jackson2JavaTypeMapper;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.context.annotation.Bean;
@@ -83,6 +85,31 @@ public class RabbitMqConfig {
         return businessQueue(MqConstants.Q_WALLET_RECHARGE_SUCCESS);
     }
 
+    /** 会员服务：消费订单已支付事件 */
+    @Bean
+    public Queue memberOrderPaidQueue() {
+        return businessQueue(MqConstants.Q_MEMBER_ORDER_PAID);
+    }
+
+    @Bean
+    public Queue memberOrderPaidDlq() {
+        return QueueBuilder.durable(MqConstants.Q_MEMBER_ORDER_PAID + MqConstants.DLQ_ROUTING_SUFFIX).build();
+    }
+
+    @Bean
+    public Binding memberOrderPaidDlqBinding() {
+        return BindingBuilder.bind(memberOrderPaidDlq())
+                .to(dlxExchange())
+                .with(MqConstants.Q_MEMBER_ORDER_PAID + MqConstants.DLQ_ROUTING_SUFFIX);
+    }
+
+    @Bean
+    public Binding memberOrderPaidBinding() {
+        return BindingBuilder.bind(memberOrderPaidQueue())
+                .to(businessExchange())
+                .with(MqConstants.RK_ORDER_PAID);
+    }
+
     @Bean
     public Binding orderPaySuccessBinding() {
         return BindingBuilder.bind(orderPaySuccessQueue())
@@ -111,9 +138,23 @@ public class RabbitMqConfig {
 
     // ==================== 模板与转换器 ====================
 
+    /**
+     * JSON 消息转换器。
+     *
+     * <p><b>为什么用 INFERRED 而不是默认的 TYPE_ID</b>：
+     * 默认会写 {@code __TypeId__} 头并在消费端按该类型反序列化，
+     * 一旦生产端发的是 {@code JsonNode}/{@code Map} 就会因"不可信包"被拒。
+     * 本项目消费端统一接收原始 {@code Message} 并自行解析，
+     * 因此让转换器<b>按目标类型推断</b>、忽略类型头，最稳妥。
+     */
     @Bean
     public MessageConverter jsonMessageConverter() {
-        return new Jackson2JsonMessageConverter();
+        Jackson2JsonMessageConverter converter = new Jackson2JsonMessageConverter();
+        DefaultJackson2JavaTypeMapper typeMapper = new DefaultJackson2JavaTypeMapper();
+        typeMapper.setTrustedPackages("*");
+        typeMapper.setTypePrecedence(Jackson2JavaTypeMapper.TypePrecedence.INFERRED);
+        converter.setJavaTypeMapper(typeMapper);
+        return converter;
     }
 
     /**

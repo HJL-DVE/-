@@ -263,25 +263,8 @@ public class OrderServiceImpl implements OrderService {
                     : new BizException(ResultCode.SYSTEM_ERROR, "订单支付失败：" + e.getMessage());
         }
 
-        updateMemberStats(order);
+        // 会员消费档案不再同步调用 —— 已改为消费 ORDER_PAID 事件（member-service 侧）
         return detail(orderNo);
-    }
-
-    private void updateMemberStats(OmsOrder order) {
-        if (order.getMemberId() == null) {
-            return;
-        }
-        // 会员消费档案由 member-service 维护，order-service 通过内部接口更新
-        Map<String, Object> body = new java.util.HashMap<>();
-        body.put("consumeAmount", order.getPaidAmount());
-        body.put("orderCount", 1);
-        body.put("lastConsumeTime", LocalDateTime.now().toString());
-        try {
-            memberClient.updateConsumeStats(order.getMemberId(), body);
-        } catch (Exception e) {
-            // 消费档案是统计性数据，更新失败不应阻断订单主流程
-            log.warn("更新会员消费档案失败（不阻断订单）: memberId={}", order.getMemberId(), e);
-        }
     }
 
     @Override
@@ -333,7 +316,7 @@ public class OrderServiceImpl implements OrderService {
 
         logStatus(order, OrderStatus.UNPAID, OrderStatus.PAID,
                 null, "SYSTEM", "微信支付成功确认 paymentNo=" + paymentNo);
-        updateMemberStats(order);
+        // 会员消费档案改由 ORDER_PAID 事件驱动（member-service 侧消费）
     }
 
     @Override

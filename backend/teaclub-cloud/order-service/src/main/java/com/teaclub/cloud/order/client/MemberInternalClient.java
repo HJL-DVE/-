@@ -4,8 +4,6 @@ import com.teaclub.cloud.core.api.Result;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 
 import java.util.Map;
 
@@ -29,10 +27,4 @@ public interface MemberInternalClient {
     @GetMapping("/level/{levelId}")
     Result<Map<String, Object>> levelInfo(@PathVariable("levelId") Long levelId);
 
-    /**
-     * 更新会员消费档案（累计消费额、订单数、最近消费时间）。
-     */
-    @PostMapping("/user/{memberId}/consume-stats")
-    Result<Void> updateConsumeStats(@PathVariable("memberId") Long memberId,
-                                    @RequestBody Map<String, Object> stats);
 }

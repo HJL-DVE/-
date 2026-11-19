@@ -35,7 +35,12 @@ public class MemberInternalController {
     private final JdbcTemplate jdbcTemplate;
 
 
-    @Operation(summary = "更新会员消费档案（内部调用）")
+    /**
+     * @deprecated 已改为消费 ORDER_PAID 领域事件（见 OrderPaidConsumer）。
+     * 保留此端点仅用于运维补数/故障修复，业务链路不再调用。
+     */
+    @Deprecated
+    @Operation(summary = "[已废弃] 更新会员消费档案（事件驱动前的同步入口）")
     @PostMapping("/user/{userId}/consume-stats")
     public Result<Void> updateConsumeStats(@PathVariable("userId") Long userId,
                                             @RequestBody Map<String, Object> stats) {

@@ -102,9 +102,17 @@ public abstract class AbstractEventConsumer implements ChannelAwareMessageListen
             String json = new String(body, StandardCharsets.UTF_8);
             var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
             mapper.findAndRegisterModules();
-            return mapper.readValue(json, EventMessage.class);
+            var node = mapper.readTree(json);
+            // 兼容：某些生产端把 JSON 当字符串发送，会被二次编码成 "{\"a\":1}"
+            if (node != null && node.isTextual()) {
+                node = mapper.readTree(node.asText());
+            }
+            if (node == null || node.isNull()) {
+                return null;
+            }
+            return mapper.treeToValue(node, EventMessage.class);
         } catch (Exception e) {
-            log.error("消息反序列化失败", e);
+            log.error("消息反序列化失败: {}", e.getMessage());
             return null;
         }
     }

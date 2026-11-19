@@ -1,5 +1,7 @@
 package com.teaclub.cloud.messaging.outbox;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.teaclub.cloud.messaging.constant.MqConstants;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +30,7 @@ public class OutboxRelay {
 
     private final OutboxStore store;
     private final RabbitTemplate rabbitTemplate;
+    private final ObjectMapper objectMapper;
 
     private static final int BATCH_SIZE = 50;
 
@@ -36,10 +39,15 @@ public class OutboxRelay {
         List<OutboxMessage> pending = store.findPending(BATCH_SIZE);
         for (OutboxMessage msg : pending) {
             try {
+                JsonNode eventNode = extractEventNode(msg.getPayload());
+                if (eventNode == null) {
+                    store.markFailed(msg.getEventId(), "payload 无法解析为事件对象");
+                    continue;
+                }
                 rabbitTemplate.convertAndSend(
                         MqConstants.BUSINESS_EXCHANGE,
                         msg.getRoutingKey(),
-                        msg.getPayload(),
+                        eventNode,
                         m -> {
                             m.getMessageProperties().setDeliveryMode(MessageDeliveryMode.PERSISTENT);
                             m.getMessageProperties().setHeader(MqConstants.HEADER_EVENT_ID, msg.getEventId());
@@ -55,6 +63,32 @@ public class OutboxRelay {
                 log.error("Outbox 投递失败: eventId={} error={}", msg.getEventId(), e.getMessage());
                 store.markFailed(msg.getEventId(), e.getMessage());
             }
+        }
+    }
+
+    /**
+     * 从 Outbox 存储的外层信封中取出标准 {@code EventMessage} JSON 作为消息体。
+     *
+     * <p>Outbox 表里存的是 {@code {event:{...}, routingKey, bizNo}} —— 便于落库追溯；
+     * 但消费端 {@code AbstractEventConsumer} 按 {@code EventMessage} 解析，
+     * 因此投递时必须只发 {@code event} 子节点，否则消费端会拿到全 null 字段。
+     *
+     * <p>若 payload 不是信封结构（历史数据/演示数据），原样投递，保持兼容。
+     */
+    private JsonNode extractEventNode(String payload) {
+        if (payload == null) {
+            return null;
+        }
+        try {
+            JsonNode root = objectMapper.readTree(payload);
+            JsonNode event = root.get("event");
+            if (event != null && !event.isNull()) {
+                return event;
+            }
+            return root;
+        } catch (Exception e) {
+            log.error("Outbox payload 解析失败，无法投递 eventId 事件: {}", e.getMessage());
+            return null;
         }
     }
 }

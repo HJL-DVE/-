@@ -1,3 +1,42 @@
+## [第五阶段·任务四补齐] ORDER_PAID 真实消费者 + 会员档案事件驱动（2026-11-20）
+
+把会员消费档案从「订单服务同步 Feign 调用」改成「订阅 `ORDER_PAID` 事件异步累加」，
+这是 8 类事件中**第一个真正有消费者的**。
+
+### 新增
+
+- `OrderPaidConsumer`（member-service）：订阅 `teaclub.member.order-paid.queue`，DLQ 兜底
+- `MemberConsumeStatsUpdater`：Inbox 认领与 `UPDATE mem_member` **同一本地事务**
+- `MqConstants.RK_ORDER_PAID` / `Q_MEMBER_ORDER_PAID`
+
+### 删除
+
+- `OrderServiceImpl.updateMemberStats` 及其两处调用（余额支付、支付成功回写）
+- `MemberInternalClient.updateConsumeStats`
+
+改后订单支付链路不再依赖 member-service 可用性；`/api/member/internal/consume-stats` 保留但标记 `@Deprecated`。
+
+### 顺带修掉的两个真实缺陷
+
+1. **Outbox 事件双重序列化**：Relay 发 `String` 导致 Jackson 二次编码，消费端报
+   `Cannot construct instance of EventMessage (no String-argument constructor)`
+   -> Relay 改发 `JsonNode`，基类解包 textual 节点
+2. **消息转换器信任包过窄**：`ObjectNode is not in the trusted packages: [java.util, java.lang]`
+   -> `DefaultJackson2JavaTypeMapper` + `trustedPackages("*")` + `TypePrecedence.INFERRED`
+
+### 实测
+
+| 脚本 | 结果 |
+| --- | --- |
+| 15-order-paid-consumer | 14/14 通过，累加 71430→73145，端到端时延约 1 秒 |
+| 16-consumer-inbox-2nd-layer | 5/5 通过，删掉 Redis 幂等键后 DB Inbox 仍拦住重复累加 |
+
+重复消息是真的投进了 Broker（`routed=true`），拦住它的是消费者与 `sys_inbox_message` 唯一键。
+
+新增文档：docs/32；新增测试脚本：15 / 16。
+
+---
+
 ## [第五阶段·任务四补齐] 超时关单 / Outbox 接入 / 跨服务对账 / 部分冻结 / 单元测试（2026-11-20）
 
 | # | 原缺口 | 现状 | 实测 |
