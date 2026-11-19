@@ -51,6 +51,11 @@ public interface WalletService {
      */
     WalletChangeResult processRechargePaid(String rechargeNo, String paymentNo);
 
+    /**
+     * 判断某业务单是否已有对应资金流水（供跨服务对账使用）。
+     */
+    boolean existsTxn(String bizType, String bizNo);
+
     /** 查询充值订单（供 payment-service 发起充值支付时校验）。 */
     Object getRechargeOrder(String rechargeNo);
 
@@ -72,6 +77,19 @@ public interface WalletService {
      */
     WalletChangeResult confirmFreeze(Long brandId, Long memberId, String orderNo,
                                      Long storeId, Long operatorId);
+
+    /**
+     * 部分确认冻结扣款：只扣指定金额，其余部分视为释放。
+     *
+     * <p>用于「订单部分成交」或「实际应付小于冻结额」的场景。
+     * 未扣除的冻结额度会随记录状态变更一并释放，不需要额外调用。
+     *
+     * @param principal 本次实际扣除的实付额（不得超过冻结额）
+     * @param gift      本次实际扣除的赠送额（不得超过冻结额）
+     */
+    WalletChangeResult confirmFreezePartial(Long brandId, Long memberId, String orderNo,
+                                            Long storeId, Long operatorId,
+                                            Long principal, Long gift);
 
     /**
      * 释放冻结（失败订单/超时订单，不写流水）。

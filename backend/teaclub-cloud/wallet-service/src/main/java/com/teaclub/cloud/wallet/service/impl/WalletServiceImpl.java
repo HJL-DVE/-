@@ -28,6 +28,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -62,6 +63,7 @@ public class WalletServiceImpl implements WalletService {
     private final HotDataCache hotDataCache;
     private final com.teaclub.cloud.wallet.mapper.WalRechargeOrderMapper rechargeOrderMapper;
     private final com.teaclub.cloud.wallet.mapper.WalWalletFreezeMapper freezeMapper;
+    private final com.teaclub.cloud.messaging.outbox.OutboxService outboxService;
 
     // ==================== 查询 ====================
 
@@ -165,6 +167,19 @@ public class WalletServiceImpl implements WalletService {
         log.info("充值入账成功 walletId={} rechargeNo={} 实付+{} 赠送+{} 余额({},{})",
                 wallet.getId(), cmd.getRechargeNo(), cmd.getPayAmount(), giftAmount,
                 principalAfter, giftAfter);
+        {
+            Map<String, Object> ev = new LinkedHashMap<>();
+            ev.put("rechargeNo", cmd.getRechargeNo());
+            ev.put("walletId", wallet.getId());
+            ev.put("memberId", cmd.getMemberId());
+            ev.put("payAmount", cmd.getPayAmount());
+            ev.put("giftAmount", giftAmount);
+            ev.put("principalAfter", principalAfter);
+            ev.put("giftAfter", giftAfter);
+            ev.put("txnNo", txn.getTxnNo());
+            outboxService.enqueue(com.teaclub.cloud.messaging.event.DomainEvents.RECHARGE_PAID,
+                    cmd.getRechargeNo(), ev);
+        }
         return toResult(txn, false);
     }
 
@@ -234,6 +249,20 @@ public class WalletServiceImpl implements WalletService {
         log.info("消费扣款成功 walletId={} orderNo={} 应付={} 实付扣={} 赠送扣={} 余额({},{})",
                 wallet.getId(), cmd.getOrderNo(), payable, principalDeduct, giftDeduct,
                 principalAfter, giftAfter);
+        {
+            Map<String, Object> ev = new LinkedHashMap<>();
+            ev.put("orderNo", cmd.getOrderNo());
+            ev.put("walletId", wallet.getId());
+            ev.put("memberId", cmd.getMemberId());
+            ev.put("payableAmount", payable);
+            ev.put("principalDeduct", principalDeduct);
+            ev.put("giftDeduct", giftDeduct);
+            ev.put("principalAfter", principalAfter);
+            ev.put("giftAfter", giftAfter);
+            ev.put("txnNo", txn.getTxnNo());
+            outboxService.enqueue(com.teaclub.cloud.messaging.event.DomainEvents.WALLET_DEDUCTED,
+                    cmd.getOrderNo(), ev);
+        }
         return toResult(txn, false);
     }
 
@@ -451,6 +480,17 @@ public class WalletServiceImpl implements WalletService {
         evictCache(brandId, memberId);
         log.info("冻结成功 orderNo={} 实付={} 赠送={} 可用余额({},{})",
                 orderNo, fp, fg, availP - fp, availG - fg);
+        {
+            Map<String, Object> ev = new LinkedHashMap<>();
+            ev.put("orderNo", orderNo);
+            ev.put("walletId", wallet.getId());
+            ev.put("memberId", memberId);
+            ev.put("freezePrincipal", fp);
+            ev.put("freezeGift", fg);
+            ev.put("freezeId", record.getId());
+            outboxService.enqueue(com.teaclub.cloud.messaging.event.DomainEvents.WALLET_FROZEN,
+                    orderNo, ev);
+        }
         return record.getId();
     }
 
@@ -518,6 +558,62 @@ public class WalletServiceImpl implements WalletService {
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
+    public WalletChangeResult confirmFreezePartial(Long brandId, Long memberId, String orderNo,
+                                                   Long storeId, Long operatorId,
+                                                   Long principal, Long gift) {
+        WalWalletFreeze freeze = freezeMapper.selectByOrderNo(orderNo);
+        if (freeze == null) {
+            throw new BizException(ResultCode.BAD_REQUEST, "冻结记录不存在: " + orderNo);
+        }
+        if ("CONFIRMED".equals(freeze.getStatus())) {
+            WalWalletTransaction txn = txnMapper.selectByBiz(WalletBizType.CONSUME_OUT.name(), orderNo);
+            if (txn != null) {
+                return toResult(txn, true);
+            }
+        }
+        if (!"FROZEN".equals(freeze.getStatus())) {
+            throw new BizException(ResultCode.BAD_REQUEST,
+                    "冻结记录状态为 " + freeze.getStatus() + "，不可确认扣款");
+        }
+
+        long p = principal == null ? freeze.getFreezePrincipal() : principal;
+        long g = gift == null ? freeze.getFreezeGift() : gift;
+        if (p < 0 || g < 0) {
+            throw new BizException(ResultCode.PARAM_INVALID, "确认扣款金额不能为负");
+        }
+        if (p > freeze.getFreezePrincipal() || g > freeze.getFreezeGift()) {
+            throw new BizException(ResultCode.PARAM_INVALID,
+                    "确认扣款金额超过冻结额：冻结 " + freeze.getFreezePrincipal() + "/" + freeze.getFreezeGift()
+                            + "，申请 " + p + "/" + g);
+        }
+        if (p + g <= 0) {
+            throw new BizException(ResultCode.PARAM_INVALID,
+                    "确认扣款金额为 0，如需取消请调用释放冻结");
+        }
+
+        // 按本次确认额扣款，剩余冻结额随状态变更一并释放
+        WalletChangeResult result = consumeOutExact(brandId, memberId, storeId, orderNo, p, g, operatorId);
+
+        WalWalletFreeze patch = new WalWalletFreeze();
+        patch.setId(freeze.getId());
+        patch.setStatus("CONFIRMED");
+        patch.setConfirmedTxnNo(result.getTxnNo());
+        patch.setFreezePrincipal(p);
+        patch.setFreezeGift(g);
+        long releasedP = freeze.getFreezePrincipal() - p;
+        long releasedG = freeze.getFreezeGift() - g;
+        if (releasedP > 0 || releasedG > 0) {
+            patch.setRemark("部分确认：释放 " + releasedP + "/" + releasedG);
+        }
+        freezeMapper.updateById(patch);
+        evictCache(brandId, memberId);
+        log.info("冻结部分确认 orderNo={} 扣款({},{}) 释放({},{}) txnNo={}",
+                orderNo, p, g, releasedP, releasedG, result.getTxnNo());
+        return result;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
     public boolean releaseFreeze(Long brandId, Long memberId, String orderNo, String reason) {
         WalWalletFreeze freeze = freezeMapper.selectByOrderNo(orderNo);
         if (freeze == null) {
@@ -582,6 +678,20 @@ public class WalletServiceImpl implements WalletService {
         wallet.setTotalPrincipalOut(wallet.getTotalPrincipalOut() + pDeduct);
         wallet.setTotalGiftOut(wallet.getTotalGiftOut() + gDeduct);
         updateWallet(wallet);
+        {
+            Map<String, Object> ev = new LinkedHashMap<>();
+            ev.put("orderNo", orderNo);
+            ev.put("walletId", wallet.getId());
+            ev.put("memberId", memberId);
+            ev.put("principalDeduct", pDeduct);
+            ev.put("giftDeduct", gDeduct);
+            ev.put("principalAfter", pAfter);
+            ev.put("giftAfter", gAfter);
+            ev.put("txnNo", txn.getTxnNo());
+            ev.put("source", "freeze-confirm");
+            outboxService.enqueue(com.teaclub.cloud.messaging.event.DomainEvents.WALLET_DEDUCTED,
+                    orderNo, ev);
+        }
         return toResult(txn, false);
     }
 
@@ -660,6 +770,18 @@ public class WalletServiceImpl implements WalletService {
         log.info("充值单入账完成 rechargeNo={} paymentNo={}", rechargeNo, paymentNo);
         return result;
     }
+    @Override
+    public boolean existsTxn(String bizType, String bizNo) {
+        if (bizType == null || bizNo == null) {
+            return false;
+        }
+        try {
+            return txnMapper.selectByBiz(bizType, bizNo) != null;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     @Override
     public Object getRechargeOrder(String rechargeNo) {
         return rechargeOrderMapper.selectOne(Wrappers.<WalRechargeOrder>lambdaQuery()

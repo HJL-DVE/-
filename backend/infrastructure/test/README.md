@@ -29,6 +29,8 @@ docker compose -f docker-compose.yml --env-file .env.docker up -d
 | 10-saga-compensation-reconcile | Saga 补偿 + 对账 | docs/29、docs/30 |
 | 11-final-evidence | 四条链路真实凭证快照 | docs/25 |
 | 12-fund-invariants | 资金不变量 I1–I6 | docs/25 |
+| 13-partial-freeze | 冻结部分确认 + 余额释放 | docs/31 |
+| 14-timeout-close-events-reconcile | 超时关单 + Outbox 事件 + 跨服务对账 | docs/31 |
 
 ## 运行
 
@@ -38,3 +40,14 @@ node backend/infrastructure/test/02-wallet-concurrency.mjs
 
 > 注意：部分脚本使用唯一会员号避免历史数据干扰；
 > 若断言「余额 +N」失败，先确认该会员是否已有历史余额。
+
+## 单元测试
+
+```bash
+cd backend/teaclub-cloud
+mvn -pl common/common-messaging,payment-service -am test \
+  -Dtest="DomainEventsTest,RefundAllocationTest,MockNotifySignatureVerifierTest" \
+  -Dsurefire.failIfNoSpecifiedTests=false
+```
+
+覆盖：事件路由键、退款资金分摊、支付通知身份校验（15 个用例）。

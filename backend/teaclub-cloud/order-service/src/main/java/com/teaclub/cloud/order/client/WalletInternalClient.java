@@ -32,4 +32,12 @@ public interface WalletInternalClient {
      */
     @PostMapping("/refund-in")
     Result<Map<String, Object>> refundIn(@RequestBody Map<String, Object> cmd);
+
+    /**
+     * 查询某业务单是否已有对应资金流水（跨服务对账用）。
+     */
+    @org.springframework.web.bind.annotation.GetMapping("/txn-exists")
+    com.teaclub.cloud.core.api.Result<Boolean> txnExists(
+            @org.springframework.web.bind.annotation.RequestParam("bizType") String bizType,
+            @org.springframework.web.bind.annotation.RequestParam("bizNo") String bizNo);
 }

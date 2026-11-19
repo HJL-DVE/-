@@ -39,6 +39,8 @@ import java.util.Map;
 public class OrderInternalController {
 
     private final OmsOrderMapper orderMapper;
+    private final com.teaclub.cloud.messaging.outbox.OutboxService outboxService;
+    private final com.teaclub.cloud.order.service.OrderWalletReconciliationService reconciliationService;
 
     @Operation(summary = "按订单号查询订单（内部调用）")
     @GetMapping("/order/{orderNo}")
@@ -68,6 +70,7 @@ public class OrderInternalController {
 
     @Operation(summary = "标记订单支付中（内部调用）")
     @PostMapping("/order/{orderNo}/mark-paying")
+    @org.springframework.transaction.annotation.Transactional(rollbackFor = Exception.class)
     public Result<Void> markPaying(@PathVariable("orderNo") String orderNo,
                                    @RequestBody Map<String, Object> body) {
         OmsOrder existing = orderMapper.selectByNo(orderNo);
@@ -85,6 +88,7 @@ public class OrderInternalController {
 
     @Operation(summary = "标记订单已支付（内部调用）")
     @PostMapping("/order/{orderNo}/mark-paid")
+    @org.springframework.transaction.annotation.Transactional(rollbackFor = Exception.class)
     public Result<Void> markPaid(@PathVariable("orderNo") String orderNo,
                                  @RequestBody Map<String, Object> body) {
         OmsOrder existing = orderMapper.selectByNo(orderNo);
@@ -99,12 +103,26 @@ public class OrderInternalController {
         patch.setPaidAmount(toLong(body.get("paidAmount")));
         patch.setPayTime(LocalDateTime.now());
         orderMapper.updateById(patch);
+
+        // 领域事件：订单已支付（微信支付渠道）
+        Map<String, Object> paidEvent = new LinkedHashMap<>();
+        paidEvent.put("orderNo", orderNo);
+        paidEvent.put("brandId", existing.getBrandId());
+        paidEvent.put("storeId", existing.getStoreId());
+        paidEvent.put("memberId", existing.getMemberId());
+        paidEvent.put("paidAmount", toLong(body.get("paidAmount")));
+        paidEvent.put("payChannel", str(body.get("payChannel")));
+        paidEvent.put("paymentNo", str(body.get("paymentNo")));
+        outboxService.enqueue(
+                com.teaclub.cloud.messaging.event.DomainEvents.ORDER_PAID, orderNo, paidEvent);
+
         log.info("内部调用标记订单已支付: orderNo={}", orderNo);
         return Result.ok();
     }
 
     @Operation(summary = "订单退款申请（内部调用）")
     @PostMapping("/order/{orderNo}/apply-refund")
+    @org.springframework.transaction.annotation.Transactional(rollbackFor = Exception.class)
     public Result<Void> applyRefund(@PathVariable("orderNo") String orderNo,
                                      @RequestBody Map<String, Object> body) {
         OmsOrder order = orderMapper.selectByNoForUpdate(orderNo);
@@ -121,6 +139,13 @@ public class OrderInternalController {
         orderMapper.updateById(patch);
         log.info("内部调用订单退款申请: orderNo={} amount={} fully={}", orderNo, amount, fully);
         return Result.ok();
+    }
+
+    @Operation(summary = "订单-钱包跨服务对账（内部调用）")
+    @org.springframework.web.bind.annotation.GetMapping("/reconcile")
+    public Result<Map<String, Object>> reconcile(
+            @RequestParam(defaultValue = "7") int days) {
+        return Result.ok(reconciliationService.reconcile(days));
     }
 
     @Operation(summary = "查询门店消费过的会员 ID（可见口径 B）")

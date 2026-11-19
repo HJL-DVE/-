@@ -1,3 +1,16 @@
+## [第五阶段·任务四补齐] 超时关单 / Outbox 接入 / 跨服务对账 / 部分冻结 / 单元测试（2026-11-20）
+
+| # | 原缺口 | 现状 | 实测 |
+| --- | --- | --- | --- |
+| 1 | 支付超时关单 | PaymentTimeoutCloser + CLOSED 状态 | PAYING → CLOSED，订单保持 UNPAID |
+| 2 | Outbox 未接业务 | 三服务业务方法内发 8 类事件 | order/wallet/payment 均 SENT |
+| 3 | 无跨服务对账 | OrderWalletReconciliationService | checked=7 issues=0 |
+| 4 | 冻结不支持部分确认 | confirmFreezePartial | 扣 1200/300，释放剩余 1800/700 |
+| 5 | 无单元测试 | 3 个测试类 | 15 用例全部通过 |
+
+新增文档：docs/31；新增测试脚本：13 / 14。
+
+---
 ## [第五阶段·任务四补充] 支付通知身份校验落地（2026-11-20）
 
 项目为课程设计、不会上线，因此不申请微信商户资质。

@@ -85,6 +85,12 @@ public class WalletInternalController {
         return Result.ok(data);
     }
 
+    @Operation(summary = "查询业务单是否已有资金流水（内部对账用）")
+    @GetMapping("/txn-exists")
+    public Result<Boolean> txnExists(@RequestParam String bizType, @RequestParam String bizNo) {
+        return Result.ok(walletService.existsTxn(bizType, bizNo));
+    }
+
     @Operation(summary = "资金对账（内部调用）")
     @GetMapping("/reconcile")
     public Result<Object> reconcile() {
@@ -117,6 +123,19 @@ public class WalletInternalController {
                                                      @RequestParam(required = false) Long storeId,
                                                      @RequestParam(required = false) Long operatorId) {
         return Result.ok(walletService.confirmFreeze(brandId, memberId, orderNo, storeId, operatorId));
+    }
+
+    @Operation(summary = "部分确认冻结扣款（内部调用，其余释放）")
+    @PostMapping("/freeze/confirm-partial")
+    public Result<WalletChangeResult> confirmFreezePartial(@RequestParam Long brandId,
+                                                            @RequestParam Long memberId,
+                                                            @RequestParam String orderNo,
+                                                            @RequestParam(required = false) Long storeId,
+                                                            @RequestParam(required = false) Long operatorId,
+                                                            @RequestParam(required = false) Long principal,
+                                                            @RequestParam(required = false) Long gift) {
+        return Result.ok(walletService.confirmFreezePartial(brandId, memberId, orderNo,
+                storeId, operatorId, principal, gift));
     }
 
     @Operation(summary = "释放冻结（内部调用）")

@@ -70,4 +70,15 @@ public interface OmsOrderMapper extends BaseMapper<OmsOrder> {
             """)
     int countByMemberAndStores(@Param("memberId") Long memberId,
                                @Param("storeIds") Collection<Long> storeIds);
+
+    /**
+     * 查询最近 N 天内使用余额支付的订单（用于订单-钱包三方对账）。
+     */
+    @Select("SELECT * FROM oms_order WHERE deleted = 0 "
+            + "AND pay_channel = 'BALANCE' "
+            + "AND status IN ('PAID','COMPLETED','REFUNDING','REFUNDED') "
+            + "AND pay_time > DATE_SUB(NOW(3), INTERVAL #{days} DAY) "
+            + "ORDER BY id DESC LIMIT #{limit}")
+    List<OmsOrder> selectBalancePaidSince(
+            @Param("days") int days, @Param("limit") int limit);
 }

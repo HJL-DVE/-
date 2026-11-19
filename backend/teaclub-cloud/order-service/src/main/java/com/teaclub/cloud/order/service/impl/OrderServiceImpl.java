@@ -51,6 +51,7 @@ public class OrderServiceImpl implements OrderService {
     private final com.teaclub.cloud.order.client.WalletInternalClient walletClient;
     private final com.teaclub.cloud.order.client.AuthInternalClient authClient;
     private final com.teaclub.cloud.order.saga.PaymentSagaService sagaService;
+    private final com.teaclub.cloud.messaging.outbox.OutboxService outboxService;
 
     @Override
     public OrderQuoteVO quote(OrderQuoteRequest request) {
@@ -216,6 +217,20 @@ public class OrderServiceImpl implements OrderService {
 
             // 订单已更新，Saga 完成
             sagaService.markCompleted(saga.getId());
+
+            // 领域事件：订单已支付（与订单状态同一本地事务）
+            Map<String, Object> paidEvent = new java.util.HashMap<>();
+            paidEvent.put("orderNo", orderNo);
+            paidEvent.put("brandId", order.getBrandId());
+            paidEvent.put("storeId", order.getStoreId());
+            paidEvent.put("memberId", order.getMemberId());
+            paidEvent.put("paidAmount", order.getPayableAmount());
+            paidEvent.put("principalAmount", principalDeduct);
+            paidEvent.put("giftAmount", giftDeduct);
+            paidEvent.put("payChannel", "BALANCE");
+            outboxService.enqueue(
+                    com.teaclub.cloud.messaging.event.DomainEvents.ORDER_PAID,
+                    orderNo, paidEvent);
         } catch (Exception e) {
             // 【Saga 补偿】订单更新失败 / 本地事务将回滚 -> 必须把已扣资金回冲，
             // 否则出现"钱扣了但订单永久待支付"。回冲用 COMP- 前缀保证幂等。

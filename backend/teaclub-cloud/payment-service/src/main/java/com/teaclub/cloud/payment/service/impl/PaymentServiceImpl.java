@@ -46,6 +46,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final PayRefundOrderMapper refundMapper;
     private final PayNotifyLogMapper notifyMapper;
     private final PaymentProvider provider;
+    private final com.teaclub.cloud.messaging.outbox.OutboxService outboxService;
     private final OrderInternalClient orderClient;
     private final WalletInternalClient walletClient;
 
@@ -254,6 +255,19 @@ public class PaymentServiceImpl implements PaymentService {
             throw new BizException(ResultCode.BAD_REQUEST, "未知业务类型: " + payment.getBizType());
         }
 
+        // 领域事件：支付成功（与业务数据同一本地事务，由 Outbox 异步投递）
+        Map<String, Object> paidEvent = new LinkedHashMap<>();
+        paidEvent.put("paymentNo", paymentNo);
+        paidEvent.put("bizType", payment.getBizType());
+        paidEvent.put("bizNo", payment.getBizNo());
+        paidEvent.put("amount", payment.getAmount());
+        paidEvent.put("channel", payment.getChannel());
+        paidEvent.put("provider", payment.getProvider());
+        paidEvent.put("transactionId", transactionId);
+        outboxService.enqueue(
+                com.teaclub.cloud.messaging.event.DomainEvents.PAYMENT_SUCCEEDED,
+                payment.getBizNo(), paidEvent);
+
         log.info("支付成功处理完成 paymentNo={} bizType={} bizNo={}",
                 paymentNo, payment.getBizType(), payment.getBizNo());
     }
@@ -441,6 +455,19 @@ public class PaymentServiceImpl implements PaymentService {
         patch.setWxRefundId(wxRefundId);
         patch.setSuccessTime(LocalDateTime.now());
         refundMapper.updateById(patch);
+
+        // 领域事件：退款成功
+        Map<String, Object> refundEvent = new LinkedHashMap<>();
+        refundEvent.put("refundNo", refund.getRefundNo());
+        refundEvent.put("paymentNo", refund.getPaymentNo());
+        refundEvent.put("bizNo", refund.getBizNo());
+        refundEvent.put("refundAmount", refund.getRefundAmount());
+        refundEvent.put("refundPrincipalAmount", refund.getRefundPrincipalAmount());
+        refundEvent.put("refundGiftAmount", refund.getRefundGiftAmount());
+        refundEvent.put("channel", refund.getChannel());
+        outboxService.enqueue(
+                com.teaclub.cloud.messaging.event.DomainEvents.REFUND_SUCCEEDED,
+                refund.getRefundNo(), refundEvent);
     }
 
     private void markRefundFailed(PayRefundOrder refund, String reason) {
