@@ -18,8 +18,6 @@ x-common-env: &common-env
   SPRING_PROFILES_ACTIVE: docker
   NACOS_ADDR: nacos:8848
   NACOS_GROUP: TEACLUB
-  NACOS_USERNAME: nacos
-  NACOS_PASSWORD: nacos
   REDIS_HOST: redis
   REDIS_PORT: "6379"
   RABBITMQ_HOST: rabbitmq
@@ -30,6 +28,8 @@ x-common-env: &common-env
   INTERNAL_TOKEN: ${INTERNAL_TOKEN:-teaclub-internal-default-token}
   JWT_ADMIN_SECRET: ${JWT_ADMIN_SECRET}
   JWT_MEMBER_SECRET: ${JWT_MEMBER_SECRET}
+  # 仅开发环境：开启本地联调令牌端点（生产环境请移除此变量）
+  DEV_TOKEN_ENDPOINT: ${DEV_TOKEN_ENDPOINT:-false}
 
 services:
   # ==================== 数据层 ====================
@@ -87,7 +87,9 @@ services:
       JVM_XMS: 512m
       JVM_XMX: 512m
       JVM_XMN: 256m
-      NACOS_AUTH_ENABLE: "true"
+      # 内嵌 Derby 模式下 Nacos 不会自动创建 nacos 用户，开启认证会导致
+      # "User nacos not found"。开发环境关闭认证，与本机原生 standalone 版一致。
+      NACOS_AUTH_ENABLE: "false"
       NACOS_AUTH_IDENTITY_KEY: serverIdentity
       NACOS_AUTH_IDENTITY_VALUE: security
       NACOS_AUTH_TOKEN: SecretKey012345678901234567890123456789012345678901234567890123456789
@@ -134,10 +136,8 @@ services:
   # ==================== 应用层 ====================
   gateway-service:
     build:
-      context: ../teaclub-cloud
-      dockerfile: gateway-service/Dockerfile
-      args:
-        SERVICE_BUILD: gateway-service
+      context: ../teaclub-cloud/gateway-service
+      dockerfile: Dockerfile
     image: teaclub/gateway-service:1.0.0
     container_name: teaclub-gateway
     restart: unless-stopped
@@ -161,10 +161,8 @@ services:
   # 业务服务统一模板
   auth-service:
     build:
-      context: ../teaclub-cloud
-      dockerfile: auth-service/Dockerfile
-      args:
-        SERVICE_BUILD: auth-service
+      context: ../teaclub-cloud/auth-service
+      dockerfile: Dockerfile
     image: teaclub/auth-service:1.0.0
     container_name: teaclub-auth
     restart: unless-stopped
@@ -175,6 +173,8 @@ services:
       DB_PORT: "3306"
       DB_USER: tc_auth
       DB_PASSWORD: ${DB_PASSWORD_AUTH}
+    ports:
+      - "9001:9001"
     depends_on:
       mysql: { condition: service_healthy }
       nacos: { condition: service_healthy }
@@ -182,10 +182,8 @@ services:
 
   member-service:
     build:
-      context: ../teaclub-cloud
-      dockerfile: member-service/Dockerfile
-      args:
-        SERVICE_BUILD: member-service
+      context: ../teaclub-cloud/member-service
+      dockerfile: Dockerfile
     image: teaclub/member-service:1.0.0
     container_name: teaclub-member
     restart: unless-stopped
@@ -196,6 +194,8 @@ services:
       DB_PORT: "3306"
       DB_USER: tc_member
       DB_PASSWORD: ${DB_PASSWORD_MEMBER}
+    ports:
+      - "9002:9002"
     depends_on:
       mysql: { condition: service_healthy }
       nacos: { condition: service_healthy }
@@ -203,10 +203,8 @@ services:
 
   product-service:
     build:
-      context: ../teaclub-cloud
-      dockerfile: product-service/Dockerfile
-      args:
-        SERVICE_BUILD: product-service
+      context: ../teaclub-cloud/product-service
+      dockerfile: Dockerfile
     image: teaclub/product-service:1.0.0
     container_name: teaclub-product
     restart: unless-stopped
@@ -217,6 +215,8 @@ services:
       DB_PORT: "3306"
       DB_USER: tc_product
       DB_PASSWORD: ${DB_PASSWORD_PRODUCT}
+    ports:
+      - "9003:9003"
     depends_on:
       mysql: { condition: service_healthy }
       nacos: { condition: service_healthy }
@@ -224,10 +224,8 @@ services:
 
   wallet-service:
     build:
-      context: ../teaclub-cloud
-      dockerfile: wallet-service/Dockerfile
-      args:
-        SERVICE_BUILD: wallet-service
+      context: ../teaclub-cloud/wallet-service
+      dockerfile: Dockerfile
     image: teaclub/wallet-service:1.0.0
     container_name: teaclub-wallet
     restart: unless-stopped
@@ -238,6 +236,8 @@ services:
       DB_PORT: "3306"
       DB_USER: tc_wallet
       DB_PASSWORD: ${DB_PASSWORD_WALLET}
+    ports:
+      - "9004:9004"
     depends_on:
       mysql: { condition: service_healthy }
       nacos: { condition: service_healthy }
@@ -246,10 +246,8 @@ services:
 
   order-service:
     build:
-      context: ../teaclub-cloud
-      dockerfile: order-service/Dockerfile
-      args:
-        SERVICE_BUILD: order-service
+      context: ../teaclub-cloud/order-service
+      dockerfile: Dockerfile
     image: teaclub/order-service:1.0.0
     container_name: teaclub-order
     restart: unless-stopped
@@ -260,6 +258,8 @@ services:
       DB_PORT: "3306"
       DB_USER: tc_order
       DB_PASSWORD: ${DB_PASSWORD_ORDER}
+    ports:
+      - "9005:9005"
     depends_on:
       mysql: { condition: service_healthy }
       nacos: { condition: service_healthy }
@@ -268,10 +268,8 @@ services:
 
   payment-service:
     build:
-      context: ../teaclub-cloud
-      dockerfile: payment-service/Dockerfile
-      args:
-        SERVICE_BUILD: payment-service
+      context: ../teaclub-cloud/payment-service
+      dockerfile: Dockerfile
     image: teaclub/payment-service:1.0.0
     container_name: teaclub-payment
     restart: unless-stopped
@@ -282,6 +280,8 @@ services:
       DB_PORT: "3306"
       DB_USER: tc_payment
       DB_PASSWORD: ${DB_PASSWORD_PAYMENT}
+    ports:
+      - "9006:9006"
     depends_on:
       mysql: { condition: service_healthy }
       nacos: { condition: service_healthy }

@@ -8,14 +8,13 @@ spring:
       discovery:
         server-addr: ${NACOS_ADDR:nacos:8848}
         group: ${NACOS_GROUP:TEACLUB}
-        username: ${NACOS_USERNAME:nacos}
-        password: ${NACOS_PASSWORD:nacos}
       config:
+        enabled: true
+        import-check:
+          enabled: false
         server-addr: ${NACOS_ADDR:nacos:8848}
         group: ${NACOS_GROUP:TEACLUB}
         file-extension: yaml
-        username: ${NACOS_USERNAME:nacos}
-        password: ${NACOS_PASSWORD:nacos}
   data:
     redis:
       host: ${REDIS_HOST:redis}
@@ -45,3 +44,14 @@ logging:
     org.springframework.cloud.gateway: INFO
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{traceId:-}] %logger{36} - %msg%n"
+
+teaclub:
+  jwt:
+    admin-secret: ${JWT_ADMIN_SECRET:}
+    member-secret: ${JWT_MEMBER_SECRET:}
+    access-token-expire-seconds: 7200
+    issuer: teaclub
+  security:
+    internal-token: ${INTERNAL_TOKEN:teaclub-internal-default-token}
+    # 仅容器联调时开启本地令牌端点（生产环境不设置该变量）
+    dev-token-endpoint-enabled: ${DEV_TOKEN_ENDPOINT:false}

@@ -5,7 +5,7 @@
 | 文档编号 | TC-MSA-09 |
 | 更新日期 | 2026-11-19 |
 | 阶段 | 第五阶段·任务二：微服务基础设施 |
-| 总体状态 | **Docker 容器化基础设施已跑通** |
+| 总体状态 | **11 个容器全部运行，微服务全链路打通** |
 
 ---
 
@@ -62,7 +62,21 @@ WSL 安装在 96.2% 处下载失败（微软 CDN 不稳定），但**两个中�
 **数据库权限隔离实测**：`tc_wallet` 访问 `order_db` 被拒
 （`ERROR 1142 SELECT command denied`），9 个库全部创建。
 
-详见 `docs/16-容器化部署验证报告.md`。
+### 应用服务容器（11 个全部运行）
+
+| 容器 | 端口 | 状态 |
+| --- | --- | --- |
+| teaclub-gateway | 9000 | ✅ healthy |
+| teaclub-auth | 9001 | ✅ UP |
+| teaclub-member | 9002 | ✅ UP |
+| teaclub-product | 9003 | ✅ UP |
+| teaclub-wallet | 9004 | ✅ UP |
+| teaclub-order | 9005 | ✅ UP |
+| teaclub-payment | 9006 | ✅ UP |
+
+**端到端实测**：真实 JWT → Gateway 容器 → Nacos 服务发现 → auth-service 容器 → 200。
+
+详见 `docs/17-容器化部署完整验证报告.md`。
 
 ### WSL 已就绪
 
