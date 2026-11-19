@@ -16,6 +16,18 @@ import java.util.List;
 public interface OmsOrderMapper extends BaseMapper<OmsOrder> {
 
     /**
+     * 按订单号查询（不加锁）。
+     */
+    @Select("SELECT * FROM oms_order WHERE order_no = #{orderNo} AND deleted = 0")
+    OmsOrder selectByNo(@Param("orderNo") String orderNo);
+
+    /**
+     * 按订单号加行锁读取（并发支付/取消时保证一致性）。
+     */
+    @Select("SELECT * FROM oms_order WHERE order_no = #{orderNo} AND deleted = 0 FOR UPDATE")
+    OmsOrder selectByNoForUpdate(@Param("orderNo") String orderNo);
+
+    /**
      * 查询在指定门店有消费的会员 ID 集合。
      *
      * <p><b>用途</b>：member-service 的会员可见口径（B 方案）需要知道
