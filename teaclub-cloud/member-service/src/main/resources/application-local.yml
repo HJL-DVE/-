@@ -1,0 +1,64 @@
+# ============================================================
+# member-service 本地验证配置
+# 启动：java -jar member-service.jar --spring.profiles.active=local
+# ============================================================
+server:
+  port: 9002
+
+spring:
+  cloud:
+    nacos:
+      discovery:
+        enabled: true
+        server-addr: 127.0.0.1:8848
+        group: TEACLUB
+        register-enabled: true
+        # Nacos 2.5.1 standalone 默认关闭 auth，不能传用户名密码
+        username:
+        password:
+      config:
+        enabled: false
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3306/teaclub?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
+    username: teaclub
+    password: ${MYSQL_PASSWORD:}
+  flyway:
+    enabled: false
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
+  rabbitmq:
+    host: 127.0.0.1
+    port: 5672
+    username: guest
+    password: guest
+    listener:
+      simple:
+        auto-startup: false
+
+teaclub:
+  jwt:
+    admin-secret: ZGV2LWFkbWluLXNlY3JldC1kby1ub3QtdXNlLWluLXByb2R1Y3Rpb24tMDE=
+    member-secret: ZGV2LW1lbWJlci1zZWNyZXQtZG8tbm90LXVzZS1pbi1wcm9kdWN0aW9uLTAy
+  security:
+    internal-token: teaclub-internal-default-token
+  feign:
+    connect-timeout: 3000
+    read-timeout: 8000
+    # 默认不重试；有副作用的操作必须靠业务单号幂等
+    default-retry: 0
+
+management:
+  health:
+    rabbit:
+      enabled: false
+    db:
+      enabled: false
+    redis:
+      enabled: false
+
+logging:
+  level:
+    com.alibaba.nacos: WARN
+    com.teaclub.cloud: DEBUG

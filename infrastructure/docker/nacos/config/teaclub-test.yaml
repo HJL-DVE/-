@@ -1,0 +1,29 @@
+# ============================================================
+# 测试环境配置（Nacos）
+# dataId: teaclub-test.yaml
+# group : TEACLUB
+# ============================================================
+
+spring:
+  datasource:
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+  jackson:
+    default-property-inclusion: non_null
+    time-zone: Asia/Shanghai
+
+logging:
+  level:
+    root: WARN
+    com.teaclub.cloud: INFO
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when-authorized

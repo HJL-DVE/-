@@ -61,6 +61,38 @@ WSL 3.0.5.0 安装成功（内核 6.18.58.1），Docker Desktop 引擎 29.9.3 �
 
 ---
 
+## [第五阶段·任务二完成] Spring Cloud 微服务基础设施（2026-11-19）
+
+### 目录调整
+
+`web/` → `teaclub-admin/`，`miniapp/` → `teaclub-miniprogram/`，`deploy/` → `infrastructure/docker/`
+
+### 新增模块
+
+- `common-redis`：缓存/验证码/登录态/热点数据/分布式锁
+- `common-feign`：客户端基类/超时/重试策略/异常解码
+
+### 补齐能力
+
+- common-core：参数校验组件 + 统一日志上下文（MDC）
+- common-web：健康指示器
+- common-messaging：消息消费者基类（手动 ACK/幂等/TraceId 恢复）+ 重试策略
+- common-security：内部接口保护（FilterRegistrationBean + 路径段匹配 + 401 统一响应）
+- Nacos 配置管理：teaclub-common/dev/test 三份共享配置
+- auth-service：Feign 客户端 + 调用演示端点
+- member-service：内部接口（受 X-Internal-Token 保护）
+
+### 验收结果（11 项全通过）
+
+编译 16 模块 / Gateway UP / Nacos OK / 注册 7/7 / 发现 healthy 7/7 /
+路由 401-401-404-200 / OpenFeign 调用成功 / RabbitMQ 集成测试 4/4 /
+Redis PONG / 11 个容器运行 / 跨库访问被拒 ERROR 1142
+
+### 本轮修复 20 个问题
+
+重点：内部接口此前无凭证可访问（过滤器路径匹配错 + 未注册进链）、
+Feign 拦截器因 @ConditionalOnMissingBean 冲突未生效。
+
 ## [第五阶段·任务二] 微服务基础设施搭建（2026-11-19）
 
 ### 新增工程

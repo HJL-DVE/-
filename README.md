@@ -1,5 +1,27 @@
 # TeaClub 连锁奶茶店会员与储值营销管理系统
 
+## 项目结构
+
+```text
+TeaClub/
+├── backend/              单体后端（保留可用，未改动）
+├── teaclub-cloud/        Spring Cloud 微服务工程
+│   ├── pom.xml           父 POM，统一管理依赖版本
+│   ├── common/
+│   │   ├── common-core/      统一返回/异常/错误码/TraceId/单号
+│   │   ├── common-web/       过滤器/全局异常/OpenAPI
+│   │   ├── common-security/  JWT/上下文/权限/内部接口保护
+│   │   ├── common-messaging/ RabbitMQ 组件
+│   │   ├── common-redis/     Redis 缓存与分布式锁
+│   │   └── common-feign/     OpenFeign 客户端基类
+│   ├── gateway-service/  统一网关
+│   └── 9 个业务服务        auth/member/product/wallet/order/payment/marketing/inventory/report
+├── teaclub-admin/        管理后台前端
+├── teaclub-miniprogram/  小程序前端
+├── infrastructure/       容器化部署编排
+└── docs/                 设计与验收文档
+```
+
 > 一个品牌 · 多家门店 · 统一会员身份
 > Web 管理后台 + 微信小程序 · 前后端分离 · 模块化单体
 

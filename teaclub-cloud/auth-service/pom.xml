@@ -18,6 +18,11 @@
     <!-- 公共组件 -->
     <dependency>
       <groupId>com.teaclub</groupId>
+      <artifactId>common-feign</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.teaclub</groupId>
       <artifactId>common-web</artifactId>
     </dependency>
     <dependency>

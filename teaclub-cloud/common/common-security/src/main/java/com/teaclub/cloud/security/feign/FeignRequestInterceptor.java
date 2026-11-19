@@ -10,7 +10,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.MDC;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Configuration;
+import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
@@ -23,8 +23,8 @@ import java.util.stream.Collectors;
  * Gateway 使用 WebFlux + spring-cloud-starter-gateway，默认不含 feign-core，
  * 若不加条件会导致网关启动时扫描到此配置类而失败。
  */
-@Configuration
 @ConditionalOnClass(name = "feign.RequestInterceptor")
+@Component
 public class FeignRequestInterceptor implements RequestInterceptor {
 
     @Value("${teaclub.security.internal-token:teaclub-internal-default-token}")

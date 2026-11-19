@@ -35,6 +35,8 @@
     <module>common/common-web</module>
     <module>common/common-security</module>
     <module>common/common-messaging</module>
+    <module>common/common-redis</module>
+    <module>common/common-feign</module>
     <!-- 基础设施 -->
     <module>gateway-service</module>
     <!-- 业务服务 -->

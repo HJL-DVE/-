@@ -1,0 +1,29 @@
+# ============================================================
+# TeaClub 共享配置（Nacos 配置中心）
+#
+# dataId: teaclub-common.yaml
+# group : TEACLUB
+#
+# 由各服务的 spring.config.import=optional:nacos:teaclub-common.yaml 拉取
+# ============================================================
+
+teaclub:
+  security:
+    # 内部调用凭证（生产环境请用 Nacos 加密配置或 KMS）
+    internal-token: ${INTERNAL_TOKEN:teaclub-internal-default-token}
+  feign:
+    connect-timeout: 3000
+    read-timeout: 8000
+    # 默认不重试。有副作用的操作必须靠业务单号幂等
+    default-retry: 0
+    retryable-prefixes:
+      - "GET:/api/member/"
+      - "GET:/api/product/"
+      - "GET:/api/report/"
+
+logging:
+  level:
+    root: INFO
+    com.teaclub.cloud: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{traceId:-}] [%X{username:-}] %logger{36} - %msg%n"

@@ -39,6 +39,13 @@ public enum ResultCode {
     GATEWAY_RATE_LIMITED(10304, "请求过于频繁，请稍后再试"),
 
     // 内部调用 104xx
+    /** 下游服务不可用 */
+    DOWNSTREAM_UNAVAILABLE(10404, "下游服务暂不可用"),
+    /** 下游服务超时 */
+    DOWNSTREAM_TIMEOUT(10405, "下游服务响应超时"),
+    /** 下游资源不存在 */
+    DOWNSTREAM_NOT_FOUND(10406, "下游资源不存在"),
+    /** Feign 调用失败 */
     FEIGN_CALL_FAILED(10401, "服务间调用失败"),
     INTERNAL_TOKEN_INVALID(10402, "内部调用凭证无效"),
     IDEMPOTENT_CONFLICT(10403, "重复请求，已忽略"),
