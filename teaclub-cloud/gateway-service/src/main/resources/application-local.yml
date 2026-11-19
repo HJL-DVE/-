@@ -1,0 +1,57 @@
+# ============================================================
+# gateway-service 本地独立验证配置（不依赖 Nacos）
+# 启动：java -jar gateway-service.jar --spring.profiles.active=local
+# ============================================================
+server:
+  port: 9000
+
+spring:
+  cloud:
+    nacos:
+      discovery:
+        enabled: false
+      config:
+        enabled: false
+    gateway:
+      discovery:
+        locator:
+          enabled: false
+      routes:
+        - id: auth-service-local
+          uri: http://127.0.0.1:9001
+          predicates:
+            - Path=/api/auth/**,/api/admin/auth/**
+        - id: member-service-local
+          uri: http://127.0.0.1:9002
+          predicates:
+            - Path=/api/member/**
+        - id: wallet-service-local
+          uri: http://127.0.0.1:9004
+          predicates:
+            - Path=/api/wallet/**
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
+
+teaclub:
+  jwt:
+    admin-secret: ZGV2LWFkbWluLXNlY3JldC1kby1ub3QtdXNlLWluLXByb2R1Y3Rpb24tMDE=
+    member-secret: ZGV2LW1lbWJlci1zZWNyZXQtZG8tbm90LXVzZS1pbi1wcm9kdWN0aW9uLTAy
+    access-token-expire-seconds: 7200
+    issuer: teaclub
+  security:
+    internal-token: teaclub-internal-default-token
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,gateway
+
+logging:
+  level:
+    root: INFO
+    com.teaclub.cloud: DEBUG
+  pattern:
+    console: "%d{HH:mm:ss.SSS} %-5level [%X{traceId:-}] %logger{30} - %msg%n"

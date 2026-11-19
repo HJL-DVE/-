@@ -29,6 +29,52 @@
 
 ---
 
+## [第五阶段·任务二] 微服务基础设施搭建（2026-11-19）
+
+### 新增工程
+
+`teaclub-cloud/` —— 15 个 Maven 模块：
+
+- `common-core`（统一响应/错误码/异常/TraceId/单号生成，16 单元测试）
+- `common-web`（TraceId 过滤器/全局异常/OpenAPI，条件装配隔离 Servlet 与 WebFlux）
+- `common-security`（JWT/登录上下文/StoreScope/Feign 透传/内部接口保护）
+- `common-messaging`（RabbitMQ 交换机/队列/死信/事件发布/消费幂等，4 项真实集成测试）
+- `gateway-service`（路由/JWT 前置校验/限流/跨域/TraceId/全局异常）
+- 9 个业务服务骨架（auth/member/product/wallet/order/payment/marketing/inventory/report）
+
+### 版本矩阵（实测修正）
+
+初选 Spring Cloud 2023.0.5 + Boot 3.5.16 → **启动失败**（SC 2023.0.x 只支持 Boot 3.2/3.3）。
+修正为 **Spring Cloud 2025.0.3 + Spring Cloud Alibaba 2025.0.0.0 + Boot 3.5.16** → 启动成功。
+
+Swagger annotations 升至 **2.2.55**（仅该版本含 `DateTimeLocalSchema`）。
+
+### 中间件安装（绕过 Docker）
+
+WSL 安装在 96.2% 下载失败，改用官方 Windows 原生版：
+
+| 组件 | 版本 | 方式 | 验证 |
+| --- | --- | --- | --- |
+| Nacos | 2.5.1 | 官方 zip | ✅ 8848 UP，服务注册成功 |
+| RabbitMQ | 3.13.7 | 官方 zip + Erlang/OTP 27.2 | ✅ 5672/15672 UP，4 项集成测试通过 |
+| WSL | 3.0.5.0 | 用户提供的 MSI + 自提权脚本 | ✅ 内核 6.18.58.1-1 |
+
+### 实测结果
+
+- Gateway 九项能力全部通过（401/401/404/503 统一 Result 结构、`X-Trace-Id`）
+- 完整链路：真实 JWT → Gateway → auth-service → 200
+- Nacos 服务注册：count=1, healthy=True
+- RabbitMQ 集成测试 4 项：拓扑/收发/Confirm/Returns
+- 单元测试：common-core 16 + common-messaging 4
+- 单体回归 99 项不受影响
+
+### 未完成（明确标注）
+
+OpenFeign 真实调用（未定义客户端）、其余 8 服务注册验证、Docker Compose（需重启后 WSL 生效）、
+Nacos 配置中心实际拉取、各服务业务代码迁移。
+
+---
+
 ## [第五阶段·任务一] 微服务架构审计与设计（2026-11-19）
 
 ### 新增文档（6 份）

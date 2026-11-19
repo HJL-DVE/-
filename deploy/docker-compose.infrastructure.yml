@@ -1,0 +1,131 @@
+# ============================================================
+# TeaClub 微服务基础设施编排
+#
+# 用途：仅启动中间件（MySQL / Redis / Nacos / RabbitMQ）
+#       业务服务在开发期用 mvn 本地跑，便于调试
+#
+# 启动：docker compose -f deploy/docker-compose.infrastructure.yml --env-file deploy/.env.docker up -d
+# 停止：docker compose -f deploy/docker-compose.infrastructure.yml down
+# 日志：docker compose -f deploy/docker-compose.infrastructure.yml logs -f nacos
+#
+# 网络：所有服务在 teaclub-net 内，容器间用服务名互访
+# 端口：为避免与本机现有 MySQL(3306) / Redis(6379) 冲突，MySQL 映射到 3307
+# ============================================================
+
+name: teaclub-infra
+
+services:
+  # ---------------- MySQL 8.4 ----------------
+  mysql:
+    image: mysql:8.4
+    container_name: teaclub-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-authentication-plugin=caching_sha2_password
+      - --lower-case-table-names=1
+    ports:
+      - "${MYSQL_PORT:-3307}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./mysql/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    networks: [teaclub-net]
+
+  # ---------------- Redis 7 ----------------
+  redis:
+    image: redis:7-alpine
+    container_name: teaclub-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "512mb"]
+    ports:
+      # 本机已有 Redis 6379，容器版映射到 6380
+      - "6380:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks: [teaclub-net]
+
+  # ---------------- Nacos 2.x（注册中心 + 配置中心）----------------
+  nacos:
+    image: nacos/nacos-server:v2.5.1
+    container_name: teaclub-nacos
+    restart: unless-stopped
+    environment:
+      MODE: standalone
+      PREFER_HOST_MODE: hostname
+      SPRING_DATASOURCE_PLATFORM: embedded
+      JVM_XMS: 512m
+      JVM_XMX: 512m
+      JVM_XMN: 256m
+      NACOS_AUTH_ENABLE: "true"
+      NACOS_AUTH_IDENTITY_KEY: serverIdentity
+      NACOS_AUTH_IDENTITY_VALUE: security
+      NACOS_AUTH_TOKEN: SecretKey012345678901234567890123456789012345678901234567890123456789
+      TZ: Asia/Shanghai
+    ports:
+      - "${NACOS_PORT:-8848}:8848"
+      - "${NACOS_GRPC_PORT:-9848}:9848"
+    volumes:
+      - nacos-data:/home/nacos/data
+      - nacos-logs:/home/nacos/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8848/nacos/v1/console/health/readiness"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    networks: [teaclub-net]
+
+  # ---------------- RabbitMQ 3.13（带管理台）----------------
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: teaclub-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-teaclub}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+      RABBITMQ_DEFAULT_VHOST: /teaclub
+      TZ: Asia/Shanghai
+    ports:
+      - "${RABBITMQ_PORT:-5672}:5672"
+      - "${RABBITMQ_MGMT_PORT:-15672}:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 8
+      start_period: 40s
+    networks: [teaclub-net]
+
+volumes:
+  mysql-data:
+    name: teaclub-mysql-data
+  redis-data:
+    name: teaclub-redis-data
+  nacos-data:
+    name: teaclub-nacos-data
+  nacos-logs:
+    name: teaclub-nacos-logs
+  rabbitmq-data:
+    name: teaclub-rabbitmq-data
+
+networks:
+  teaclub-net:
+    name: teaclub-net
+    driver: bridge

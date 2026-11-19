@@ -1,0 +1,64 @@
+# ============================================================
+# auth-service 本地验证配置
+# 用途：在不依赖 Docker 的环境下验证 Nacos 注册/发现与 Gateway 路由
+# 启动：java -jar auth-service.jar --spring.profiles.active=local
+# ============================================================
+server:
+  port: 9001
+
+spring:
+  cloud:
+    nacos:
+      discovery:
+        enabled: true
+        server-addr: 127.0.0.1:8848
+        group: TEACLUB
+        register-enabled: true
+        # Nacos 2.5.1 standalone 默认关闭 auth，不能传用户名密码
+        username:
+        password:
+      config:
+        enabled: false
+  # 本地验证不连库：禁用数据源与 Flyway，仅验证注册与路由
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3306/teaclub?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
+    username: teaclub
+    password: ${MYSQL_PASSWORD:}
+  flyway:
+    enabled: false
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
+  rabbitmq:
+    host: 127.0.0.1
+    port: 5672
+    username: guest
+    password: guest
+    # 本机暂无 RabbitMQ，关闭自动连接避免启动阻塞
+    listener:
+      simple:
+        auto-startup: false
+
+teaclub:
+  jwt:
+    admin-secret: ZGV2LWFkbWluLXNlY3JldC1kby1ub3QtdXNlLWluLXByb2R1Y3Rpb24tMDE=
+    member-secret: ZGV2LW1lbWJlci1zZWNyZXQtZG8tbm90LXVzZS1pbi1wcm9kdWN0aW9uLTAy
+  security:
+    internal-token: teaclub-internal-default-token
+    # 仅 local profile 启用联调令牌端点
+    dev-token-endpoint-enabled: true
+
+management:
+  health:
+    rabbit:
+      enabled: false
+    db:
+      enabled: false
+    redis:
+      enabled: false
+
+logging:
+  level:
+    com.alibaba.nacos: WARN
+    com.teaclub.cloud: DEBUG
