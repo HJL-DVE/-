@@ -5,7 +5,7 @@
 | 文档编号 | TC-MSA-09 |
 | 更新日期 | 2026-11-19 |
 | 阶段 | 第五阶段·任务二：微服务基础设施 |
-| 总体状态 | **基础设施全部就绪并实测通过** |
+| 总体状态 | **Docker 容器化基础设施已跑通** |
 
 ---
 
@@ -49,6 +49,20 @@ WSL 安装在 96.2% 处下载失败（微软 CDN 不稳定），但**两个中�
 | RabbitMQ 3.13.7 | 官方 zip（30.7 MB）+ Erlang/OTP 27.2（133 MB） | ✅ 5672 AMQP UP，15672 管理台 UP，4 项集成测试通过 |
 | Redis 3.0.504 | winget（Windows 移植版） | ✅ 6379 UP，Gateway 限流已连接 |
 | MySQL 8.4.9 | 本机已装 | ✅ 3306 UP |
+
+### Docker 容器版（重启后新增）
+
+| 容器 | 镜像 | 端口 | 状态 |
+| --- | --- | --- | --- |
+| teaclub-mysql | mysql:8.4 | 3307 | ✅ healthy |
+| teaclub-redis | redis:7-alpine | 6380 | ✅ healthy |
+| teaclub-nacos | nacos/nacos-server:v2.5.1 | 8848 | ✅ healthy |
+| teaclub-rabbitmq | rabbitmq:3.13-management-alpine | 5672/15672 | ✅ healthy |
+
+**数据库权限隔离实测**：`tc_wallet` 访问 `order_db` 被拒
+（`ERROR 1142 SELECT command denied`），9 个库全部创建。
+
+详见 `docs/16-容器化部署验证报告.md`。
 
 ### WSL 已就绪
 

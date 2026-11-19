@@ -29,6 +29,38 @@
 
 ---
 
+## [第五阶段·任务三] Docker 容器化部署验证（2026-11-19）
+
+### 环境突破
+
+WSL 3.0.5.0 安装成功（内核 6.18.58.1），Docker Desktop 引擎 29.9.3 就绪。
+配置镜像加速器（Docker Hub 被墙）后成功拉取全部镜像。
+
+### 容器编排
+
+- `deploy/docker-compose.yml`：4 中间件 + 7 应用服务，含健康检查、依赖顺序、命名网络、数据卷
+- `deploy/nacos/conf/application.properties`：从镜像提取原始配置后精确修改，强制内嵌 Derby
+  （镜像默认走 MySQL 分支，占位符未展开导致崩溃，排查 4 轮才定位）
+- `deploy/mysql/init/01-create-databases.sql`：9 库 + 10 账号，密码与 `.env.docker` 同步
+- 7 个服务的多阶段 Dockerfile（构建上下文为 `teaclub-cloud` 父目录）
+
+### 实测
+
+| 项 | 结果 |
+| --- | --- |
+| 4 个中间件容器 | ✅ 全部 healthy |
+| 9 个数据库 | ✅ 自动创建 |
+| 权限隔离 | ✅ `tc_wallet` 访问 `order_db` 被拒（ERROR 1142） |
+| Redis | ✅ PING → PONG |
+| RabbitMQ 管理台 | ✅ 认证通过 |
+
+### 未完成
+
+7 个应用服务容器构建中、Nginx 前置（前端目录为空）、各服务 Flyway 迁移、
+应用服务连容器 Nacos 的注册验证。
+
+---
+
 ## [第五阶段·任务二] 微服务基础设施搭建（2026-11-19）
 
 ### 新增工程

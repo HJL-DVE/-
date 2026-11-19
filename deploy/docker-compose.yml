@@ -1,0 +1,306 @@
+# ============================================================
+# TeaClub 完整微服务编排
+#
+# 包含：MySQL / Redis / Nacos / RabbitMQ / Gateway / 9 个业务服务
+#
+# 启动：
+#   docker compose -f deploy/docker-compose.yml --env-file deploy/.env.docker up -d
+#
+# 说明：
+#   1. 业务服务镜像由各自 Dockerfile 构建（build.context 指向模块目录）
+#   2. 所有服务在 teaclub-net 内互通，用服务名互访
+#   3. 健康检查保证启动顺序（depends_on condition: service_healthy）
+# ============================================================
+
+name: teaclub
+
+x-common-env: &common-env
+  SPRING_PROFILES_ACTIVE: docker
+  NACOS_ADDR: nacos:8848
+  NACOS_GROUP: TEACLUB
+  NACOS_USERNAME: nacos
+  NACOS_PASSWORD: nacos
+  REDIS_HOST: redis
+  REDIS_PORT: "6379"
+  RABBITMQ_HOST: rabbitmq
+  RABBITMQ_PORT: "5672"
+  RABBITMQ_USER: ${RABBITMQ_DEFAULT_USER:-teaclub}
+  RABBITMQ_PASSWORD: ${RABBITMQ_DEFAULT_PASS}
+  RABBITMQ_VHOST: /teaclub
+  INTERNAL_TOKEN: ${INTERNAL_TOKEN:-teaclub-internal-default-token}
+  JWT_ADMIN_SECRET: ${JWT_ADMIN_SECRET}
+  JWT_MEMBER_SECRET: ${JWT_MEMBER_SECRET}
+
+services:
+  # ==================== 数据层 ====================
+  mysql:
+    image: mysql:8.4
+    container_name: teaclub-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --lower-case-table-names=1
+    ports:
+      - "${MYSQL_PORT:-3307}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./mysql/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    networks: [teaclub-net]
+
+  redis:
+    image: redis:7-alpine
+    container_name: teaclub-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "512mb"]
+    ports:
+      - "${REDIS_PORT:-6380}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks: [teaclub-net]
+
+  # ==================== 中间件 ====================
+  nacos:
+    image: nacos/nacos-server:v2.5.1
+    container_name: teaclub-nacos
+    restart: unless-stopped
+    environment:
+      MODE: standalone
+      PREFER_HOST_MODE: hostname
+      # 注意：不要在此处声明任何 MYSQL_SERVICE_* 变量。
+      # Nacos 镜像的 startup.sh 以"变量是否存在"判断是否切换到 MySQL 存储模式
+      # （置空也会触发），一旦误判就会连接不存在的 MySQL 而崩溃。
+      JVM_XMS: 512m
+      JVM_XMX: 512m
+      JVM_XMN: 256m
+      NACOS_AUTH_ENABLE: "true"
+      NACOS_AUTH_IDENTITY_KEY: serverIdentity
+      NACOS_AUTH_IDENTITY_VALUE: security
+      NACOS_AUTH_TOKEN: SecretKey012345678901234567890123456789012345678901234567890123456789
+      TZ: Asia/Shanghai
+    ports:
+      - "${NACOS_PORT:-8848}:8848"
+      - "${NACOS_GRPC_PORT:-9848}:9848"
+    volumes:
+      - nacos-data:/home/nacos/data
+      - nacos-logs:/home/nacos/logs
+      # 覆盖镜像内 application.properties，显式使用内嵌 Derby，
+      # 避免 db.url.0 中的占位符未展开导致启动崩溃
+      - ./nacos/conf/application.properties:/home/nacos/conf/application.properties:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8848/nacos/v1/console/health/readiness"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+    networks: [teaclub-net]
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: teaclub-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-teaclub}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+      RABBITMQ_DEFAULT_VHOST: /teaclub
+      TZ: Asia/Shanghai
+    ports:
+      - "${RABBITMQ_PORT:-5672}:5672"
+      - "${RABBITMQ_MGMT_PORT:-15672}:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 40s
+    networks: [teaclub-net]
+
+  # ==================== 应用层 ====================
+  gateway-service:
+    build:
+      context: ../teaclub-cloud
+      dockerfile: gateway-service/Dockerfile
+      args:
+        SERVICE_BUILD: gateway-service
+    image: teaclub/gateway-service:1.0.0
+    container_name: teaclub-gateway
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+      SERVER_PORT: "9000"
+      REDIS_PORT: "6379"
+    ports:
+      - "${GATEWAY_PORT:-9000}:9000"
+    depends_on:
+      nacos: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 45s
+    networks: [teaclub-net]
+
+  # 业务服务统一模板
+  auth-service:
+    build:
+      context: ../teaclub-cloud
+      dockerfile: auth-service/Dockerfile
+      args:
+        SERVICE_BUILD: auth-service
+    image: teaclub/auth-service:1.0.0
+    container_name: teaclub-auth
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+      SERVER_PORT: "9001"
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_USER: tc_auth
+      DB_PASSWORD: ${DB_PASSWORD_AUTH}
+    depends_on:
+      mysql: { condition: service_healthy }
+      nacos: { condition: service_healthy }
+    networks: [teaclub-net]
+
+  member-service:
+    build:
+      context: ../teaclub-cloud
+      dockerfile: member-service/Dockerfile
+      args:
+        SERVICE_BUILD: member-service
+    image: teaclub/member-service:1.0.0
+    container_name: teaclub-member
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+      SERVER_PORT: "9002"
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_USER: tc_member
+      DB_PASSWORD: ${DB_PASSWORD_MEMBER}
+    depends_on:
+      mysql: { condition: service_healthy }
+      nacos: { condition: service_healthy }
+    networks: [teaclub-net]
+
+  product-service:
+    build:
+      context: ../teaclub-cloud
+      dockerfile: product-service/Dockerfile
+      args:
+        SERVICE_BUILD: product-service
+    image: teaclub/product-service:1.0.0
+    container_name: teaclub-product
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+      SERVER_PORT: "9003"
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_USER: tc_product
+      DB_PASSWORD: ${DB_PASSWORD_PRODUCT}
+    depends_on:
+      mysql: { condition: service_healthy }
+      nacos: { condition: service_healthy }
+    networks: [teaclub-net]
+
+  wallet-service:
+    build:
+      context: ../teaclub-cloud
+      dockerfile: wallet-service/Dockerfile
+      args:
+        SERVICE_BUILD: wallet-service
+    image: teaclub/wallet-service:1.0.0
+    container_name: teaclub-wallet
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+      SERVER_PORT: "9004"
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_USER: tc_wallet
+      DB_PASSWORD: ${DB_PASSWORD_WALLET}
+    depends_on:
+      mysql: { condition: service_healthy }
+      nacos: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+    networks: [teaclub-net]
+
+  order-service:
+    build:
+      context: ../teaclub-cloud
+      dockerfile: order-service/Dockerfile
+      args:
+        SERVICE_BUILD: order-service
+    image: teaclub/order-service:1.0.0
+    container_name: teaclub-order
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+      SERVER_PORT: "9005"
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_USER: tc_order
+      DB_PASSWORD: ${DB_PASSWORD_ORDER}
+    depends_on:
+      mysql: { condition: service_healthy }
+      nacos: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+    networks: [teaclub-net]
+
+  payment-service:
+    build:
+      context: ../teaclub-cloud
+      dockerfile: payment-service/Dockerfile
+      args:
+        SERVICE_BUILD: payment-service
+    image: teaclub/payment-service:1.0.0
+    container_name: teaclub-payment
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+      SERVER_PORT: "9006"
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_USER: tc_payment
+      DB_PASSWORD: ${DB_PASSWORD_PAYMENT}
+    depends_on:
+      mysql: { condition: service_healthy }
+      nacos: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+    networks: [teaclub-net]
+
+volumes:
+  mysql-data:
+    name: teaclub-mysql-data
+  redis-data:
+    name: teaclub-redis-data
+  nacos-data:
+    name: teaclub-nacos-data
+  nacos-logs:
+    name: teaclub-nacos-logs
+  rabbitmq-data:
+    name: teaclub-rabbitmq-data
+
+networks:
+  teaclub-net:
+    name: teaclub-net
+    driver: bridge

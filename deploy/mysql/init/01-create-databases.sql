@@ -23,12 +23,12 @@ CREATE DATABASE IF NOT EXISTS report_db     DEFAULT CHARACTER SET utf8mb4 COLLAT
 
 -- ============ 2. 建账号（密码仅用于本地开发，生产必须更换）============
 -- 注意：'%' 允许容器网络内互访；生产应限定 IP
-CREATE USER IF NOT EXISTS 'tc_auth'@'%'       IDENTIFIED BY 'TcAuth_2026';
-CREATE USER IF NOT EXISTS 'tc_member'@'%'     IDENTIFIED BY 'TcMember_2026';
-CREATE USER IF NOT EXISTS 'tc_product'@'%'    IDENTIFIED BY 'TcProduct_2026';
-CREATE USER IF NOT EXISTS 'tc_wallet'@'%'     IDENTIFIED BY 'TcWallet_2026';
-CREATE USER IF NOT EXISTS 'tc_order'@'%'      IDENTIFIED BY 'TcOrder_2026';
-CREATE USER IF NOT EXISTS 'tc_payment'@'%'    IDENTIFIED BY 'TcPayment_2026';
+CREATE USER IF NOT EXISTS 'tc_auth'@'%'       IDENTIFIED BY 'PojGEBVSQZ3Umgvq';
+CREATE USER IF NOT EXISTS 'tc_member'@'%'     IDENTIFIED BY 'XjSDFsTyg9HBkDrY';
+CREATE USER IF NOT EXISTS 'tc_product'@'%'    IDENTIFIED BY 'dL9Wc2gHV2LYfSTq';
+CREATE USER IF NOT EXISTS 'tc_wallet'@'%'     IDENTIFIED BY 'SLFryLmZ4BgmLLUC';
+CREATE USER IF NOT EXISTS 'tc_order'@'%'      IDENTIFIED BY 'kGqukEZgg7FPtBS6';
+CREATE USER IF NOT EXISTS 'tc_payment'@'%'    IDENTIFIED BY 'iRBFTkrm7HEpF7UW';
 CREATE USER IF NOT EXISTS 'tc_marketing'@'%'  IDENTIFIED BY 'TcMarketing_2026';
 CREATE USER IF NOT EXISTS 'tc_inventory'@'%'  IDENTIFIED BY 'TcInventory_2026';
 CREATE USER IF NOT EXISTS 'tc_report'@'%'     IDENTIFIED BY 'TcReport_2026';
