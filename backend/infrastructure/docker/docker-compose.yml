@@ -218,6 +218,7 @@ services:
       DB_HOST: mysql
       DB_PORT: "3306"
       DB_USER: tc_product
+      DB_NAME: product_db
       DB_PASSWORD: ${DB_PASSWORD_PRODUCT}
     ports:
       - "9003:9003"

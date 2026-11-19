@@ -29,6 +29,21 @@
 
 ---
 
+## [第五阶段·任务三第四批] product-service 迁移与价格快照验证（2026-11-19）
+
+### 迁移 30 个文件
+
+实体 5 / DTO 6 / VO 5 / Mapper 5 / Service 6 / Controller 3 / ProductInternalController / AuthInternalClient
+
+### 实测
+
+- 数据量：SPU 7 / SKU 14 / 门店SPU 25 / 门店SKU 17，**历史 ID 保留**
+- 门店差异化价：SKU1 基准 1800 -> 门店1 价 **1750**（差异化生效）
+- **订单快照独立性**：订单快照单价 1750 vs SKU1 当前价 1800 -> **快照独立生效**
+- 跨库依赖：`SysStoreMapper` -> Feign 调 auth-service（降级为拒绝操作）
+
+---
+
 ## [第五阶段·任务三第三批] member-service 迁移与可见口径 B 验证（2026-11-19）
 
 ### 关键改造：可见口径 B 从跨库子查询改为跨服务调用

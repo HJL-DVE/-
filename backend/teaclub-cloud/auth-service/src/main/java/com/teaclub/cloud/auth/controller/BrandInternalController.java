@@ -52,6 +52,18 @@ public class BrandInternalController {
         return Result.ok(value);
     }
 
+    @Operation(summary = "查询单个门店信息")
+    @GetMapping("/store/{storeId}")
+    public Result<Map<String, Object>> store(@PathVariable("storeId") Long storeId) {
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT id, brand_id, store_code, store_name, status FROM sys_store WHERE id = ?",
+                storeId);
+        if (rows.isEmpty()) {
+            return Result.ok(null);
+        }
+        return Result.ok(rows.get(0));
+    }
+
     @Operation(summary = "批量查询门店名称")
     @GetMapping("/stores/names")
     public Result<Map<Long, String>> storeNames(@RequestParam Long brandId,
