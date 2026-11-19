@@ -21,7 +21,7 @@ const FORCE = process.argv.includes('--force');
 const SRC = { host: '127.0.0.1', port: '3306', user: 'root', pass: '1234', db: 'teaclub' };
 const DST = { host: '127.0.0.1', port: '3307', user: 'root', pass: null };
 
-const envTxt = fs.readFileSync(ROOT + '\\infrastructure\\docker\\.env.docker', 'utf8');
+const envTxt = fs.readFileSync(ROOT + '\\backend\\infrastructure\\docker\\.env.docker', 'utf8');
 const env = {};
 envTxt.split(/\r?\n/).forEach(l => {
   const m = l.match(/^([A-Z_]+)=(.*)$/);

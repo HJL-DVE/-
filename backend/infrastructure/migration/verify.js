@@ -22,7 +22,7 @@ const ROOT = "H:\\奶茶店会员与储值营销系统";
 const SRC = { host: '127.0.0.1', port: '3306', user: 'root', pass: '1234', db: 'teaclub' };
 const DST = { host: '127.0.0.1', port: '3307', user: 'root', pass: null };
 
-const envTxt = fs.readFileSync(ROOT + '\\infrastructure\\docker\\.env.docker', 'utf8');
+const envTxt = fs.readFileSync(ROOT + '\\backend\\infrastructure\\docker\\.env.docker', 'utf8');
 const env = {};
 envTxt.split(/\r?\n/).forEach(l => {
   const m = l.match(/^([A-Z_]+)=(.*)$/);
@@ -214,11 +214,12 @@ const idChecks = [
   ['payment_db','pay_payment_order','transaction_id','微信交易号'],
 ];
 for (const [db, table, col, label] of idChecks) {
-  let minMax = 'ERR';
-  try { minMax = sql('dst', 'SELECT COALESCE(MIN(' + col + '),0), COALESCE(MAX(' + col + '),0) FROM ' + QT(db) + '.' + QT(table)).trim().replace(/\n/g, ' '); }
+  // 只校验 MIN（历史起点）：迁移后会产生新业务数据，MAX 天然会变化
+  let dstMin = 'ERR';
+  try { dstMin = sql('dst', 'SELECT COALESCE(MIN(' + col + '),0) FROM ' + QT(db) + '.' + QT(table)).trim().split('\n')[0]; }
   catch (e) {}
-  const srcMinMax = sql('src', 'SELECT COALESCE(MIN(' + col + '),0), COALESCE(MAX(' + col + '),0) FROM ' + QT(table)).trim().replace(/\n/g, ' ');
-  check(label + ' 范围一致 (' + col + ')', minMax, srcMinMax);
+  const srcMin = sql('src', 'SELECT COALESCE(MIN(' + col + '),0) FROM ' + QT(table)).trim().split('\n')[0];
+  check(label + ' 历史起点保留 (' + col + ')', dstMin, srcMin);
 }
 console.log('');
 
