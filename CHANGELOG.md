@@ -1,3 +1,11 @@
+## [第五阶段·任务三七批] 分布式事件 Outbox / Inbox（2026-11-19）
+
+- 8 类领域事件常量（含 event_id/业务单号/版本/产生时间/trace_id）
+- Transactional Outbox：业务事务内登记事件 + Relay 定时投递
+- Consumer Inbox：数据库主键幂等 + Redis 守卫双层去重
+- 实测：事件登记 ORDER_PAID → Relay 投递 → SENT=1
+
+---
 ## [决策变更] 会员可见口径 U-09 → B 方案
 
 ### 背景
