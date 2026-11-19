@@ -52,4 +52,4 @@ desktop.ini
 *.sql.gz
 
 # Docker Compose 环境变量（含数据库密码与密钥，禁止提交）
-deploy/.env.docker
+backend/infrastructure/docker/.env.docker

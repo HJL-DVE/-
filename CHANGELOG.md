@@ -29,6 +29,59 @@
 
 ---
 
+## [第五阶段·任务三第二批] auth-service 业务迁移 + 目录结构调整（2026-11-19）
+
+### 目录结构调整
+
+以 `backend/` 为微服务父目录：
+
+```text
+backend/
+├── src/  pom.xml            现有单体（保留，未改动）
+├── teaclub-cloud/           微服务工程（16 模块）
+├── teaclub-admin/           管理后台前端
+├── teaclub-miniprogram/     小程序前端
+└── infrastructure/
+    ├── docker/              Compose 编排
+    └── migration/           数据迁移 + 备份
+```
+
+同步修正 compose build context、迁移脚本 ROOT 常量、.gitignore 路径。
+
+### auth-service 业务迁移（58 个文件）
+
+实体 9 / DTO 13 / VO 9 / Mapper 9 / Service 12 / Controller 6 / TokenPrincipalResolver 1
+
+### 数据权限端到端实测
+
+| 账号 | 角色 | 权限点 | 可见门店 |
+| --- | --- | --- | --- |
+| admin | SUPER_ADMIN | 68 | 全部 3 家 |
+| mgr_xihu | STORE_MANAGER | 28 | 仅 1 家 |
+| cashier01 | CASHIER | 15 | 仅 1 家 |
+
+拦截验证：
+- 店长访问门店 999 → 10202 没有该门店的数据权限
+- 店长删其它门店 → 10201 没有该操作权限
+- 收银员删用户 → 10201 没有该操作权限
+- 无 token → 401
+
+BCrypt 密码散列原样迁移，历史账号可直接登录。
+
+### API 兼容性
+
+单体 24 个接口在微服务版一个不少，额外 4 个内部接口。前端无需改动。
+
+### 关键修复
+
+**缺 JwtAuthenticationFilter 导致所有管理接口 500** ——
+权限上下文没有装进 Spring Security 的 Authentication，
+所有 @PreAuthorize 都会拒绝。已迁移该过滤器并让 Gateway 透传 X-Permissions。
+
+另补齐 24 个业务错误码（编号与单体一致）、PasswordEncoder Bean、LoginProperties。
+
+---
+
 ## [第五阶段·任务三第一批] 数据迁移 + wallet 资金业务迁移（2026-11-19）
 
 ### 数据迁移

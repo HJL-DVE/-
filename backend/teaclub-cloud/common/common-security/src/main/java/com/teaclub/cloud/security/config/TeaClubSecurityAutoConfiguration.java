@@ -1,0 +1,101 @@
+package com.teaclub.cloud.security.config;
+
+import com.teaclub.cloud.security.feign.FeignRequestInterceptor;
+import com.teaclub.cloud.security.filter.InternalTokenFilter;
+import com.teaclub.cloud.security.filter.JwtAuthenticationFilter;
+import com.teaclub.cloud.security.jwt.JwtProperties;
+import com.teaclub.cloud.security.jwt.LoginProperties;
+import com.teaclub.cloud.security.jwt.TokenIssuer;
+import com.teaclub.cloud.security.jwt.JwtProvider;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+
+/**
+ * common-security 自动装配入口。
+ *
+ * <p>关键设计：
+ * <ul>
+ *   <li>JWT / 用户上下文 / StoreScope 与 Web 类型无关，始终注册</li>
+ *   <li>{@link InternalTokenFilter} 继承 Servlet 过滤器，
+ *       <b>只在 Servlet Web 应用中注册</b>；Gateway 是 WebFlux，不含它</li>
+ *   <li>Feign 拦截器不在此扫描范围内，由业务服务按需 {@code @Import}</li>
+ * </ul>
+ */
+@AutoConfiguration
+@EnableConfigurationProperties(JwtProperties.class)
+@Import({ResourceServerSecurityConfig.class, FeignRequestInterceptor.class})
+public class TeaClubSecurityAutoConfiguration {
+
+    @Bean
+    @ConditionalOnMissingBean(LoginProperties.class)
+    public LoginProperties loginProperties() {
+        return new LoginProperties();
+    }
+
+    @Bean
+    public JwtProvider jwtProvider(JwtProperties props) {
+        return new JwtProvider(props);
+    }
+
+    /**
+     * 密码编码器。
+     *
+     * <p>沿用单体 backend 的 BCrypt 实现，
+     * 保证迁移后的历史密码（BCrypt 散列）仍可校验通过。
+     */
+    @Bean
+    @ConditionalOnMissingBean(PasswordEncoder.class)
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+
+    @Bean
+    public TokenIssuer tokenIssuer(JwtProvider jwtProvider) {
+        return new TokenIssuer(jwtProvider);
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
+    @ConditionalOnClass(name = "jakarta.servlet.Filter")
+    static class ServletSecurityConfig {
+
+        @Bean
+        public JwtAuthenticationFilter jwtAuthenticationFilter(
+                JwtProvider jwtProvider, com.fasterxml.jackson.databind.ObjectMapper objectMapper) {
+            return new JwtAuthenticationFilter(jwtProvider, objectMapper);
+        }
+
+        @Bean
+        public InternalTokenFilter internalTokenFilter(
+                @Value("${teaclub.security.internal-token:teaclub-internal-default-token}") String internalToken) {
+            return new InternalTokenFilter(internalToken);
+        }
+
+        /**
+         * 显式注册过滤器到 Servlet 过滤器链。
+         *
+         * <p><b>关键</b>：仅用 {@code @Bean} 声明的 {@code Filter} 不会自动加入过滤器链，
+         * 必须通过 {@code FilterRegistrationBean} 注册，否则过滤器形同虚设
+         * （内部接口无凭证也能访问）。
+         */
+        @Bean
+        public org.springframework.boot.web.servlet.FilterRegistrationBean<InternalTokenFilter>
+                internalTokenFilterRegistration(InternalTokenFilter filter) {
+            org.springframework.boot.web.servlet.FilterRegistrationBean<InternalTokenFilter> registration =
+                    new org.springframework.boot.web.servlet.FilterRegistrationBean<>(filter);
+            registration.addUrlPatterns("/*");
+            registration.setOrder(org.springframework.core.Ordered.HIGHEST_PRECEDENCE + 10);
+            registration.setName("internalTokenFilter");
+            return registration;
+        }
+    }
+}

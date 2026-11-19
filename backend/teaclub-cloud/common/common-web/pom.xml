@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>com.teaclub</groupId>
+    <artifactId>teaclub-cloud</artifactId>
+    <version>1.0.0</version>
+    <relativePath>../..</relativePath>
+  </parent>
+
+  <artifactId>common-web</artifactId>
+  <name>common-web</name>
+  <description>公共 Web 组件：TraceId 过滤器、全局异常处理、OpenAPI、日志</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.teaclub</groupId>
+      <artifactId>common-core</artifactId>
+    </dependency>
+    <!--
+      使用 provided 而非 compile：
+      Gateway 是 WebFlux 应用，引入 Servlet 栈会导致启动失败
+      （Please set spring.main.web-application-type=reactive ...）。
+      Servlet 型业务服务在自己的 pom 中显式引入 starter-web。
+    -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-aop</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springdoc</groupId>
+      <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.swagger.core.v3</groupId>
+      <artifactId>swagger-models-jakarta</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-actuator</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.security</groupId>
+      <artifactId>spring-security-core</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>org.projectlombok</groupId>
+      <artifactId>lombok</artifactId>
+      <optional>true</optional>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+        <configuration><skip>true</skip></configuration>
+      </plugin>
+    </plugins>
+  </build>
+</project>
