@@ -18,6 +18,19 @@ public interface WalWalletTransactionMapper extends BaseMapper<WalWalletTransact
     WalWalletTransaction selectByBiz(@Param("bizType") String bizType, @Param("bizNo") String bizNo);
 
     /**
+     * 查询某会员发生过资金流水的门店 ID（用于判断门店是否"服务过"该会员）。
+     */
+    @Select("""
+            <script>
+            SELECT DISTINCT store_id FROM wal_wallet_transaction
+            WHERE member_id = #{memberId} AND store_id IS NOT NULL AND store_id IN
+            <foreach collection="storeIds" item="sid" open="(" separator="," close=")">#{sid}</foreach>
+            </script>
+            """)
+    java.util.List<Long> selectServiceStoreIdsByMember(@Param("memberId") Long memberId,
+                                                       @Param("storeIds") java.util.Collection<Long> storeIds);
+
+    /**
      * 对账：找出余额与流水累计不一致的钱包。
      *
      * <p>不变量：principal_balance = SUM(principal_change) 且 gift_balance = SUM(gift_change)。

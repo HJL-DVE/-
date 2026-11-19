@@ -70,15 +70,14 @@ public class WalletQueryServiceImpl implements WalletQueryService {
             wrapper.in(WalWallet::getMemberId, ids);
         }
 
-        // 门店角色：只能看到注册门店在授权范围内的会员的钱包
+        // 门店角色（B 口径）：可见会员 = 注册门店在范围内 或 在本店消费过，
+        // 与 MemMemberServiceImpl 保持完全一致，避免"能看到会员却查不到钱包"的矛盾。
         if (!scope.isAll()) {
             if (scope.isEmptyLimited()) {
                 return new PageResult<>(Collections.emptyList(), 0, query.safePageNo(), query.safePageSize());
             }
-            List<Long> memberIds = memberMapper.selectList(Wrappers.<MemMember>lambdaQuery()
-                            .eq(MemMember::getBrandId, current.getBrandId())
-                            .in(MemMember::getRegisterStoreId, scope.getStoreIds()))
-                    .stream().map(MemMember::getId).collect(Collectors.toList());
+            List<Long> memberIds = memberMapper.selectVisibleMemberIds(
+                    current.getBrandId(), scope.getStoreIds());
             if (memberIds.isEmpty()) {
                 return new PageResult<>(Collections.emptyList(), 0, query.safePageNo(), query.safePageSize());
             }
@@ -133,10 +132,19 @@ public class WalletQueryServiceImpl implements WalletQueryService {
         }
         StoreScope scope = StoreScope.from(current);
         if (!scope.isAll()) {
-            if (member.getRegisterStoreId() == null) {
-                throw new BizException(ResultCode.NO_STORE_PERMISSION, "无权查看该会员钱包");
+            // B 口径：注册门店在范围内 或 在本店消费过
+            boolean registerInScope = member.getRegisterStoreId() != null
+                    && scope.canAccess(member.getRegisterStoreId());
+            if (!registerInScope) {
+                if (scope.isEmptyLimited()) {
+                    throw new BizException(ResultCode.NO_STORE_PERMISSION, "当前账号未授权任何门店");
+                }
+                List<Long> visible = memberMapper.selectVisibleMemberIds(
+                        current.getBrandId(), scope.getStoreIds());
+                if (!visible.contains(memberId)) {
+                    throw new BizException(ResultCode.NO_STORE_PERMISSION, "无权查看该会员钱包");
+                }
             }
-            scope.assertAccessible(member.getRegisterStoreId());
         }
         WalWallet w = walletMapper.selectOne(Wrappers.<WalWallet>lambdaQuery()
                 .eq(WalWallet::getBrandId, current.getBrandId())

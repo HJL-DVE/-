@@ -43,19 +43,28 @@ public class MemMemberServiceImpl implements MemMemberService {
         LambdaQueryWrapper<MemMember> wrapper = Wrappers.<MemMember>lambdaQuery()
                 .eq(MemMember::getBrandId, current.getBrandId());
 
-        // 数据权限：门店角色仅能看到「注册门店在授权范围内」或「在本店消费过」的会员。
-        // 一期以注册门店为准，避免跨店会员画像泄露。
+        // ===== 数据权限（B 口径）=====
+        // 门店角色可见：注册门店在授权范围内 **或** 在该门店消费过的会员。
+        // 理由：会员属于品牌而非门店，会员跨店消费时收银台必须能识别身份；
+        // 若只看注册门店，会出现"看得到订单却查不到会员"的矛盾。
         if (!scope.isAll()) {
             if (scope.isEmptyLimited()) {
                 return new PageResult<>(Collections.emptyList(), 0, query.safePageNo(), query.safePageSize());
             }
+            // 越权参数必须显式拒绝，不得静默忽略（安全要求）
             if (query.getRegisterStoreId() != null) {
                 scope.assertAccessible(query.getRegisterStoreId());
-                wrapper.eq(MemMember::getRegisterStoreId, query.getRegisterStoreId());
-            } else {
-                wrapper.in(MemMember::getRegisterStoreId, scope.getStoreIds());
             }
-        } else if (query.getRegisterStoreId() != null) {
+            List<Long> visibleIds = memberMapper.selectVisibleMemberIds(
+                    current.getBrandId(), scope.getStoreIds());
+            if (visibleIds.isEmpty()) {
+                return new PageResult<>(Collections.emptyList(), 0, query.safePageNo(), query.safePageSize());
+            }
+            wrapper.in(MemMember::getId, visibleIds);
+        }
+
+        // 注册门店精确筛选
+        if (query.getRegisterStoreId() != null) {
             wrapper.eq(MemMember::getRegisterStoreId, query.getRegisterStoreId());
         }
 
@@ -161,13 +170,8 @@ public class MemMemberServiceImpl implements MemMemberService {
         if (m == null) {
             throw new BizException(ResultCode.MEMBER_NOT_FOUND);
         }
-        // 数据权限：非全量范围时，会员必须注册于授权门店
-        if (!scope.isAll()) {
-            if (m.getRegisterStoreId() == null) {
-                throw new BizException(ResultCode.NO_STORE_PERMISSION, "无权查看该会员");
-            }
-            scope.assertAccessible(m.getRegisterStoreId());
-        }
+        // 数据权限（B 口径）：注册门店在授权范围 或 在本店消费过
+        assertMemberVisible(m, scope);
         return toVO(m, loadLevelMap(), loadStoreMap(), true);
     }
 
@@ -179,14 +183,36 @@ public class MemMemberServiceImpl implements MemMemberService {
     }
 
     private void assertMemberScope(MemMember m) {
-        StoreScope scope = StoreScope.from(UserContext.require());
+        assertMemberVisible(m, StoreScope.from(UserContext.require()));
+    }
+
+    /**
+     * 会员可见性判定（B 口径）。
+     *
+     * <p>可见条件（满足任一）：
+     * <ol>
+     *   <li>会员注册门店在当前用户授权门店内</li>
+     *   <li>会员在授权门店有过消费订单</li>
+     * </ol>
+     * 全量范围（总部）不受限。
+     */
+    private void assertMemberVisible(MemMember m, StoreScope scope) {
         if (scope.isAll()) {
             return;
         }
-        if (m.getRegisterStoreId() == null) {
-            throw new BizException(ResultCode.NO_STORE_PERMISSION, "无权查看该会员");
+        if (scope.isEmptyLimited()) {
+            throw new BizException(ResultCode.NO_STORE_PERMISSION, "当前账号未授权任何门店");
         }
-        scope.assertAccessible(m.getRegisterStoreId());
+        // 1) 注册门店在范围内
+        if (m.getRegisterStoreId() != null && scope.canAccess(m.getRegisterStoreId())) {
+            return;
+        }
+        // 2) 在范围内门店消费过
+        List<Long> visible = memberMapper.selectVisibleMemberIds(m.getBrandId(), scope.getStoreIds());
+        if (visible.contains(m.getId())) {
+            return;
+        }
+        throw new BizException(ResultCode.NO_STORE_PERMISSION, "无权查看该会员");
     }
 
     private MemMember requireMember(Long id) {
