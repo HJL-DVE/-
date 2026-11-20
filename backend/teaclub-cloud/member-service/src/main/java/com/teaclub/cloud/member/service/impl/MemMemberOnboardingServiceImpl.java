@@ -27,7 +27,6 @@ import org.springframework.util.StringUtils;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.Locale;
 
 /**
  * 会员开户与微信绑定实现。
@@ -254,8 +253,21 @@ public class MemMemberOnboardingServiceImpl implements MemMemberOnboardingServic
         return "会员" + (seed.length() <= 4 ? seed : seed.substring(seed.length() - 4));
     }
 
+    /**
+     * 小程序静默登录（未拿到真实手机号）时的占位手机号：
+     * <b>1 开头的 11 位数字</b>，由 openid 的 SHA-256 派生 —— 同一 openid 稳定得到同一号码。
+     * 空间 10^10，与新注册真实手机号偶发碰撞时由 persist 的重试逻辑兜底
+     * （占位号场景 phoneAssigned=false，冲突重试换号重插）。
+     */
     private static String placeholderPhone(String openid) {
-        return "WX" + sha256Hex(openid).substring(0, 16).toUpperCase(Locale.ROOT);
+        String hash = sha256Hex(openid);
+        // 取哈希前 10 个十进制位拼在「1」后面：1 + 10 位 = 11 位，1 开头
+        StringBuilder sb = new StringBuilder(11);
+        sb.append('1');
+        for (int i = 0; i < 10; i++) {
+            sb.append(Character.forDigit(Character.digit(hash.charAt(i % hash.length()), 16) % 10, 10));
+        }
+        return sb.toString();
     }
 
     private static String sha256Hex(String raw) {
