@@ -1,7 +1,10 @@
 import { getToken, clearToken, emitAuthExpired, gotoLogin } from './auth'
 
-/** 唯一网关地址：所有业务请求必须经网关，禁止硬编码各微服务端口 */
-export const BASE_URL = 'http://127.0.0.1:9000'
+/** 唯一网关地址：所有业务请求必须经网关，禁止硬编码各微服务端口
+ * 127.0.0.1 仅适用于开发者工具/模拟器（后端在本机 Docker）。
+ * 真机调试/预览必须改成本机局域网 IP（手机与电脑须在同一局域网），
+ * 本机当前局域网地址：以太网 192.168.3.34（备用 WLAN 192.168.3.35）。 */
+export const BASE_URL = 'http://192.168.3.34:9000'
 
 /** 契约 {@code code===0} 为成功 */
 export const CODE_SUCCESS = 0

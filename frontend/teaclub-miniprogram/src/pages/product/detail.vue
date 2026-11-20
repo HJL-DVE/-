@@ -69,7 +69,10 @@
         <view class="footer-total">
           合计 <text class="price">¥{{ fen2yuan(currentPrice * quantity) }}</text>
         </view>
-        <button class="btn-primary add-btn" @tap="addCart">加入购物车</button>
+        <view class="footer-btns">
+          <button class="btn-plain add-btn" @tap="addCart">加入购物车</button>
+          <button class="btn-primary add-btn" @tap="buyNow">立即下单</button>
+        </view>
       </view>
     </view>
   </view>
