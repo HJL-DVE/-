@@ -139,6 +139,36 @@ public class ReportController {
         return Result.ok(reportService.refundOverview(storeId, days));
     }
 
+    @Operation(summary = "每小时订单趋势（今日 0-23 点补零）")
+    @GetMapping("/store/hourly")
+    @PreAuthorize("hasAuthority('report:view')")
+    public Result<Map<String, Object>> hourlyOrders(
+            @RequestParam(required = false) Long storeId,
+            @RequestParam(required = false)
+            @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE)
+            java.time.LocalDate date) {
+        return Result.ok(reportService.hourlyOrders(storeId, date));
+    }
+
+    @Operation(summary = "商品分类销售排行（metric=qty|amount）")
+    @GetMapping("/product/category-ranking")
+    @PreAuthorize("hasAuthority('report:view')")
+    public Result<Map<String, Object>> categoryRanking(
+            @RequestParam(required = false) Long storeId,
+            @RequestParam(required = false, defaultValue = "30") Integer days,
+            @RequestParam(required = false, defaultValue = "qty") String metric,
+            @RequestParam(required = false, defaultValue = "10") Integer limit) {
+        return Result.ok(reportService.categoryRanking(storeId, days, metric, limit));
+    }
+
+    @Operation(summary = "商品销售趋势（按日，销量/销售额）")
+    @GetMapping("/product/trend")
+    @PreAuthorize("hasAuthority('report:view')")
+    public Result<Map<String, Object>> productTrend(
+            @RequestParam(required = false) Long storeId,
+            @RequestParam(required = false, defaultValue = "30") Integer days) {
+        return Result.ok(reportService.productTrend(storeId, days));
+    }
     // ==================== 营销分析 ====================
 
     @Operation(summary = "营销分析（券/积分/等级分布）")

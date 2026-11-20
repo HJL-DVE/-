@@ -116,6 +116,59 @@ public interface ReportMapper {
                                            @Param("since") LocalDateTime since,
                                            @Param("until") LocalDateTime until);
 
+
+    /** 今日每小时订单趋势（0-23 点；无单的小时由服务层补零）。 */
+    @Select("""
+            SELECT HOUR(pay_time) AS h, COUNT(*) AS orders,
+                   COALESCE(SUM(payable_amount),0) AS sales
+            FROM order_db.oms_order
+            WHERE brand_id = #{brandId} AND deleted = 0
+              AND status IN ('PAID','COMPLETED','REFUNDING','REFUNDED')
+              AND (#{storeId} IS NULL OR store_id = #{storeId})
+              AND pay_time >= #{since}
+            GROUP BY HOUR(pay_time) ORDER BY h
+            """)
+    List<Map<String, Object>> hourlyOrders(@Param("brandId") Long brandId,
+                                           @Param("storeId") Long storeId,
+                                           @Param("since") LocalDateTime since);
+
+    /** 商品分类销售排行（经 product_db.prd_spu 关联分类；metric 白名单由服务层传入）。 */
+    @Select("""
+            SELECT c.category_name AS name,
+                   SUM(i.quantity) AS qty,
+                   COALESCE(SUM(i.actual_amount),0) AS amount
+            FROM order_db.oms_order_item i
+            JOIN order_db.oms_order o ON o.id = i.order_id
+            JOIN product_db.prd_spu s ON s.id = i.spu_id
+            LEFT JOIN product_db.prd_category c ON c.id = s.category_id
+            WHERE i.brand_id = #{brandId} AND o.deleted = 0
+              AND o.status IN ('PAID','COMPLETED','REFUNDING','REFUNDED')
+              AND (#{storeId} IS NULL OR i.store_id = #{storeId})
+              AND (#{since} IS NULL OR o.pay_time >= #{since})
+            GROUP BY c.category_name
+            ORDER BY ${metric} DESC LIMIT #{limit}
+            """)
+    List<Map<String, Object>> categoryRank(@Param("brandId") Long brandId,
+                                           @Param("storeId") Long storeId,
+                                           @Param("since") LocalDateTime since,
+                                           @Param("metric") String metric,
+                                           @Param("limit") int limit);
+
+    /** 商品销售趋势（按日：销量与销售额）。 */
+    @Select("""
+            SELECT DATE(o.pay_time) AS d, SUM(i.quantity) AS qty,
+                   COALESCE(SUM(i.actual_amount),0) AS amount
+            FROM order_db.oms_order_item i
+            JOIN order_db.oms_order o ON o.id = i.order_id
+            WHERE i.brand_id = #{brandId} AND o.deleted = 0
+              AND o.status IN ('PAID','COMPLETED','REFUNDING','REFUNDED')
+              AND (#{storeId} IS NULL OR i.store_id = #{storeId})
+              AND o.pay_time >= #{since}
+            GROUP BY DATE(o.pay_time) ORDER BY d
+            """)
+    List<Map<String, Object>> productTrend(@Param("brandId") Long brandId,
+                                           @Param("storeId") Long storeId,
+                                           @Param("since") LocalDateTime since);
     /** 商品排行：metric 只允许 qty 或 amount（服务层白名单传入，用 ${} 拼 ORDER BY）。 */
     @Select("""
             SELECT i.sku_id AS skuId, i.sku_name AS name,

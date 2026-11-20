@@ -31,6 +31,7 @@ const SUITE = [
   { file: '24-nack-redelivery.mjs',           tag: 'dlq',      desc: '业务失败→DLQ→恢复→补偿重放→消费成功' },
   { file: '25-marketing-activity.mjs',        tag: 'activity', desc: '券模板CRUD/8类活动/满赠触发/积分商城/等级权益' },
   { file: '26-report.mjs',                    tag: 'report',   desc: '经营报表：总部/门店/日期/门店筛选/会员/储值/支付/退款/权限' },
+  { file: '27-report-ext.mjs',                tag: 'report2',  desc: '报表扩展：每小时趋势/分类排行/商品趋势 + 越权复核' },
 ];
 
 const filters = process.argv.slice(2).filter((a) => !a.startsWith('-'));

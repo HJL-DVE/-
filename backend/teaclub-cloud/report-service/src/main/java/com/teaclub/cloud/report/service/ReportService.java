@@ -252,6 +252,59 @@ public class ReportService {
                 "trend", fillDays(mapper.refundTrend(brandId, sid, since), span, "amount"));
     }
 
+
+    /**
+     * 每小时订单趋势（0-23 点补零）。
+     * 日期参数只取其当天（报表页的「每日小时趋势」概念）。
+     */
+    public Map<String, Object> hourlyOrders(Long storeId, LocalDate date) {
+        ReportScope scope = ReportScope.current();
+        Long sid = scope.resolveStoreId(storeId);
+        Long brandId = UserContext.require().getBrandId();
+        LocalDateTime day = (date == null ? LocalDate.now() : date).atStartOfDay();
+        List<Map<String, Object>> rows = mapper.hourlyOrders(brandId, sid, day);
+        Map<Integer, Map<String, Object>> byHour = new LinkedHashMap<>();
+        if (rows != null) {
+            for (Map<String, Object> r : rows) {
+                byHour.put(((Number) r.get("h")).intValue(), r);
+            }
+        }
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (int h = 0; h < 24; h++) {
+            Map<String, Object> src = byHour.get(h);
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("hour", String.format("%02d:00", h));
+            item.put("orders", src == null ? 0 : num(src.get("orders")));
+            item.put("sales", src == null ? 0 : money(src.get("sales")));
+            out.add(item);
+        }
+        return mapOf("date", day.toLocalDate().toString(), "list", out);
+    }
+
+    /** 商品分类销售排行。 */
+    public Map<String, Object> categoryRanking(Long storeId, Integer days, String metric, int limit) {
+        ReportScope scope = ReportScope.current();
+        Long sid = scope.resolveStoreId(storeId);
+        Long brandId = UserContext.require().getBrandId();
+        int span = days == null || days <= 0 ? 30 : Math.min(days, 365);
+        String m = "amount".equalsIgnoreCase(metric) ? "amount" : "qty";
+        LocalDateTime since = LocalDate.now().minusDays(span - 1L).atStartOfDay();
+        return mapOf("metric", m,
+                "list", mapper.categoryRank(brandId, sid, since, m,
+                        limit <= 0 ? 10 : Math.min(limit, 50)));
+    }
+
+    /** 商品销售趋势（按日）。 */
+    public Map<String, Object> productTrend(Long storeId, Integer days) {
+        ReportScope scope = ReportScope.current();
+        Long sid = scope.resolveStoreId(storeId);
+        Long brandId = UserContext.require().getBrandId();
+        int span = days == null || days <= 0 ? 30 : Math.min(days, 365);
+        LocalDateTime since = LocalDate.now().minusDays(span - 1L).atStartOfDay();
+        return mapOf("days", span,
+                "trend", fillDays(mapper.productTrend(brandId, sid, since), span, "qty"),
+                "trendAmount", fillDays(mapper.productTrend(brandId, sid, since), span, "amount"));
+    }
     // ==================== 营销分析 ====================
 
     public Map<String, Object> marketingOverview(Integer days) {

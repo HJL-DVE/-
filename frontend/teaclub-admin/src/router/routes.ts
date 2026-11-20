@@ -32,6 +32,8 @@ export const viewRegistry: Record<string, LazyView> = {
   'report/recharge': () => import('@/views/report/recharge.vue'),
   'report/payment': () => import('@/views/report/payment.vue'),
   'report/refund': () => import('@/views/report/refund.vue'),
+  'report/product': () => import('@/views/report/product.vue'),
+  'report/marketing': () => import('@/views/report/marketing.vue'),
   // 营销模块（component 标识与 iam_db.sys_permission 完全一致）
   'marketing/coupon': () => import('@/views/marketing/coupon.vue'),
   'marketing/level': () => import('@/views/marketing/level.vue'),

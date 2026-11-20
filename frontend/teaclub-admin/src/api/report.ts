@@ -119,3 +119,32 @@ export function getMarketingOverview(days = 30) {
 export function yuan(fen: number | undefined | null): string {
   return (((fen ?? 0) as number) / 100).toFixed(2)
 }
+/** ============ 阶段八扩展（ hourly/分类/商品趋势 ）============ */
+
+export interface HourlyPoint { hour: string; orders: number; sales: number }
+
+export function getHourlyOrders(storeId?: number, date?: string) {
+  const q: Record<string, unknown> = {}
+  if (storeId) q.storeId = storeId
+  if (date) q.date = date
+  return http.get<{ date: string; list: HourlyPoint[] }>('/api/report/store/hourly', q)
+}
+
+export function getCategoryRanking(days = 30, metric: 'qty' | 'amount' = 'qty', storeId?: number) {
+  const q: Record<string, unknown> = { days, metric }
+  if (storeId) q.storeId = storeId
+  return http.get<{ metric: string; list: { name: string; qty: number; amount: number }[] }>(
+    '/api/report/product/category-ranking', q,
+  )
+}
+
+export function getProductTrend(days = 30, storeId?: number) {
+  const q: Record<string, unknown> = { days }
+  if (storeId) q.storeId = storeId
+  return http.get<{ days: number; trend: TrendPoint[]; trendAmount: TrendPoint[] }>(
+    '/api/report/product/trend', q,
+  )
+}
+
+/** 加载态三元组：所有报表页统一使用 */
+export type LoadState = 'loading' | 'error' | 'ready'

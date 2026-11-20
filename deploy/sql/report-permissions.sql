@@ -12,13 +12,15 @@ FROM (
   SELECT 'report:member',   '会员分析',   '/report/member',   'report/member',   3 UNION ALL
   SELECT 'report:recharge', '充值统计',   '/report/recharge', 'report/recharge', 4 UNION ALL
   SELECT 'report:payment',  '支付统计',   '/report/payment',  'report/payment',  5 UNION ALL
-  SELECT 'report:refund',   '退款统计',   '/report/refund',   'report/refund',   6
+  SELECT 'report:refund',   '退款统计',   '/report/refund',   'report/refund',   6 UNION ALL
+  SELECT 'report:product',  '商品销售分析', '/report/product',  'report/product',  7 UNION ALL
+  SELECT 'report:marketing','营销数据分析', '/report/marketing','report/marketing', 8
 ) c
 WHERE NOT EXISTS (SELECT 1 FROM sys_permission p WHERE p.perm_code = c.code);
 
 INSERT IGNORE INTO sys_role_permission (role_id, permission_id)
 SELECT r.id, p.id FROM sys_role r
-JOIN sys_permission p ON p.perm_code IN ('report:view','report:dashboard','report:sales','report:member','report:recharge','report:payment','report:refund')
+JOIN sys_permission p ON p.perm_code IN ('report:view','report:dashboard','report:sales','report:member','report:recharge','report:payment','report:refund','report:product','report:marketing')
 WHERE r.id IN (1,2,3);
 
 DELETE rp FROM sys_role_permission rp

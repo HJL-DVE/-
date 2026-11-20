@@ -8,4 +8,5 @@ GRANT SELECT ON member_db.* TO 'tc_report'@'%';
 GRANT SELECT ON marketing_db.* TO 'tc_report'@'%';
 GRANT SELECT ON payment_db.* TO 'tc_report'@'%';
 GRANT SELECT ON iam_db.* TO 'tc_report'@'%';
+GRANT SELECT ON product_db.* TO 'tc_report'@'%';
 FLUSH PRIVILEGES;
