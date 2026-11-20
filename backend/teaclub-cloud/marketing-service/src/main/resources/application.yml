@@ -54,10 +54,11 @@ spring:
     listener:
       simple:
         acknowledge-mode: manual
+        default-requeue-rejected: false
         prefetch: 10
         retry:
           enabled: true
-          max-attempts: 3
+          max-attempts: 1
           initial-interval: 1000ms
 
 mybatis-plus:
@@ -70,6 +71,14 @@ mybatis-plus:
   mapper-locations: classpath*:/mapper/**/*.xml
 
 teaclub:
+  messaging:
+    dlq-replay-enabled: true
+    dlq-queues: teaclub.marketing.order-paid.queue.dlq,teaclub.marketing.refund-success.queue.dlq
+    dlq-replay-ms: 15000
+    dlq-replay-initial-delay-ms: 15000
+    dlq-replay-batch: 20
+    dlq-replay-max-retry: 5
+
   jwt:
     admin-secret: ${JWT_ADMIN_SECRET:}
     member-secret: ${JWT_MEMBER_SECRET:}

@@ -1,3 +1,49 @@
+## [第七阶段] 消息消费可靠性修复 + 优惠券/积分域（2026-11-21）
+
+### 新增：marketing-service 优惠券与积分
+
+- `marketing_db` 18 张表（V1 优惠券 / V2 积分等级活动 / V3 outbox-inbox / V4 说明 / V5 签到规则）
+- 优惠券：模板、发行、领取限领、锁定、核销、释放、过期（幂等三层：Redis + 条件 UPDATE + 流水表）
+- 积分：账户/流水/批次/签到/过期，`mkt_points_account` 为唯一事实来源，`mem_member.points` 仅快照
+- 事件消费：`ORDER_PAID` 发积分、`REFUND_SUCCEEDED` 按原流水冲正
+- 权限点 17 个（`deploy/sql/marketing-permissions.sql`）
+- 新增测试脚本 21 / 22 / 23 / 24
+
+### 修复 3 个真实缺陷
+
+1. **Redis 幂等键未按消费者隔离**（最严重）
+   `mq:consumed:{eventId}` 不含队列名，而 `ORDER_PAID` 被 member 与 marketing 同时订阅。
+   先消费成功的一方写入标记，另一方**永远被判"重复消息"跳过**，日志看起来完全正常。
+   改为 `mq:consumed:{queueName}:{eventId}`。
+
+2. **签到积分 bizNo 不含会员 ID**
+   同一天第二个会员签到会撞上第一个人的流水（`uk_points_biz`），积分被静默丢弃。
+   改为 `{memberId}-{yyyyMMdd}`。
+
+3. **Maven 构建缓存导致 common 修改从未生效**
+   `mvn -am package` 不安装本地仓库，服务打包取旧 jar（实测仓库 `releaseClaim=true`、服务内嵌 `false`）。
+   此前多轮针对 common-messaging 的修复实际都没部署。已确立严格构建顺序并写入 docs/39。
+
+### 消费失败处理改为方案 A（统一进 DLQ + 定时补偿重放）
+
+放弃 `nack(requeue=true)`——它不改消息头、无法计数、重投耗尽后静默丢弃（实测队列 0 / DLQ 0）。
+
+新的语义：
+- 业务成功 → ack → 写幂等标记
+- 任何失败 → 释放 Inbox 认领 → `nack(requeue=false)` → 进 DLQ
+- `DlqReplayScheduler` 每 15s 扫描，按 `x-death.count` 重放（≤5 次），超限保留待人工
+
+### 实测
+
+```text
+脚本 9/9，断言 118/118，65 秒
+21 优惠券 16/16 · 22 积分 12/12 · 23 退款冲正 14/14 · 24 失败重放 5/5
+```
+
+新增文档：docs/39。
+
+---
+
 ## [第六阶段·续] Web 部署 + 支付渠道修正 + 一键回归门禁（2026-11-21）
 
 ### 1. Web 管理后台容器化部署（同源反代）

@@ -54,10 +54,11 @@ spring:
     listener:
       simple:
         acknowledge-mode: manual
+        default-requeue-rejected: false
         prefetch: 10
         retry:
           enabled: true
-          max-attempts: 3
+          max-attempts: 1
           initial-interval: 1000ms
 
 mybatis-plus:

@@ -1,6 +1,5 @@
 # ============================================================
-# 容器环境配置（profile=docker）
-# 依赖容器内的 nacos / redis / rabbitmq / mysql
+# 閻庡湱鎳撳▍鎺楁偝椤栨凹鏆旈梺鏉跨Ф閻ゅ棝鏁嶉崸顪竜file=docker闁?# 濞撴碍绻嗙粋鍡欌偓鍦嚀濞呮帡宕橀崨顖涚暠 nacos / redis / rabbitmq / mysql
 # ============================================================
 spring:
   cloud:
@@ -36,10 +35,11 @@ spring:
     listener:
       simple:
         acknowledge-mode: manual
+        default-requeue-rejected: false
         prefetch: 10
         retry:
           enabled: true
-          max-attempts: 3
+          max-attempts: 1
           initial-interval: 1000ms
 
 logging:
@@ -51,6 +51,14 @@ logging:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{traceId:-}] %logger{36} - %msg%n"
 
 teaclub:
+  messaging:
+    dlq-replay-enabled: true
+    dlq-queues: teaclub.member.order-paid.queue.dlq
+    dlq-replay-ms: 15000
+    dlq-replay-initial-delay-ms: 15000
+    dlq-replay-batch: 20
+    dlq-replay-max-retry: 5
+
   jwt:
     admin-secret: ${JWT_ADMIN_SECRET:}
     member-secret: ${JWT_MEMBER_SECRET:}
@@ -58,5 +66,4 @@ teaclub:
     issuer: teaclub
   security:
     internal-token: ${INTERNAL_TOKEN:teaclub-internal-default-token}
-    # 仅容器联调时开启本地令牌端点（生产环境不设置该变量）
-    dev-token-endpoint-enabled: ${DEV_TOKEN_ENDPOINT:false}
+    # 濞寸姴鎳庨鎰板闯閵娿劋绮撻悹瀣暞濡炲倸顕ｉ埀顒勫触椤栨稒鎷遍柛锕傤暒閹躲倝鎮у畝鈧顒勬倷閻у摜绀勯柣銏㈠枍妤犲洭鎮抽姘兼殧濞戞挸绉烽鏇犵磾椤旀鍤夐柛娆愶耿閸ｆ椽鏁?    dev-token-endpoint-enabled: ${DEV_TOKEN_ENDPOINT:false}

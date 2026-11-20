@@ -25,6 +25,10 @@ const SUITE = [
   { file: '19-refund-via-gateway.mjs',        tag: 'refund',   desc: '微信支付→退款→重复退款被拒→订单 REFUNDED' },
   { file: '20-payment-channel.mjs',           tag: 'channel',  desc: '支付渠道默认值/显式覆盖/非法拒绝/降级' },
   { file: '12-fund-invariants.mjs',           tag: 'invariant', desc: '资金不变量 I1–I6 + 流水链式衔接' },
+  { file: '21-marketing-coupon.mjs',          tag: 'coupon',   desc: '优惠券领取/试算/锁定/核销/释放幂等' },
+  { file: '22-marketing-points.mjs',          tag: 'points',   desc: '积分发放/签到幂等/重复投递不重发' },
+  { file: '23-marketing-points-refund.mjs',   tag: 'pointsrf', desc: '退款按原流水冲正/重复退款不重冲' },
+  { file: '24-nack-redelivery.mjs',           tag: 'dlq',      desc: '业务失败→DLQ→恢复→补偿重放→消费成功' },
 ];
 
 const filters = process.argv.slice(2).filter((a) => !a.startsWith('-'));

@@ -1,6 +1,5 @@
 # ============================================================
-# 容器环境配置（profile=docker）
-# 依赖容器内的 nacos / redis / rabbitmq / mysql
+# 鐎圭懓娅掗悳顖氼暔闁板秶鐤嗛敍鍧ofile=docker閿?# 娓氭繆绂嗙€圭懓娅掗崘鍛畱 nacos / redis / rabbitmq / mysql
 # ============================================================
 spring:
   cloud:
@@ -40,10 +39,11 @@ spring:
     listener:
       simple:
         acknowledge-mode: manual
+        default-requeue-rejected: false
         prefetch: 10
         retry:
           enabled: true
-          max-attempts: 3
+          max-attempts: 1
           initial-interval: 1000ms
 
 logging:
@@ -62,5 +62,4 @@ teaclub:
     issuer: teaclub
   security:
     internal-token: ${INTERNAL_TOKEN:teaclub-internal-default-token}
-    # 仅容器联调时开启本地令牌端点（生产环境不设置该变量）
-    dev-token-endpoint-enabled: ${DEV_TOKEN_ENDPOINT:false}
+    # 娴犲懎顔愰崳銊ㄤ粓鐠嬪啯妞傚鈧崥顖涙拱閸﹂鎶ら悧宀€顏悙鐧哥礄閻㈢喍楠囬悳顖氼暔娑撳秷顔曠純顔款嚉閸欐﹢鍣洪敍?    dev-token-endpoint-enabled: ${DEV_TOKEN_ENDPOINT:false}

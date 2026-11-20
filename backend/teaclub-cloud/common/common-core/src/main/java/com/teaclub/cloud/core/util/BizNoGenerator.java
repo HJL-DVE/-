@@ -24,6 +24,21 @@ public final class BizNoGenerator {
         return prefix + LocalDateTime.now().format(TS) + String.format("%06d", seq);
     }
 
+    /**
+     * 通用带前缀单号。
+     *
+     * <p>供新业务（优惠券码、积分兑换单号等）复用，避免每加一个业务就往这里塞一个方法。
+     * 前缀建议 2-4 位大写字母，与既有单号风格保持一致。
+     *
+     * @param prefix 前缀，如 {@code CP}（券）、{@code PX}（兑换）
+     */
+    public static String of(String prefix) {
+        if (prefix == null || prefix.isBlank()) {
+            throw new IllegalArgumentException("单号前缀不能为空");
+        }
+        return base(prefix.trim().toUpperCase());
+    }
+
     public static String orderNo()    { return base("TC"); }
     public static String rechargeNo() { return base("RC"); }
     public static String paymentNo()  { return base("PAY"); }

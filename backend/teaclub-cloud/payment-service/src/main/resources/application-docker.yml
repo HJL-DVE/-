@@ -1,6 +1,5 @@
 # ======
-# 容器环境配置（profile=docker）
-# 依赖容器内的 nacos / redis / rabbitmq / mysql
+# 鐎圭懓娅掗悳顖氼暔闁板秶鐤嗛敍鍧ofile=docker閿?# 娓氭繆绂嗙€圭懓娅掗崘鍛畱 nacos / redis / rabbitmq / mysql
 # ======
 spring:
   cloud:
@@ -36,10 +35,11 @@ spring:
     listener:
       simple:
         acknowledge-mode: manual
+        default-requeue-rejected: false
         prefetch: 10
         retry:
           enabled: true
-          max-attempts: 3
+          max-attempts: 1
           initial-interval: 1000ms
 
 logging:
@@ -59,10 +59,9 @@ teaclub:
     internal-token: ${INTERNAL_TOKEN:teaclub-internal-default-token}
     dev-token-endpoint-enabled: ${DEV_TOKEN_ENDPOINT:false}
 
-  # ===== 支付渠道配置 =====
-  # provider=mock      课程设计使用，支付单 provider 恒为 MOCK
-  # provider=wechat-v3 真实微信支付 API v3（需商户资质，本项目不启用）
-  payment:
+  # ===== 閺€顖欑帛濞撶娀浜鹃柊宥囩枂 =====
+  # provider=mock      鐠囧墽鈻肩拋鎹愵吀娴ｈ法鏁ら敍灞炬暜娴犳ê宕?provider 閹帊璐?MOCK
+  # provider=wechat-v3 閻喎鐤勫顔讳繆閺€顖欑帛 API v3閿涘牓娓堕崯鍡樺煕鐠у嫯宸濋敍灞炬拱妞ゅ湱娲版稉宥呮儙閻㈩煉绱?  payment:
     provider: ${PAYMENT_PROVIDER:mock}
     wechat:
       merchant-id: ${WX_MERCHANT_ID:}
@@ -73,11 +72,9 @@ teaclub:
       notify-url: ${WX_NOTIFY_URL:}
       refund-notify-url: ${WX_REFUND_NOTIFY_URL:}
       platform-cert-path: ${WX_PLATFORM_CERT_PATH:}
-    # Mock 渠道通知身份校验：期望值来自配置而非真实商户资质，
-    # 但 AppID 比对 / 商户号比对 / 签名校验三条规则真实生效。
-    mock:
+    # Mock 濞撶娀浜鹃柅姘辩叀闊偂鍞ら弽锟犵崣閿涙碍婀￠張娑樷偓鍏兼降閼奉亪鍘ょ純顔库偓宀勬姜閻喎鐤勯崯鍡樺煕鐠у嫯宸濋敍?    # 娴?AppID 濮ｆ柨顕?/ 閸熷棙鍩涢崣閿嬬槷鐎?/ 缁涙儳鎮曢弽锟犵崣娑撳娼憴鍕灟閻喎鐤勯悽鐔告櫏閵?    mock:
       expected-app-id: ${PAYMENT_MOCK_APP_ID:mock-appid}
       expected-mch-id: ${PAYMENT_MOCK_MCH_ID:mock-mchid}
       sign-secret: ${PAYMENT_MOCK_SIGN_SECRET:mock-sign-secret}
-      # 严格模式：要求通知必须携带 appId/mchId/sign，缺一即拒
+      # 娑撱儲鐗稿Ο鈥崇础閿涙俺顩﹀Ч鍌炩偓姘辩叀韫囧懘銆忛幖鍝勭敨 appId/mchId/sign閿涘瞼宸辨稉鈧崡铏珕
       enforce-notify-check: ${PAYMENT_MOCK_ENFORCE:false}

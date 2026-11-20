@@ -34,6 +34,38 @@ public class MemberInternalController {
 
     private final JdbcTemplate jdbcTemplate;
 
+    /**
+     * 积分快照回写（供 marketing-service 调用）。
+     *
+     * <p><b>语义</b>：marketing_db 是积分的唯一事实来源，
+     * member_db 的 {@code mem_member.points} 只是给会员列表展示用的快照。
+     * 因此这里是<b>覆盖写</b>，不是增减 —— 由营销服务算好总额传过来，
+     * 避免两个服务各加一次导致对不上。
+     *
+     * <p>幂等：同一笔调整重复推送同样的值，结果一致。
+     */
+    @Operation(summary = "积分快照回写（营销服务调用，覆盖写）")
+    @PostMapping("/user/{userId}/points-snapshot")
+    public Result<Void> syncPointsSnapshot(@PathVariable("userId") Long userId,
+                                           @RequestBody Map<String, Object> body) {
+        Object v = body == null ? null : body.get("points");
+        if (v == null) {
+            return Result.fail(com.teaclub.cloud.core.api.ResultCode.PARAM_INVALID, "points 不能为空");
+        }
+        long points = ((Number) v).longValue();
+        if (points < 0) {
+            return Result.fail(com.teaclub.cloud.core.api.ResultCode.PARAM_INVALID, "points 不能为负");
+        }
+        int rows = jdbcTemplate.update(
+                "UPDATE mem_member SET points = ? WHERE id = ? AND deleted = 0", points, userId);
+        if (rows == 0) {
+            log.warn("积分快照回写失败：会员不存在 userId={}", userId);
+            return Result.fail(com.teaclub.cloud.core.api.ResultCode.NOT_FOUND, "会员不存在");
+        }
+        log.debug("积分快照已回写 userId={} points={}", userId, points);
+        return Result.ok();
+    }
+
 
     /**
      * @deprecated 已改为消费 ORDER_PAID 领域事件（见 OrderPaidConsumer）。

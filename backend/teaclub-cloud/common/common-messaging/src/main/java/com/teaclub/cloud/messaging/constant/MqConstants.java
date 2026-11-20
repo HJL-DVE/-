@@ -55,6 +55,17 @@ public final class MqConstants {
     public static final String Q_ORDER_REFUND_SUCCESS = "teaclub.order.refund-success.queue";
     /** 会员服务：消费订单已支付事件（累加消费档案） */
     public static final String Q_MEMBER_ORDER_PAID = "teaclub.member.order-paid.queue";
+    /**
+     * 营销服务：消费订单已支付事件（发放消费积分）。
+     *
+     * <p>与会员服务用<b>不同队列</b>消费同一个 routingKey：
+     * topic 交换机会把消息投给所有匹配队列，各服务互不阻塞、互不影响。
+     */
+    public static final String Q_MARKETING_ORDER_PAID = "teaclub.marketing.order-paid.queue";
+    /** 营销服务：消费退款成功事件（积分冲正） */
+    public static final String Q_MARKETING_REFUND_SUCCESS = "teaclub.marketing.refund-success.queue";
+    /** 营销服务：优惠券过期处理相关的延迟/补偿（预留） */
+    public static final String Q_MARKETING_COUPON_EXPIRE = "teaclub.marketing.coupon-expire.queue";
 
     // ===== 消息头 =====
     public static final String HEADER_EVENT_ID = "x-event-id";

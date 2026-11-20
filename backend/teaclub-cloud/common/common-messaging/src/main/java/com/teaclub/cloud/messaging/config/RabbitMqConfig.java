@@ -110,6 +110,58 @@ public class RabbitMqConfig {
                 .with(MqConstants.RK_ORDER_PAID);
     }
 
+    // ==================== 营销服务队列 ====================
+
+    /** 营销服务：消费订单已支付事件（发积分） */
+    @Bean
+    public Queue marketingOrderPaidQueue() {
+        return businessQueue(MqConstants.Q_MARKETING_ORDER_PAID);
+    }
+
+    @Bean
+    public Queue marketingOrderPaidDlq() {
+        return QueueBuilder.durable(MqConstants.Q_MARKETING_ORDER_PAID + MqConstants.DLQ_ROUTING_SUFFIX).build();
+    }
+
+    @Bean
+    public Binding marketingOrderPaidDlqBinding() {
+        return BindingBuilder.bind(marketingOrderPaidDlq())
+                .to(dlxExchange())
+                .with(MqConstants.Q_MARKETING_ORDER_PAID + MqConstants.DLQ_ROUTING_SUFFIX);
+    }
+
+    @Bean
+    public Binding marketingOrderPaidBinding() {
+        return BindingBuilder.bind(marketingOrderPaidQueue())
+                .to(businessExchange())
+                .with(MqConstants.RK_ORDER_PAID);
+    }
+
+    /** 营销服务：消费退款成功事件（积分冲正） */
+    @Bean
+    public Queue marketingRefundSuccessQueue() {
+        return businessQueue(MqConstants.Q_MARKETING_REFUND_SUCCESS);
+    }
+
+    @Bean
+    public Queue marketingRefundSuccessDlq() {
+        return QueueBuilder.durable(MqConstants.Q_MARKETING_REFUND_SUCCESS + MqConstants.DLQ_ROUTING_SUFFIX).build();
+    }
+
+    @Bean
+    public Binding marketingRefundSuccessDlqBinding() {
+        return BindingBuilder.bind(marketingRefundSuccessDlq())
+                .to(dlxExchange())
+                .with(MqConstants.Q_MARKETING_REFUND_SUCCESS + MqConstants.DLQ_ROUTING_SUFFIX);
+    }
+
+    @Bean
+    public Binding marketingRefundSuccessBinding() {
+        return BindingBuilder.bind(marketingRefundSuccessQueue())
+                .to(businessExchange())
+                .with(MqConstants.RK_REFUND_ORDER_SUCCESS);
+    }
+
     @Bean
     public Binding orderPaySuccessBinding() {
         return BindingBuilder.bind(orderPaySuccessQueue())

@@ -37,6 +37,17 @@ public final class UserContext {
         return require().getBrandId();
     }
 
+    /**
+     * 当前品牌 ID；无上下文时返回 null（不抛异常）。
+     *
+     * <p>用于事件消费等<b>没有 HTTP 请求上下文</b>的场景：
+     * 那里没有网关透传的品牌头，只能读事件载荷或回落到默认值。
+     */
+    public static Long currentBrandIdOrNull() {
+        LoginUser u = HOLDER.get();
+        return u == null ? null : u.getBrandId();
+    }
+
     /** 当前会员 ID；管理端请求返回 null（不抛异常，便于共用代码判断）。 */
     public static Long currentMemberIdOrNull() {
         LoginUser u = HOLDER.get();

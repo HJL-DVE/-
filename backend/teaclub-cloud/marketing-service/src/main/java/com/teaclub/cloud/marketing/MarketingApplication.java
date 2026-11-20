@@ -14,6 +14,7 @@ import org.springframework.cloud.openfeign.EnableFeignClients;
 @SpringBootApplication
 @EnableDiscoveryClient
 @EnableFeignClients(basePackages = "com.teaclub.cloud.marketing")
+@org.springframework.scheduling.annotation.EnableScheduling
 public class MarketingApplication {
 
     public static void main(String[] args) {
