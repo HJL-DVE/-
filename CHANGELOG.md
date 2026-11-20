@@ -1,3 +1,35 @@
+## [第七阶段] 营销模块前端 + 接口文档/时序图/测试报告（2026-11-21）
+
+### Web 管理后台（6 页）
+
+- `src/api/marketing.ts` 营销 API 层
+- views/marketing：coupon / level / pointsRule（只读，规则编辑接口未提供，如实标注）/ points / activity / stat
+- routes.ts viewRegistry 注册（pointsRule 双 key 兼容契约差异）
+
+### 微信小程序（7 页，pages.json 19→26）
+
+- coupon/center 优惠券中心、coupon/mine 我的优惠券
+- member/points 积分中心（占位页重写）、member/level 等级、member/sign-in 签到、member/birthday 生日福利
+- points/goods 积分商城、points/records 兑换记录
+- member/coupons 占位页改为真实入口
+
+### 后端补一个会员端只读接口
+
+- `GET /api/marketing/coupons/available`：优惠券中心可领模板列表（过滤发完，含 receivedCount，
+  支持 birthdayOnly/newMemberOnly —— 生日福利页依赖它）
+
+### 验证
+
+```text
+admin: npm run build exit=0；admin-web 容器重建，8080 路由 200，营销 chunk 8 个
+mp:    uni build -p mp-weixin exit=0，app.json pages=26，7 页产物齐全
+接口:  会员端 11/11、管理端路由+接口 12/12
+回归:  10/10 脚本、146/146 断言
+```
+
+新增文档：docs/41（接口文档+时序图）、docs/42（测试报告）。
+
+---
 ## [第七阶段] 营销活动 / 等级权益 / 积分商城 / 券模板管理（2026-11-21）
 
 ### 新增
