@@ -12,13 +12,19 @@ export const viewRegistry: Record<string, LazyView> = {
   'store/list': () => import('@/views/store/list.vue'),
   'brand/detail': () => import('@/views/store/brand.vue'),
   'system/user': () => import('@/views/system/user.vue'),
+  'system/role': () => import('@/views/system/role.vue'),
+  'system/permission': () => import('@/views/system/permission.vue'),
+  'system/log': () => import('@/views/system/log.vue'),
   'member/list': () => import('@/views/member/list.vue'),
   'member/level': () => import('@/views/member/level.vue'),
   'member/detail': () => import('@/views/member/detail.vue'),
   'product/spu': () => import('@/views/product/spu.vue'),
+  'product/category': () => import('@/views/product/category.vue'),
   'product/store': () => import('@/views/product/store.vue'),
   'order/list': () => import('@/views/order/list.vue'),
+  'order/statistics': () => import('@/views/order/statistics.vue'),
   'wallet/recharge': () => import('@/views/wallet/recharge.vue'),
+  'wallet/plan': () => import('@/views/wallet/plan.vue'),
   'wallet/transaction': () => import('@/views/wallet/transaction.vue'),
   'wallet/account': () => import('@/views/wallet/account.vue'),
   'payment/list': () => import('@/views/payment/list.vue'),
@@ -51,12 +57,6 @@ export const viewRegistry: Record<string, LazyView> = {
 
 /** 菜单里存在、但不在 docs/33 第四节 13 页清单内的条目：显式占位，不伪造页面 */
 export const placeholderComponents = new Set<string>([
-  'product/category',
-  'order/statistics',
-  'wallet/plan',
-  'system/role',
-  'system/permission',
-  'system/log',
 ])
 
 export function resolveView(component?: string | null): LazyView {

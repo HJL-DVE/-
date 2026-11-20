@@ -52,3 +52,17 @@ export function shelfStoreSpu(storeId: number, spuId: number, isOnSale: number):
 export function removeStoreSpu(storeId: number, spuId: number): Promise<void> {
   return http.del<void>('/api/admin/product/store-products/' + storeId + '/spu/' + spuId)
 }
+
+// ===== 分类 CRUD（阶段九：product/category 页面）=====
+
+export function createCategory(data: { categoryName: string; sort?: number; status?: string }) {
+  return http.post<number>('/api/admin/product/categories', data)
+}
+
+export function updateCategory(id: number, data: { categoryName?: string; sort?: number; status?: string }) {
+  return http.put<void>('/api/admin/product/categories/' + id, data)
+}
+
+export function deleteCategory(id: number) {
+  return http.del<void>('/api/admin/product/categories/' + id)
+}

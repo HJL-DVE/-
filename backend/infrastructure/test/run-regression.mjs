@@ -34,6 +34,7 @@ const SUITE = [
   { file: '27-report-ext.mjs',                tag: 'report2',  desc: '报表扩展：每小时趋势/分类排行/商品趋势 + 越权复核' },
   { file: '28-member-level.mjs',              tag: 'level',    desc: '会员等级 CRUD 全链路（增改删回读+权限）' },
   { file: '30-full-journey.mjs',              tag: 'journey',  desc: '第九阶段完整流程：注册→充值→消费→积分→报表一致+重复防护' },
+  { file: '31-placeholder-pages.mjs',         tag: 'pages',    desc: '6 占位页后端全链路：分类/统计/套餐/角色/权限/日志' },
 ];
 
 const filters = process.argv.slice(2).filter((a) => !a.startsWith('-'));
