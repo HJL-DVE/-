@@ -87,8 +87,8 @@
       <view v-else-if="categories.length === 0" class="state">该门店暂无可售分类</view>
       <view v-else class="cat-grid">
         <view v-for="cat in categories" :key="categoryIdOf(cat)" class="cat-item" @tap="goCategory(categoryIdOf(cat))">
-          <image v-if="cat.iconUrl" class="cat-icon" :src="cat.iconUrl" mode="aspectFill" />
-          <view v-else class="cat-icon placeholder">类</view>
+          <image v-if="categoryIcon(cat)" class="cat-icon" :src="categoryIcon(cat)" mode="aspectFill" />
+          <view v-else class="cat-icon placeholder">{{ (cat.categoryName || '类').slice(0, 1) }}</view>
           <view class="cat-name">{{ cat.categoryName }}</view>
         </view>
       </view>
@@ -113,7 +113,7 @@ import { useCartStore } from '@/stores/cart'
 import * as productApi from '@/api/product'
 import type { CategoryItem, SpuItem } from '@/api/types'
 import { fen2yuan } from '@/utils/money'
-import { categoryIdOf, isStoreOpen, spuIdOf, spuImage, spuPrice, storeBusinessHours } from '@/utils/normalize'
+import { categoryIcon, categoryIdOf, isStoreOpen, spuIdOf, spuImage, spuPrice, storeBusinessHours } from '@/utils/normalize'
 
 const storeStore = useStoreStore()
 const cartStore = useCartStore()

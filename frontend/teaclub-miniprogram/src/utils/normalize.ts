@@ -11,9 +11,31 @@ export function categoryIdOf(cat: CategoryItem | null | undefined): number {
   return Math.trunc(Number(cat.categoryId) || 0)
 }
 
+/**
+ * 静态图片根地址。
+ *
+ * <p>商品/分类图在后端库里存的是相对路径（`/static/images/spu/1.jpg`），
+ * 实际文件在小程序工程 `src/static/images/` 下（uni-app 会原样打进产物）。
+ * 小程序 `<image>` 的 src 支持以 `/` 开头的包内绝对路径，直接用即可，
+ * 不需要拼接网关地址 —— 拼了反而会变成跨域网络请求，且要走 downloadFile 白名单。
+ */
+function resolveImage(raw: string | null | undefined): string {
+  const v = (raw || '').trim()
+  if (!v) return ''
+  // 已经是完整 URL 或包内绝对路径，直接返回
+  if (v.startsWith('http://') || v.startsWith('https://') || v.startsWith('/')) return v
+  // 裸文件名兜底
+  return '/static/images/' + v
+}
+
 export function spuImage(spu: SpuItem | null | undefined): string {
   if (!spu) return ''
-  return spu.imageUrl || ''
+  return resolveImage(spu.imageUrl)
+}
+
+export function categoryIcon(cat: CategoryItem | null | undefined): string {
+  if (!cat) return ''
+  return resolveImage(cat.iconUrl)
 }
 
 export function spuPrice(spu: SpuItem | null | undefined): number {

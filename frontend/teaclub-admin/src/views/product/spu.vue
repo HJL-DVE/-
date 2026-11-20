@@ -24,6 +24,21 @@
       </div>
 
       <el-table :data="records" v-loading="loading" border stripe>
+        <el-table-column label="图片" width="80" align="center">
+          <template #default="{ row }">
+            <el-image
+              v-if="row.mainImage"
+              :src="row.mainImage"
+              :preview-src-list="[row.mainImage]"
+              preview-teleported
+              fit="cover"
+              style="width: 44px; height: 44px; border-radius: 6px"
+            >
+              <template #error><span class="img-fallback">无图</span></template>
+            </el-image>
+            <span v-else class="img-fallback">无图</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="spuCode" label="商品编码" width="130" />
         <el-table-column prop="spuName" label="商品名称" min-width="180" show-overflow-tooltip />
         <el-table-column prop="categoryName" label="分类" width="120" />
@@ -179,3 +194,12 @@ onMounted(async () => {
   }
 })
 </script>
+
+<style scoped>
+.img-fallback {
+  display: inline-block;
+  font-size: 12px;
+  color: #9ca3af;
+  line-height: 44px;
+}
+</style>
