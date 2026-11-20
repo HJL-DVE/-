@@ -36,6 +36,17 @@ docker compose -f docker-compose.yml --env-file .env.docker up -d
 | 17-phase6-smoke | 第六阶段冒烟：管理端/钱包管理端/统计/会员码/匿名浏览/微信登录/会员端/令牌隔离 | docs/36 |
 | 18-recharge-pay-closed-loop | 充值→支付→入账→幂等→下单→钱包支付 全闭环 | docs/36 |
 | 19-refund-via-gateway | 微信支付→申请退款→重复退款被拒→退款回调→订单 REFUNDED | docs/36 |
+| 20-payment-channel | 支付渠道默认值/显式覆盖/非法拒绝/无 openid 降级 | docs/37 |
+
+## 一键回归门禁
+
+```bash
+node backend/infrastructure/test/run-regression.mjs
+```
+
+顺序跑 17 / 18 / 19 / 20 / 12，任一失败即整体失败（退出码 1）；
+网关未就绪会先等待 60 秒并提示容器启动命令。当前：**脚本 5/5，断言 71/71**。
+支持过滤：`run-regression.mjs smoke` / `run-regression.mjs 17 18`。
 
 ## 运行
 

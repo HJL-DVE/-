@@ -63,8 +63,9 @@ public class PaymentAppController {
             throw new BizException(ResultCode.FORBIDDEN, "无权为该业务单发起支付");
         }
 
-        normalizeChannel(request);
-        return Result.ok(inBrandScope(() -> paymentService.createPayment(request)));
+        // 无 openid 时 JSAPI 无法调起（微信要求 openid），降级为 Native 二维码
+        downgradeIfNoOpenid(request);
+        return Result.ok(inBrandScope(() -> paymentService.createPaymentForMember(request)));
     }
 
     @Operation(summary = "支付结果轮询（只返回本人支付单）")
@@ -144,15 +145,19 @@ public class PaymentAppController {
     }
 
     /**
-     * 渠道归一：小程序请求体只带 {@code openid?}。
-     * 无 openid 时 JSAPI 无法调起（微信要求 openid），降级为 Native 二维码（返回 codeUrl）。
+     * 无 openid 时的降级。
+     *
+     * <p>小程序走 JSAPI 必须带 openid（微信硬性要求）；没带就调不起，
+     * 此时降级为 Native 二维码（返回 codeUrl，小程序用 canvas 展示）。
+     * <p>默认渠道由 service 的会员端入口决定（{@code WECHAT_JSAPI}），
+     * 这里只处理「不降级就会失败」的那一种情况。
      */
-    private static void normalizeChannel(PayCreateRequest request) {
-        boolean hasOpenid = StringUtils.hasText(request.getOpenid());
+    private static void downgradeIfNoOpenid(PayCreateRequest request) {
+        if (StringUtils.hasText(request.getOpenid())) {
+            return;
+        }
         String channel = request.getChannel();
-        if (!StringUtils.hasText(channel)) {
-            request.setChannel(hasOpenid ? "WECHAT_JSAPI" : "WECHAT_NATIVE");
-        } else if (!hasOpenid && "WECHAT_JSAPI".equals(channel)) {
+        if (!StringUtils.hasText(channel) || "WECHAT_JSAPI".equals(channel)) {
             request.setChannel("WECHAT_NATIVE");
         }
     }

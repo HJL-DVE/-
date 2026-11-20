@@ -1,0 +1,39 @@
+# ============================================================
+# TeaClub Web 管理后台 独立编排（叠加在 docker-compose.yml 之上）
+#
+# 单独成文件的原因：Web 前端不属于后端服务集合，
+# 且构建上下文需要仓库根（要同时拿 frontend/ 与 deploy/），
+# 直接塞进 docker-compose.yml 会打乱后端编排的上下文约定。
+#
+# 启动（在 backend/infrastructure/docker 目录）：
+#   docker compose -f docker-compose.yml -f docker-compose.web.yml \
+#     --env-file .env.docker up -d
+#
+# 只启 Web：
+#   docker compose -f docker-compose.yml -f docker-compose.web.yml \
+#     --env-file .env.docker up -d admin-web
+#
+# 访问： http://127.0.0.1:${WEB_PORT:-8080}
+# ============================================================
+
+services:
+  admin-web:
+    image: teaclub/admin-web:1.0.0
+    container_name: teaclub-admin-web
+    restart: unless-stopped
+    build:
+      # 上下文必须是仓库根，见 deploy/web/Dockerfile 顶部说明
+      context: ../../..
+      dockerfile: deploy/web/Dockerfile
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    depends_on:
+      gateway-service:
+        condition: service_healthy
+    networks: [teaclub-net]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s

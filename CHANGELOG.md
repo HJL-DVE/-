@@ -1,3 +1,41 @@
+## [第六阶段·续] Web 部署 + 支付渠道修正 + 一键回归门禁（2026-11-21）
+
+### 1. Web 管理后台容器化部署（同源反代）
+
+- 新增 `deploy/web/Dockerfile`（两阶段：node 构建 → nginx 运行）
+- 新增 `deploy/web/nginx.conf`：history 回退 `try_files`、`/api/` 反代到 gateway、gzip、安全头、`/healthz`
+- 新增 `backend/infrastructure/docker/docker-compose.web.yml`（叠加编排，构建上下文为仓库根）
+- `.env.production` 改为 **`VITE_API_BASE_URL=` 留空**：生产走同源相对路径
+
+> 原先写的 `http://127.0.0.1:9000` 在远程部署时指向用户自己的机器，根本不可用。
+> 实测：首页 200、深链 `/member/detail/1` 200、`/api` 反代返回 401 JSON（证明真的到了网关而非 Nginx 404）、
+> 经 8080 完成登录+业务查询 5/5 通过。
+
+### 2. 支付渠道语义修正（真实缺陷）
+
+`PayCreateRequest.channel` 原为 `= "WECHAT_JSAPI"`，导致「不传」与「传 JSAPI」无法区分，
+桌面收银台若不带 channel 就拿不到 `codeUrl`（脚本 19 的"订单支付无 codeUrl"正是此因）。
+
+- DTO 去掉默认值
+- Service 拆两个入口：`createPayment`（管理端默认 Native）/ `createPaymentForMember`（会员端默认 JSAPI）
+- 渠道白名单校验，非法值返回 `PARAM_INVALID`
+- 会员端无 openid 自动降级 Native
+
+实测 `20-payment-channel.mjs` **6/6 通过**。
+
+### 3. 一键回归门禁
+
+- 新增 `backend/infrastructure/test/run-regression.mjs`：顺序跑 17/18/19/20/12，任一失败即退出码 1
+- 网关未就绪先等 60 秒并提示容器启动命令；失败只回放 FAIL 行
+- **`12-fund-invariants.mjs` 重写**：原先只打印查询结果、没有任何断言（门禁里显示 PASS=0 FAIL=0），
+  现为 I1–I6 六条真断言
+
+当前门禁：**脚本 5/5，断言 71/71，用时约 7 秒**。
+
+新增文档：docs/37；新增脚本：20、run-regression。
+
+---
+
 ## [第六阶段] Web 管理后台 + 微信小程序 + 会员端接口补齐（2026-11-21）
 
 ### 目录调整（按需求方意见）

@@ -52,10 +52,51 @@ public class PaymentServiceImpl implements PaymentService {
 
     // ==================== 创建支付 ====================
 
+    /** 管理端（桌面收银台）默认渠道：需要二维码，所以是 Native。 */
+    public static final String DEFAULT_ADMIN_CHANNEL = "WECHAT_NATIVE";
+
+    /** 会员端（小程序）默认渠道：需要 invokeParams 调 wx.requestPayment。 */
+    public static final String DEFAULT_MEMBER_CHANNEL = "WECHAT_JSAPI";
+
+    /** 允许的渠道白名单，防止前端传入任意字符串写进库里。 */
+    private static final Set<String> ALLOWED_CHANNELS =
+            Set.of("WECHAT_NATIVE", "WECHAT_JSAPI", "MOCK_NATIVE", "MOCK");
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public PayCreateVO createPayment(PayCreateRequest request) {
+        // 管理端入口：桌面收银台无 openid，默认 Native 出二维码
+        return doCreatePayment(request, DEFAULT_ADMIN_CHANNEL);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public PayCreateVO createPaymentForMember(PayCreateRequest request) {
+        // 会员端入口：小程序默认 JSAPI 出 invokeParams
+        return doCreatePayment(request, DEFAULT_MEMBER_CHANNEL);
+    }
+
+    /**
+     * 解析并校验支付渠道。
+     *
+     * <p>显式传入优先；不传则落到调用端默认值。
+     * JSAPI 必须有 openid，否则在真实微信渠道下必然失败，这里提前拦掉。
+     */
+    private String resolveChannel(String requested, String defaultChannel) {
+        String channel = StringUtils.hasText(requested) ? requested.trim() : defaultChannel;
+        if (!ALLOWED_CHANNELS.contains(channel)) {
+            throw new BizException(ResultCode.PARAM_INVALID,
+                    "不支持的支付渠道：" + channel + "，可选 " + ALLOWED_CHANNELS);
+        }
+        return channel;
+    }
+
+    private PayCreateVO doCreatePayment(PayCreateRequest request, String defaultChannel) {
         LoginUser current = UserContext.require();
+
+        // 统一解析渠道：显式传入优先，否则用调用端默认值；并做白名单校验
+        String channel = resolveChannel(request.getChannel(), defaultChannel);
+        request.setChannel(channel);
 
         // 已有支付单则复用（幂等）
         PayPaymentOrder existing = paymentMapper.selectByBizForUpdate(request.getBizType(), request.getBizNo());

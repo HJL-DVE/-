@@ -16,8 +16,20 @@ public class PayCreateRequest {
     @Pattern(regexp = "^(ORDER|RECHARGE)$", message = "业务类型只能是 ORDER 或 RECHARGE")
     private String bizType;
 
-    @Schema(description = "支付渠道：WECHAT_JSAPI / WECHAT_NATIVE / MOCK")
-    private String channel = "WECHAT_JSAPI";
+    /**
+     * 支付渠道：WECHAT_NATIVE / WECHAT_JSAPI / MOCK_NATIVE / MOCK。
+     *
+     * <p><b>不设默认值</b>。历史写法在此给了 {@code = "WECHAT_JSAPI"}，
+     * 导致「不传 channel」与「显式传 JSAPI」无法区分，
+     * 桌面收银台（需要 Native 二维码）永远拿不到 codeUrl。
+     * 现在由调用端按场景决定默认值：
+     * <ul>
+     *   <li>管理端 {@code /api/admin/payment/create}（桌面收银台）→ Native</li>
+     *   <li>会员端 {@code /api/payment/create}（小程序）→ JSAPI</li>
+     * </ul>
+     */
+    @Schema(description = "支付渠道：WECHAT_NATIVE / WECHAT_JSAPI；不传则由调用端按场景取默认值")
+    private String channel;
 
     @Schema(description = "小程序 openid（JSAPI 必填）")
     private String openid;
