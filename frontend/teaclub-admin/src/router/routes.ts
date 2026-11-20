@@ -24,6 +24,17 @@ export const viewRegistry: Record<string, LazyView> = {
   'payment/refund': () => import('@/views/payment/refund.vue'),
   'payment/notify': () => import('@/views/payment/notify.vue'),
   'cashier/index': () => import('@/views/cashier/index.vue'),
+  // 营销模块（component 标识与 iam_db.sys_permission 完全一致）
+  'marketing/coupon': () => import('@/views/marketing/coupon.vue'),
+  'marketing/level': () => import('@/views/marketing/level.vue'),
+  // 注意：iam_db.sys_permission 实际值是驼峰 'marketing/pointsRule'，
+  // 契约文档写作 'marketing/points-rule'，两个 key 同时注册以兼容，
+  // 避免菜单命中 placeholder。
+  'marketing/pointsRule': () => import('@/views/marketing/pointsRule.vue'),
+  'marketing/points-rule': () => import('@/views/marketing/pointsRule.vue'),
+  'marketing/points': () => import('@/views/marketing/points.vue'),
+  'marketing/activity': () => import('@/views/marketing/activity.vue'),
+  'marketing/stat': () => import('@/views/marketing/stat.vue'),
 }
 
 /** 菜单里存在、但不在 docs/33 第四节 13 页清单内的条目：显式占位，不伪造页面 */

@@ -33,6 +33,15 @@ public class CouponAppController {
         return Result.ok(couponService.receive(templateId, memberId, qty));
     }
 
+    @Operation(summary = "优惠券中心：可领取的券模板")
+    @GetMapping("/available")
+    public Result<List<com.teaclub.cloud.marketing.vo.CouponTemplateVO>> available(
+            @RequestParam(required = false) Boolean birthdayOnly,
+            @RequestParam(required = false) Boolean newMemberOnly) {
+        return Result.ok(couponService.listAvailableTemplates(
+                UserContext.requireMemberId(), birthdayOnly, newMemberOnly));
+    }
+
     @Operation(summary = "我的优惠券（可按状态过滤）")
     @GetMapping("/mine")
     public Result<List<CouponVO>> mine(@RequestParam(required = false) String status,

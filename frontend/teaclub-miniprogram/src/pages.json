@@ -99,6 +99,49 @@
         "navigationBarTitleText": "我的积分"
       }
     },
+
+    {
+      "path": "pages/member/level",
+      "style": {
+        "navigationBarTitleText": "会员等级"
+      }
+    },
+    {
+      "path": "pages/member/sign-in",
+      "style": {
+        "navigationBarTitleText": "每日签到"
+      }
+    },
+    {
+      "path": "pages/member/birthday",
+      "style": {
+        "navigationBarTitleText": "生日福利"
+      }
+    },
+    {
+      "path": "pages/coupon/center",
+      "style": {
+        "navigationBarTitleText": "优惠券中心"
+      }
+    },
+    {
+      "path": "pages/coupon/mine",
+      "style": {
+        "navigationBarTitleText": "我的优惠券"
+      }
+    },
+    {
+      "path": "pages/points/goods",
+      "style": {
+        "navigationBarTitleText": "积分商城"
+      }
+    },
+    {
+      "path": "pages/points/records",
+      "style": {
+        "navigationBarTitleText": "兑换记录"
+      }
+    },
     {
       "path": "pages/member/coupons",
       "style": {

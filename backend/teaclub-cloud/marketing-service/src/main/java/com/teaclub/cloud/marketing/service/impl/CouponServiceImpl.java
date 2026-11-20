@@ -142,6 +142,59 @@ public class CouponServiceImpl implements CouponService {
         return toVO(coupon, tpl.getCouponName());
     }
 
+    @Override
+    public List<com.teaclub.cloud.marketing.vo.CouponTemplateVO> listAvailableTemplates(
+            Long memberId, Boolean birthdayOnly, Boolean newMemberOnly) {
+        var w = com.baomidou.mybatisplus.core.toolkit.Wrappers.<MktCouponTemplate>lambdaQuery()
+                .eq(MktCouponTemplate::getDeleted, 0)
+                .eq(MktCouponTemplate::getStatus, "ENABLED")
+                .orderByAsc(MktCouponTemplate::getId);
+        if (birthdayOnly != null) {
+            w.eq(MktCouponTemplate::getBirthdayOnly, birthdayOnly ? 1 : 0);
+        }
+        if (newMemberOnly != null) {
+            w.eq(MktCouponTemplate::getNewMemberOnly, newMemberOnly ? 1 : 0);
+        }
+        List<com.teaclub.cloud.marketing.vo.CouponTemplateVO> out = new ArrayList<>();
+        for (MktCouponTemplate t : templateMapper.selectList(w)) {
+            // 发完的不再展示
+            if (t.getTotalCount() != null && t.getTotalCount() > 0
+                    && t.getIssuedCount() != null && t.getIssuedCount() >= t.getTotalCount()) {
+                continue;
+            }
+            com.teaclub.cloud.marketing.vo.CouponTemplateVO vo =
+                    new com.teaclub.cloud.marketing.vo.CouponTemplateVO();
+            vo.setId(t.getId());
+            vo.setTemplateNo(t.getTemplateNo());
+            vo.setCouponName(t.getCouponName());
+            vo.setCouponType(t.getCouponType());
+            try {
+                vo.setCouponTypeLabel(CouponType.valueOf(t.getCouponType()).getLabel());
+            } catch (Exception e) {
+                vo.setCouponTypeLabel(t.getCouponType());
+            }
+            vo.setScopeType(t.getScopeType());
+            vo.setFaceValue(t.getFaceValue());
+            vo.setDiscountRate(t.getDiscountRate());
+            vo.setMaxDiscountAmount(t.getMaxDiscountAmount());
+            vo.setThresholdAmount(t.getThresholdAmount());
+            vo.setTotalCount(t.getTotalCount());
+            vo.setIssuedCount(t.getIssuedCount());
+            vo.setPerMemberLimit(t.getPerMemberLimit());
+            vo.setValidType(t.getValidType());
+            vo.setValidDays(t.getValidDays());
+            vo.setNewMemberOnly(t.getNewMemberOnly());
+            vo.setBirthdayOnly(t.getBirthdayOnly());
+            vo.setStatus(t.getStatus());
+            vo.setRemark(t.getRemark());
+            if (memberId != null) {
+                vo.setReceivedCount(couponMapper.countByTemplateAndMember(t.getId(), memberId));
+            }
+            out.add(vo);
+        }
+        return out;
+    }
+
     /** 按模板生成一张券实例，有效期按 validType 计算。 */
     private MktCoupon buildCoupon(MktCouponTemplate tpl, Long memberId, String obtainType) {
         MktCoupon c = new MktCoupon();

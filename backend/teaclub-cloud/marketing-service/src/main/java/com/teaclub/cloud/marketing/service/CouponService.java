@@ -34,6 +34,15 @@ public interface CouponService {
      */
     CouponVO grant(Long templateId, Long memberId, String obtainType);
 
+    /**
+     * 会员可领取的券模板列表（优惠券中心）。
+     *
+     * @param birthdayOnly 只返回生日券；null=不限
+     * @param newMemberOnly 只返回新人券；null=不限
+     */
+    java.util.List<com.teaclub.cloud.marketing.vo.CouponTemplateVO> listAvailableTemplates(
+            Long memberId, Boolean birthdayOnly, Boolean newMemberOnly);
+
     /** 会员券列表。status 为空则返回全部。 */
     List<CouponVO> listMine(Long memberId, String status, int limit);
 

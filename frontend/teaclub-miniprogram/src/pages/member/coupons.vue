@@ -1,54 +1,47 @@
 <template>
   <view class="page">
-    <view class="card placeholder">
-      <view class="icon">券</view>
-      <view class="title">敬请期待</view>
-      <view class="muted desc">
-        优惠券由营销服务（marketing-service）提供，本阶段未开放。
-        当前页面不展示任何伪造优惠券数据。
+    <view class="entry" @tap="goCenter">
+      <view class="entry-left">
+        <text class="entry-title">优惠券中心</text>
+        <text class="entry-sub">领取门店发放的优惠券</text>
       </view>
-      <view class="muted small">契约 docs/33 第六节：优惠券页面为「预留」，无后端接口。</view>
-      <button class="btn-primary back" @tap="goMember">返回会员中心</button>
+      <text class="entry-arrow">></text>
+    </view>
+
+    <view class="entry" @tap="goMine">
+      <view class="entry-left">
+        <text class="entry-title">我的优惠券</text>
+        <text class="entry-sub">查看未使用 / 已使用 / 已过期</text>
+      </view>
+      <text class="entry-arrow">></text>
+    </view>
+
+    <view class="entry" @tap="goBirthday">
+      <view class="entry-left">
+        <text class="entry-title">生日福利</text>
+        <text class="entry-sub">生日当月专属好礼</text>
+      </view>
+      <text class="entry-arrow">></text>
     </view>
   </view>
 </template>
 
 <script setup lang="ts">
-function goMember() {
-  uni.navigateTo({ url: '/pages/member/index' })
+function goCenter() {
+  uni.navigateTo({ url: '/pages/coupon/center' })
+}
+function goMine() {
+  uni.navigateTo({ url: '/pages/coupon/mine' })
+}
+function goBirthday() {
+  uni.navigateTo({ url: '/pages/member/birthday' })
 }
 </script>
 
 <style scoped>
-.placeholder {
-  margin-top: 120rpx;
-  text-align: center;
-  padding: 60rpx 40rpx;
-}
-.icon {
-  width: 120rpx;
-  height: 120rpx;
-  line-height: 120rpx;
-  border-radius: 50%;
-  background: #ffedd5;
-  color: #b45309;
-  font-size: 44rpx;
-  margin: 0 auto 24rpx;
-}
-.title {
-  font-size: 34rpx;
-  font-weight: 700;
-}
-.desc {
-  margin-top: 20rpx;
-  line-height: 1.7;
-  font-size: 26rpx;
-}
-.small {
-  margin-top: 16rpx;
-  font-size: 22rpx;
-}
-.back {
-  margin-top: 48rpx;
-}
+.page { min-height: 100vh; background: #f6f7f9; padding: 20rpx; }
+.entry { display: flex; align-items: center; justify-content: space-between; background: #fff; border-radius: 16rpx; padding: 28rpx 24rpx; margin-bottom: 20rpx; }
+.entry-title { display: block; font-size: 30rpx; font-weight: 600; }
+.entry-sub { display: block; font-size: 22rpx; color: #9ca3af; margin-top: 6rpx; }
+.entry-arrow { font-size: 28rpx; color: #d1d5db; }
 </style>
