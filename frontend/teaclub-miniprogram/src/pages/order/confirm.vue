@@ -15,11 +15,11 @@
 
       <view class="card">
         <view class="section-title">商品</view>
-        <view v-for="item in cartStore.currentItems" :key="item.key" class="item-line">
+        <view v-for="item in cartStore.checkoutItems" :key="item.key" class="item-line">
           <view class="item-name">{{ item.spuName }} <text class="muted">×{{ item.quantity }}</text></view>
           <view class="muted item-spec">{{ item.skuName }}<text v-if="specRemark(item)"> · {{ specRemark(item) }}</text></view>
         </view>
-        <view v-if="cartStore.currentItems.length === 0" class="muted">购物车为空</view>
+        <view v-if="cartStore.checkoutItems.length === 0" class="muted">购物车为空</view>
       </view>
 
       <view class="card">
@@ -92,8 +92,14 @@ const quoteError = ref('')
 const payMode = ref<'WALLET' | 'WECHAT'>('WALLET')
 const submitting = ref(false)
 
-onLoad(() => {
-  cartStore.setStore(storeStore.currentStoreId)
+onLoad((opts) => {
+  const isBuyNow = opts && opts.mode === 'buynow'
+  if (isBuyNow) {
+    // 立即下单：门店以商品页传入为准（商品页已把 storeStore.currentStoreId 用于规格价）
+    cartStore.setStore(storeStore.currentStoreId)
+  } else {
+    cartStore.setStore(storeStore.currentStoreId)
+  }
   if (authStore.isLoggedIn) loadQuote()
 })
 

@@ -216,6 +216,35 @@ function addCart() {
   })
   toast('已加入购物车')
 }
+
+/** 立即下单：跳过购物车，携带当前规格直通订单确认页（mode=buynow） */
+function buyNow() {
+  if (!spu.value) return
+  if (!selectedSku.value) {
+    toast('请选择规格')
+    return
+  }
+  if (storeStore.currentStoreId === null) {
+    toast('请先选择门店')
+    return
+  }
+  const spec = collectSpec()
+  const toppingText = spec.toppings.length > 0 ? ' 加' + spec.toppings.join('+') : ''
+  cartStore.setBuyNow({
+    storeId: Number(storeStore.currentStoreId),
+    spuId: Number(spu.value.spuId),
+    skuId: skuIdOf(selectedSku.value),
+    spuName: spu.value.spuName,
+    skuName: selectedSku.value.skuName + toppingText,
+    imageUrl: spuImage(spu.value),
+    unitPrice: currentPrice.value,
+    quantity: quantity.value,
+    sugar: spec.sugar,
+    ice: spec.ice,
+    toppings: spec.toppings,
+  })
+  uni.navigateTo({ url: '/pages/order/confirm?mode=buynow' })
+}
 </script>
 
 <style scoped>
@@ -310,6 +339,16 @@ function addCart() {
 .footer-total {
   flex: 1;
   font-size: 26rpx;
+}
+.footer-btns {
+  display: flex;
+  gap: 16rpx;
+  flex: 1;
+}
+.footer-btns .btn-primary,
+.footer-btns .btn-plain {
+  flex: 1;
+  margin: 0;
 }
 .add-btn {
   width: 300rpx;

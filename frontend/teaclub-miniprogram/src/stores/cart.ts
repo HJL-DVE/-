@@ -51,6 +51,31 @@ export const useCartStore = defineStore('cart', () => {
   const items = ref<CartItem[]>(readCart())
   const currentStoreId = ref<number | null>(null)
 
+  // ===== 立即下单（buy-now）直通通道 =====
+  // 与购物车互不影响：进入确认页时若带 mode=buynow，用这份临时商品代替购物车内容。
+  const buyNowItem = ref<CartItem | null>(null)
+
+  function setBuyNow(payload: AddCartPayload) {
+    buyNowItem.value = {
+      key: buildKey(payload),
+      storeId: payload.storeId,
+      spuId: payload.spuId,
+      skuId: payload.skuId,
+      spuName: payload.spuName,
+      skuName: payload.skuName,
+      imageUrl: payload.imageUrl || '',
+      unitPrice: payload.unitPrice,
+      quantity: payload.quantity,
+      sugar: payload.sugar || '',
+      ice: payload.ice || '',
+      toppings: payload.toppings || [],
+    }
+  }
+
+  function clearBuyNow() {
+    buyNowItem.value = null
+  }
+
   function readCart(): CartItem[] {
     try {
       const raw = uni.getStorageSync(CART_KEY)
@@ -76,9 +101,14 @@ export const useCartStore = defineStore('cart', () => {
     return items.value.filter((i) => Number(i.storeId) === Number(currentStoreId.value))
   })
 
+  const checkoutItems = computed<CartItem[]>(() => {
+    if (buyNowItem.value) return [buyNowItem.value]
+    return currentItems.value
+  })
+
   const totalQuantity = computed(() => currentItems.value.reduce((acc, i) => acc + i.quantity, 0))
 
-  /** 金额一律整数分求和 */
+  /** 金额一律整数分求和（购物车本体） */
   const totalAmount = computed(() =>
     currentItems.value.reduce((acc, i) => acc + Math.trunc(i.unitPrice) * i.quantity, 0),
   )
@@ -131,14 +161,22 @@ export const useCartStore = defineStore('cart', () => {
   }
 
   function clear() {
+    buyNowItem.value = null
     if (currentStoreId.value === null) items.value = []
     else items.value = items.value.filter((i) => Number(i.storeId) !== Number(currentStoreId.value))
     persist()
   }
 
+  /** 确认页实际使用的商品集：立即下单模式用 buyNowItem，否则用购物车当前门店商品 */
+
+
+  /** 确认页合计（立即下单模式 = buyNowItem；购物车模式 = 当前门店购物车） */
+  const checkoutTotal = computed(() =>
+    checkoutItems.value.reduce((acc, i) => acc + i.unitPrice * i.quantity, 0))
+
   /** 下单请求体：仅 skuId + quantity（OrderItemRequest 不含价格字段） */
   function toOrderItems(): Array<{ skuId: number; quantity: number }> {
-    return currentItems.value.map((i) => ({ skuId: i.skuId, quantity: i.quantity }))
+    return checkoutItems.value.map((i) => ({ skuId: i.skuId, quantity: i.quantity }))
   }
 
   /** 规格备注汇总，写入订单级 remark（OrderItemRequest 无法承载 remark） */
@@ -166,5 +204,10 @@ export const useCartStore = defineStore('cart', () => {
     clear,
     toOrderItems,
     toRemark,
+    buyNowItem,
+    checkoutItems,
+    checkoutTotal,
+    setBuyNow,
+    clearBuyNow,
   }
 })
