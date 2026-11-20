@@ -224,7 +224,8 @@ public class OrderServiceImpl implements OrderService {
             paidEvent.put("brandId", order.getBrandId());
             paidEvent.put("storeId", order.getStoreId());
             paidEvent.put("memberId", order.getMemberId());
-            paidEvent.put("paidAmount", order.getPayableAmount());
+            paidEvent.put("levelId", fetchMemberLevelId(order.getMemberId()));
+                        paidEvent.put("paidAmount", order.getPayableAmount());
             paidEvent.put("principalAmount", principalDeduct);
             paidEvent.put("giftAmount", giftDeduct);
             paidEvent.put("payChannel", "BALANCE");
@@ -608,5 +609,26 @@ public class OrderServiceImpl implements OrderService {
 
     private static Long toLong(Object v) {
         return v == null ? null : ((Number) v).longValue();
+    }
+
+    /**
+     * 查会员当前等级 ID（事件载荷携带，供下游按等级倍率发积分）。
+     * 失败返回 null —— 等级查询失败不应阻断支付主流程。
+     */
+    private Long fetchMemberLevelId(Long memberId) {
+        if (memberId == null) {
+            return null;
+        }
+        try {
+            var resp = memberClient.memberBrief(memberId);
+            if (resp == null || resp.getCode() != 0 || resp.getData() == null) {
+                return null;
+            }
+            Object v = resp.getData().get("levelId");
+            return v instanceof Number n ? n.longValue() : null;
+        } catch (Exception e) {
+            log.warn("查询会员等级失败（不影响支付）: memberId={}", memberId, e);
+            return null;
+        }
     }
 }

@@ -3,6 +3,7 @@ package com.teaclub.cloud.marketing.client;
 import com.teaclub.cloud.core.api.Result;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
@@ -17,6 +18,10 @@ import java.util.Map;
 @FeignClient(name = "member-service", path = "/api/member/internal",
         contextId = "marketingMemberInternalClient")
 public interface MemberSnapshotClient {
+
+    /** 会员简要信息（含 levelId，用于积分倍率）。 */
+    @GetMapping("/user/{memberId}/brief")
+    Result<Map<String, Object>> memberBrief(@PathVariable("memberId") Long memberId);
 
     @PostMapping("/user/{userId}/points-snapshot")
     Result<Void> syncPoints(@PathVariable("userId") Long userId,

@@ -160,6 +160,10 @@ r=await req('POST','/api/admin/marketing/level-benefits',{token:adminTok,body:{
 chk('同等级同编码更新而非新增',r.json?.data===benefitId,'id='+r.json?.data);
 r=await req('GET','/api/marketing/level-benefits/level/3',{token:mtok});
 chk('会员端查等级权益',r.json?.code===0&&(r.json?.data||[]).length>=1,'count='+(r.json?.data||[]).length);
+// 测完恢复金卡倍率 150（避免污染后续 32 号倍率测试）
+r=await req('POST','/api/admin/marketing/level-benefits',{token:adminTok,body:{
+  levelId:3, benefitCode:'POINT_RATE', benefitName:'金卡积分倍率', benefitValue:'150', status:'ENABLED'
+}});
 
 console.log('');
 console.log('=== 8. 活动过期处理 ===');

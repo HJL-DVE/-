@@ -22,6 +22,12 @@ public interface MemberInternalClient {
     Result<Map<String, Object>> userInfo(@PathVariable("userId") Long userId);
 
     /**
+     * 会员简要信息（含 levelId）。
+     */
+    @GetMapping("/user/{memberId}/brief")
+    Result<Map<String, Object>> memberBrief(@org.springframework.web.bind.annotation.PathVariable("memberId") Long memberId);
+
+    /**
      * 查询会员等级信息（含折扣率）。
      */
     @GetMapping("/level/{levelId}")

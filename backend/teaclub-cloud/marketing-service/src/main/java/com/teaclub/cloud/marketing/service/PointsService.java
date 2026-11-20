@@ -32,6 +32,13 @@ public interface PointsService {
                         Long paidAmount, String traceId);
 
     /**
+     * 带等级倍率的发放（levelId 来自事件载荷/会员档案）。
+     * levelId 为 null 时等同无倍率（1.0）。
+     */
+    boolean earnByOrderWithLevel(Long brandId, Long memberId, Long storeId, String orderNo,
+                                 Long paidAmount, Long levelId, String traceId);
+
+    /**
      * 订单退款 → 按原流水冲正。
      *
      * <p>{@code memberId} 允许为空：REFUND_SUCCEEDED 事件的载荷里<b>没有 memberId</b>，

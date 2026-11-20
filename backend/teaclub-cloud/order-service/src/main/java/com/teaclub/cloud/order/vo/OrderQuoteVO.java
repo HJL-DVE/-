@@ -11,6 +11,9 @@ import java.util.List;
 @Data
 @Schema(description = "订单金额试算")
 public class OrderQuoteVO {
+
+    /** 会员等级 ID（倍率/等级折扣溯源用；散客为 null） */
+    private Long levelId;
     @Schema(description = "商品总额（分）")
     private Long totalAmount;
     @Schema(description = "等级折扣优惠（分）")

@@ -35,6 +35,7 @@ import java.util.Map;
 public class OrderPaidPointsConsumer extends AbstractEventConsumer {
 
     private final PointsService pointsService;
+    private final com.teaclub.cloud.marketing.client.MemberSnapshotClient memberSnapshotClient;
     private final com.teaclub.cloud.marketing.service.ActivityService activityService;
 
     @RabbitListener(queues = MqConstants.Q_MARKETING_ORDER_PAID)
@@ -64,8 +65,21 @@ public class OrderPaidPointsConsumer extends AbstractEventConsumer {
             log.debug("[POINTS-ORDER] 散客订单，不发积分 orderNo={}", orderNo);
             return;
         }
-        boolean applied = pointsService.earnByOrder(brandId == null ? 1L : brandId, memberId,
-                storeId, orderNo, paidAmount, event.getTraceId());
+        // 等级倍率：事件载荷带 levelId 优先；没有则查 member brief 兜底
+        Long levelId = toLong(m.get("levelId"));
+        if (levelId == null) {
+            try {
+                var brief = memberSnapshotClient.memberBrief(memberId);
+                if (brief != null && brief.getCode() == 0 && brief.getData() != null) {
+                    Object v = brief.getData().get("levelId");
+                    levelId = v instanceof Number n ? n.longValue() : null;
+                }
+            } catch (Exception e) {
+                log.warn("[POINTS-ORDER] 查会员等级失败，按 1.0 倍发放 memberId={}", memberId);
+            }
+        }
+        boolean applied = pointsService.earnByOrderWithLevel(brandId == null ? 1L : brandId, memberId,
+                storeId, orderNo, paidAmount, levelId, event.getTraceId());
         if (!applied) {
             log.info("[POINTS-ORDER] 未发放（已发过或金额不足）orderNo={}", orderNo);
         }

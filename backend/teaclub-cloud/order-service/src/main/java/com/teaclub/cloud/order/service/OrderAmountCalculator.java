@@ -145,6 +145,7 @@ public class OrderAmountCalculator {
         long levelDiscount = 0L;
         Integer discountRate = 10000;
         String levelName = null;
+        Long memberLevelId = null;
 
         if (memberId != null) {
             Map<String, Object> member = fetchMember(memberId);
@@ -156,6 +157,7 @@ public class OrderAmountCalculator {
                 throw new BizException(ResultCode.BAD_REQUEST, "会员已被冻结，无法下单");
             }
             Long levelId = toLong(member.get("level_id"));
+            memberLevelId = levelId;
             if (levelId != null) {
                 Map<String, Object> level = fetchMemberLevel(levelId);
                 if (level != null && level.get("discount_rate") != null) {
@@ -201,6 +203,7 @@ public class OrderAmountCalculator {
         vo.setDiscountAmount(totalDiscount);
         vo.setPayableAmount(payable);
         vo.setMemberId(memberId);
+        vo.setLevelId(memberLevelId);
         vo.setMemberLevelName(levelName);
         vo.setDiscountRate(discountRate);
         vo.setItems(itemVOs);

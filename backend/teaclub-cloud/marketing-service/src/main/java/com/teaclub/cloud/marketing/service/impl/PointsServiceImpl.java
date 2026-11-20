@@ -54,6 +54,7 @@ public class PointsServiceImpl implements PointsService {
     private static final long DEFAULT_EXPIRE_DAYS = 365L;
 
     private final MktPointsAccountMapper accountMapper;
+    private final com.teaclub.cloud.marketing.service.LevelBenefitService levelBenefitService;
     private final MktPointsTransactionMapper txnMapper;
     private final MktPointsBatchMapper batchMapper;
     private final MktPointsRuleMapper ruleMapper;
@@ -96,10 +97,34 @@ public class PointsServiceImpl implements PointsService {
             log.debug("[POINTS] 缺少会员或金额，跳过发积分 orderNo={}", orderNo);
             return false;
         }
+        return earnInternal(brandId, memberId, storeId, orderNo, paidAmount, 100, traceId);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public boolean earnByOrderWithLevel(Long brandId, Long memberId, Long storeId, String orderNo,
+                                        Long paidAmount, Long levelId, String traceId) {
+        int rate = 100;
+        if (levelId != null) {
+            rate = levelBenefitService.pointRateOf(brandId, levelId);
+        }
+        return earnInternal(brandId, memberId, storeId, orderNo, paidAmount, rate, traceId);
+    }
+
+    /** 积分计算与发放的公共实现（rate 为倍率 ×100）。 */
+    private boolean earnInternal(Long brandId, Long memberId, Long storeId, String orderNo,
+                                 Long paidAmount, int rate, String traceId) {
+        if (memberId == null || orderNo == null || paidAmount == null || paidAmount <= 0) {
+            log.debug("[POINTS] 缺少会员或金额，跳过发积分 orderNo={}", orderNo);
+            return false;
+        }
         MktPointsRule rule = ruleMapper.selectByCode(brandId, PointsBizType.ORDER_EARN.name());
         long per = (rule == null || rule.getAmountPerPoint() == null || rule.getAmountPerPoint() <= 0)
                 ? 100L : rule.getAmountPerPoint();
-        long points = paidAmount / per;
+        // 基础分 = 金额/单位；等级倍率在基础分上乘（乘后再取整，避免每单位截断累积误差）
+        long basePoints = paidAmount / per;
+        long points = basePoints * rate / 100;
         if (points <= 0) {
             log.debug("[POINTS] 消费 {} 分不足 {} 分，不计积分 orderNo={}", paidAmount, per, orderNo);
             return false;
