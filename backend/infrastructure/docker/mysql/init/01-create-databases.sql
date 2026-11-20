@@ -45,10 +45,19 @@ GRANT ALL PRIVILEGES ON inventory_db.* TO 'tc_inventory'@'%';
 GRANT ALL PRIVILEGES ON report_db.*    TO 'tc_report'@'%';
 
 -- ============ 4. 迁移用账号（需跨库读写，仅迁移期临时使用）============
+-- 注意：MySQL 不支持一条 GRANT 里写多个 db.*（旧写法在此处静默失败，
+-- 账号建出来却只有 USAGE）。必须按库逐条授权。
+-- 口径：跨库【只读】，供 DataGrip / 排查使用；迁移期如需读写请另建独立账号。
 CREATE USER IF NOT EXISTS 'tc_migrator'@'%' IDENTIFIED BY 'TcMigrator_2026';
-GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER, INDEX
-  ON iam_db.*, member_db.*, product_db.*, wallet_db.*, order_db.*, payment_db.*
-  TO 'tc_migrator'@'%';
+GRANT SELECT, SHOW VIEW ON iam_db.*       TO 'tc_migrator'@'%';
+GRANT SELECT, SHOW VIEW ON member_db.*    TO 'tc_migrator'@'%';
+GRANT SELECT, SHOW VIEW ON product_db.*   TO 'tc_migrator'@'%';
+GRANT SELECT, SHOW VIEW ON wallet_db.*    TO 'tc_migrator'@'%';
+GRANT SELECT, SHOW VIEW ON order_db.*     TO 'tc_migrator'@'%';
+GRANT SELECT, SHOW VIEW ON payment_db.*   TO 'tc_migrator'@'%';
+GRANT SELECT, SHOW VIEW ON marketing_db.* TO 'tc_migrator'@'%';
+GRANT SELECT, SHOW VIEW ON inventory_db.* TO 'tc_migrator'@'%';
+GRANT SELECT, SHOW VIEW ON report_db.*    TO 'tc_migrator'@'%';
 
 FLUSH PRIVILEGES;
 

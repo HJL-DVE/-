@@ -85,9 +85,16 @@ payment_db  marketing_db  inventory_db  report_db
 | `tc_marketing` | `marketing_db` | `TcMarketing_2026` |
 | `tc_inventory` | `inventory_db` | `TcInventory_2026` |
 | `tc_report` | `report_db` | `TcReport_2026` |
-| `tc_migrator` | 6 个业务库（**仅迁移期使用**） | `TcMigrator_2026` |
+| `tc_migrator` | **9 个库，跨库只读**（`SELECT` + `SHOW VIEW`，DataGrip / 排查用） | `TcMigrator_2026` |
 
 > 密码仅用于本地开发环境。生产必须通过密钥管理注入。
+>
+> **`tc_migrator` 修复记录（第六阶段）**：init 脚本原写法
+> `GRANT ... ON iam_db.*, member_db.*, ... TO 'tc_migrator'@'%'` 是**非法语法**
+> （MySQL 一条 GRANT 只能跟一个 `db.*`），初始化时报错但被忽略，
+> 导致该账号只有 `USAGE`——能连上却读不到任何表。
+> 已改为按库逐条授权，口径为**只读**；若迁移期确需读写，请另建独立账号，
+> 不要给该账号加写权限。存量库可执行 `mysql/init/02-tc-migrator-readonly.sql` 修复。
 
 ### 4.3 隔离验证方法
 
