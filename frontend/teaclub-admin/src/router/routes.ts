@@ -10,6 +10,7 @@ type LazyView = () => Promise<unknown>
 export const viewRegistry: Record<string, LazyView> = {
   'dashboard/index': () => import('@/views/dashboard/index.vue'),
   'store/list': () => import('@/views/store/list.vue'),
+  'brand/detail': () => import('@/views/store/brand.vue'),
   'system/user': () => import('@/views/system/user.vue'),
   'member/list': () => import('@/views/member/list.vue'),
   'member/detail': () => import('@/views/member/detail.vue'),
@@ -49,7 +50,6 @@ export const viewRegistry: Record<string, LazyView> = {
 
 /** 菜单里存在、但不在 docs/33 第四节 13 页清单内的条目：显式占位，不伪造页面 */
 export const placeholderComponents = new Set<string>([
-  'brand/detail',
   'member/level',
   'product/category',
   'order/statistics',
