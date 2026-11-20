@@ -23,6 +23,7 @@ public class MarketingScheduler {
 
     private final CouponService couponService;
     private final PointsService pointsService;
+    private final com.teaclub.cloud.marketing.service.ActivityService activityService;
 
     @Value("${teaclub.marketing.coupon-expire-enabled:true}")
     private boolean couponExpireEnabled;
@@ -43,6 +44,19 @@ public class MarketingScheduler {
             }
         } catch (Exception e) {
             log.error("[SCHEDULER] 优惠券过期处理失败", e);
+        }
+    }
+
+    /** 活动过期：每 30 分钟把 end_time 已过的活动置为 EXPIRED。 */
+    @Scheduled(fixedDelayString = "${teaclub.marketing.activity-expire-ms:1800000}")
+    public void expireActivities() {
+        try {
+            int n = activityService.expireBatch(200);
+            if (n > 0) {
+                log.info("[SCHEDULER] 活动过期处理完成 count={}", n);
+            }
+        } catch (Exception e) {
+            log.error("[SCHEDULER] 活动过期处理失败", e);
         }
     }
 

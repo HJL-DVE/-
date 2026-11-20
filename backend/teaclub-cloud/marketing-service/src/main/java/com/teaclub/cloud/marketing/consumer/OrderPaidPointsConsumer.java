@@ -35,6 +35,7 @@ import java.util.Map;
 public class OrderPaidPointsConsumer extends AbstractEventConsumer {
 
     private final PointsService pointsService;
+    private final com.teaclub.cloud.marketing.service.ActivityService activityService;
 
     @RabbitListener(queues = MqConstants.Q_MARKETING_ORDER_PAID)
     public void onMessage(Message message, Channel channel) throws Exception {
@@ -67,6 +68,23 @@ public class OrderPaidPointsConsumer extends AbstractEventConsumer {
                 storeId, orderNo, paidAmount, event.getTraceId());
         if (!applied) {
             log.info("[POINTS-ORDER] 未发放（已发过或金额不足）orderNo={}", orderNo);
+        }
+
+        // ===== 满赠 / 门店专属活动 =====
+        // 与发积分相互独立：积分失败不影响活动发奖，反之亦然。
+        // 活动侧的幂等由 mkt_activity_record 的
+        // uk_activity_member_biz(activity_id, member_id, biz_no) 保证，
+        // biz_no 用订单号，消息重放不会重复发券。
+        try {
+            int granted = activityService.triggerOrderActivity(
+                    brandId == null ? 1L : brandId, memberId, storeId, orderNo,
+                    paidAmount == null ? 0L : paidAmount);
+            if (granted > 0) {
+                log.info("[ACTIVITY-ORDER] 触发 {} 个活动 orderNo={}", granted, orderNo);
+            }
+        } catch (Exception e) {
+            // 活动异常不能影响积分发放的结果，也不能让消息重投（积分已入账）
+            log.error("[ACTIVITY-ORDER] 活动触发失败 orderNo={} err={}", orderNo, e.getMessage());
         }
     }
 

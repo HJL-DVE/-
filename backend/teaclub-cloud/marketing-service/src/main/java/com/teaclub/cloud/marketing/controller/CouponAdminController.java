@@ -4,12 +4,15 @@ import com.teaclub.cloud.core.api.PageResult;
 import com.teaclub.cloud.core.api.Result;
 import com.teaclub.cloud.marketing.entity.MktCouponTemplate;
 import com.teaclub.cloud.marketing.mapper.MktCouponTemplateMapper;
+import com.teaclub.cloud.marketing.dto.CouponTemplateSaveRequest;
 import com.teaclub.cloud.marketing.service.CouponService;
+import com.teaclub.cloud.marketing.service.CouponTemplateService;
 import com.teaclub.cloud.marketing.vo.CouponTemplateVO;
 import com.teaclub.cloud.marketing.vo.CouponVO;
 import com.teaclub.cloud.security.context.StoreScope;
 import com.teaclub.cloud.security.context.UserContext;
 import io.swagger.v3.oas.annotations.Operation;
+import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -29,6 +32,7 @@ import java.util.List;
 public class CouponAdminController {
 
     private final CouponService couponService;
+    private final CouponTemplateService couponTemplateService;
     private final MktCouponTemplateMapper templateMapper;
 
     @Operation(summary = "优惠券模板分页/列表")
@@ -79,6 +83,46 @@ public class CouponAdminController {
             return vo;
         }).toList();
         return Result.ok(new PageResult<>(vos, page.getTotal(), page.getCurrent(), page.getSize()));
+    }
+
+    @Operation(summary = "新建优惠券模板")
+    @PostMapping("/templates")
+    @PreAuthorize("hasAuthority('marketing:coupon:create')")
+    public Result<Long> createTemplate(@Valid @RequestBody CouponTemplateSaveRequest request) {
+        return Result.ok(couponTemplateService.create(request));
+    }
+
+    @Operation(summary = "编辑优惠券模板")
+    @PutMapping("/templates/{id}")
+    @PreAuthorize("hasAuthority('marketing:coupon:update')")
+    public Result<Void> updateTemplate(@PathVariable Long id,
+                                       @Valid @RequestBody CouponTemplateSaveRequest request) {
+        couponTemplateService.update(id, request);
+        return Result.ok();
+    }
+
+    @Operation(summary = "删除优惠券模板（已发行的不允许删）")
+    @DeleteMapping("/templates/{id}")
+    @PreAuthorize("hasAuthority('marketing:coupon:delete')")
+    public Result<Void> deleteTemplate(@PathVariable Long id) {
+        couponTemplateService.delete(id);
+        return Result.ok();
+    }
+
+    @Operation(summary = "启用/停用优惠券模板")
+    @PutMapping("/templates/{id}/status")
+    @PreAuthorize("hasAuthority('marketing:coupon:update')")
+    public Result<Void> changeTemplateStatus(@PathVariable Long id,
+                                             @RequestParam String status) {
+        couponTemplateService.changeStatus(id, status);
+        return Result.ok();
+    }
+
+    @Operation(summary = "优惠券模板详情")
+    @GetMapping("/templates/{id}")
+    @PreAuthorize("hasAuthority('marketing:coupon:list')")
+    public Result<CouponTemplateVO> templateDetail(@PathVariable Long id) {
+        return Result.ok(couponTemplateService.detail(id));
     }
 
     @Operation(summary = "会员券查询（按会员或按券码）")

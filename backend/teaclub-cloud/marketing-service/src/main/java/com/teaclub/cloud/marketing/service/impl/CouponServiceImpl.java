@@ -120,6 +120,28 @@ public class CouponServiceImpl implements CouponService {
         return result;
     }
 
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public CouponVO grant(Long templateId, Long memberId, String obtainType) {
+        MktCouponTemplate tpl = templateMapper.selectById(templateId);
+        if (tpl == null || tpl.getDeleted() == 1) {
+            throw new BizException(ResultCode.NOT_FOUND, "优惠券模板不存在: " + templateId);
+        }
+        if (!"ENABLED".equals(tpl.getStatus())) {
+            throw new BizException(ResultCode.BAD_REQUEST, "券模板未启用，无法发放: " + tpl.getCouponName());
+        }
+        // 只受发行总量约束，不受每人限领约束
+        if (templateMapper.tryIssueOne(templateId) == 0) {
+            throw new BizException(ResultCode.BAD_REQUEST, "该券已发完: " + tpl.getCouponName());
+        }
+        MktCoupon coupon = buildCoupon(tpl, memberId,
+                obtainType == null || obtainType.isBlank() ? "GRANT" : obtainType);
+        couponMapper.insert(coupon);
+        log.info("[COUPON] 发放成功 templateId={} memberId={} couponNo={} 来源={}",
+                templateId, memberId, coupon.getCouponNo(), coupon.getObtainType());
+        return toVO(coupon, tpl.getCouponName());
+    }
+
     /** 按模板生成一张券实例，有效期按 validType 计算。 */
     private MktCoupon buildCoupon(MktCouponTemplate tpl, Long memberId, String obtainType) {
         MktCoupon c = new MktCoupon();

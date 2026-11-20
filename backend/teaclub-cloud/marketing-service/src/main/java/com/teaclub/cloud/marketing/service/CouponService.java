@@ -20,6 +20,20 @@ public interface CouponService {
     /** 领取模板券。重复领取受 per_member_limit 与 Redis 锁双重约束。 */
     List<CouponVO> receive(Long templateId, Long memberId, int qty);
 
+    /**
+     * 后台/活动发放单张券。
+     *
+     * <p>与 {@link #receive} 的区别：
+     * <ul>
+     *   <li>不受 {@code per_member_limit} 约束（活动奖励应能突破限领）</li>
+     *   <li>仍受发行总量约束（{@code total_count}），防止超发</li>
+     *   <li>不写领取记录（obtainType 标记来源，便于区分主动领取与奖励）</li>
+     * </ul>
+     *
+     * @param obtainType GRANT=后台发放 / ACTIVITY=活动赠送
+     */
+    CouponVO grant(Long templateId, Long memberId, String obtainType);
+
     /** 会员券列表。status 为空则返回全部。 */
     List<CouponVO> listMine(Long memberId, String status, int limit);
 

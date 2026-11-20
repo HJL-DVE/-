@@ -29,6 +29,7 @@ const SUITE = [
   { file: '22-marketing-points.mjs',          tag: 'points',   desc: '积分发放/签到幂等/重复投递不重发' },
   { file: '23-marketing-points-refund.mjs',   tag: 'pointsrf', desc: '退款按原流水冲正/重复退款不重冲' },
   { file: '24-nack-redelivery.mjs',           tag: 'dlq',      desc: '业务失败→DLQ→恢复→补偿重放→消费成功' },
+  { file: '25-marketing-activity.mjs',        tag: 'activity', desc: '券模板CRUD/8类活动/满赠触发/积分商城/等级权益' },
 ];
 
 const filters = process.argv.slice(2).filter((a) => !a.startsWith('-'));

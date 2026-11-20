@@ -65,6 +65,11 @@ chk('退款单创建',r.json?.code===0,'refundNo='+refund?.refundNo);
 r=await call('POST','/api/payment/mock/refund-notify',{body:{refundNo:refund?.refundNo}});
 chk('退款回调受理',r.json?.code===0,'code='+r.json?.code);
 
+// 关键：退款只冲正「消费积分（ORDER_EARN）」，不冲正活动奖励积分。
+// 因此预期扣减额必须取该订单 ORDER_EARN 流水的实际值，
+// 不能用「订单前后的总积分差」——那样会把同单触发的活动积分也算进去。
+const orderEarnRow=mysql('marketing_db',"SELECT change_points FROM mkt_points_transaction WHERE member_id="+mid+" AND biz_type='ORDER_EARN' AND biz_no='"+order?.orderNo+"'")[0];
+const orderEarn=Number(orderEarnRow||0);
 let after=pts;
 for(let i=0;i<20;i++){
   await sleep(1000);
@@ -72,7 +77,8 @@ for(let i=0;i<20;i++){
   after=r.json?.data?.totalPoints;
   if(after<pts) break;
 }
-chk('积分已按原额冲正',after===pts-earned,'冲正前='+pts+' 冲正后='+after+'（应扣 '+earned+'）');
+chk('积分已按原额冲正',after===pts-orderEarn,
+    '冲正前='+pts+' 冲正后='+after+'（应扣该单消费积分 '+orderEarn+'，活动奖励不冲正）');
 
 const rev=mysql('marketing_db',"SELECT biz_type,change_points FROM mkt_points_transaction WHERE member_id="+mid+" AND biz_type='ORDER_REFUND_REVERSE'");
 chk('冲正流水存在且为负',rev.length===1&&rev[0].includes('-'),'流水='+rev.join(' | '));
