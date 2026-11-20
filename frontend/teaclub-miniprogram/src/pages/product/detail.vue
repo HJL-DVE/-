@@ -246,7 +246,14 @@ function buyNow() {
     ice: spec.ice,
     toppings: spec.toppings,
   })
-  uni.navigateTo({ url: '/pages/order/confirm?mode=buynow' })
+  uni.navigateTo({
+    url: '/pages/order/confirm?mode=buynow',
+    success: () => {},
+    fail: (err: { errMsg?: string }) => {
+      console.error('[buyNow navigateTo]', err)
+      toast('跳转失败：' + (err.errMsg || '未知原因'))
+    },
+  })
 }
 </script>
 
