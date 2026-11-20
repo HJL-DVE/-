@@ -24,6 +24,14 @@ export const viewRegistry: Record<string, LazyView> = {
   'payment/refund': () => import('@/views/payment/refund.vue'),
   'payment/notify': () => import('@/views/payment/notify.vue'),
   'cashier/index': () => import('@/views/cashier/index.vue'),
+  // ===== 阶段八：经营报表 =====
+  'report/dashboard': () => import('@/views/report/dashboard.vue'),
+  'report/store': () => import('@/views/report/store.vue'),
+  'report/sales': () => import('@/views/report/sales.vue'),
+  'report/member': () => import('@/views/report/member.vue'),
+  'report/recharge': () => import('@/views/report/recharge.vue'),
+  'report/payment': () => import('@/views/report/payment.vue'),
+  'report/refund': () => import('@/views/report/refund.vue'),
   // 营销模块（component 标识与 iam_db.sys_permission 完全一致）
   'marketing/coupon': () => import('@/views/marketing/coupon.vue'),
   'marketing/level': () => import('@/views/marketing/level.vue'),

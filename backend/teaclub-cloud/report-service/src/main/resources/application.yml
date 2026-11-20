@@ -1,5 +1,5 @@
 server:
-  port: ${SERVER_PORT:9009}
+  port: ${SERVER_PORT:9008}
 
 spring:
   application:
@@ -71,6 +71,14 @@ mybatis-plus:
   mapper-locations: classpath*:/mapper/**/*.xml
 
 teaclub:
+  messaging:
+    dlq-replay-enabled: true
+    dlq-queues: teaclub.report.order-paid.queue.dlq,teaclub.report.refund-success.queue.dlq
+    dlq-replay-ms: 15000
+    dlq-replay-initial-delay-ms: 15000
+    dlq-replay-batch: 20
+    dlq-replay-max-retry: 5
+
   jwt:
     admin-secret: ${JWT_ADMIN_SECRET:}
     member-secret: ${JWT_MEMBER_SECRET:}

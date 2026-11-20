@@ -320,6 +320,28 @@ services:
       redis: { condition: service_healthy }
     networks: [teaclub-net]
 
+  report-service:
+    build:
+      context: ../../teaclub-cloud/report-service
+      dockerfile: Dockerfile
+    image: teaclub/report-service:1.0.0
+    container_name: teaclub-report
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+      SERVER_PORT: "9008"
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_USER: tc_report
+      DB_NAME: report_db
+      DB_PASSWORD: ${DB_PASSWORD_REPORT}
+    ports:
+      - "9008:9008"
+    depends_on:
+      mysql: { condition: service_healthy }
+      nacos: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    networks: [teaclub-net]
 volumes:
   mysql-data:
     name: teaclub-mysql-data

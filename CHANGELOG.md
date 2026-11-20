@@ -1,3 +1,31 @@
+## [第八阶段] 经营报表微服务 report-service（2026-11-22）
+
+### 新增
+
+- **report-service**（端口 9008，report_db）：总部/门店驾驶舱、销售/会员/储值/支付/退款/营销 6 组分析
+  11 个 GET 接口全部支持 days 日期筛选 + storeId 门店筛选，`@PreAuthorize("report:view")`
+  跨库**只读**聚合（tc_report 账号 SELECT-only，与 tc_migrator 同模式；未启用数据仓库/调度组件）
+  金额口径：充值=本金、赠送单列不计收款、模拟支付明确标记、钱包消费单列不重复计收
+  趋势补零、占比计算、商品排行 metric 白名单防注入
+  数据权限：SUPER_ADMIN/HQ_ADMIN 全店；STORE_MANAGER 绑定门店（越权 403）；CASHIER 无权限点
+- 网关路由 `/api/report/**` → lb://report-service（骨架期已预置，本阶段激活）
+- 权限点 SQL deploy/sql/report-permissions.sql（幂等；CASHIER 显式移除）
+- mysql/init/03-report-db.sql（重建容器时自动建库授权）
+- Web 管理后台 7 个 ECharts 页面（dashboard/store/sales/member/recharge/payment/refund）+ EChart 共用组件
+- 测试脚本 26-report.mjs（26 断言：9 项测试要求全覆盖）
+
+### 实测
+
+```text
+report-service Started in 4.0s；/health UP；Nacos 注册可达
+26 断言全绿（含店长越权 403、收银员 10201）
+admin npm run build exit=0；7 条报表路由 200；10 个 chunk
+全量回归 11/11 脚本、172/172 断言、58.5s
+```
+
+新增文档：docs/43。
+
+---
 ## [第七阶段] 营销模块前端 + 接口文档/时序图/测试报告（2026-11-21）
 
 ### Web 管理后台（6 页）

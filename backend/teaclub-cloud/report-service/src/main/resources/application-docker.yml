@@ -1,0 +1,60 @@
+# ============================================================
+# 瀹瑰櫒鐜閰嶇疆锛坧rofile=docker锛?# 渚濊禆瀹瑰櫒鍐呯殑 nacos / redis / rabbitmq / mysql
+# ============================================================
+spring:
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_ADDR:nacos:8848}
+        group: ${NACOS_GROUP:TEACLUB}
+      config:
+        enabled: true
+        import-check:
+          enabled: false
+        server-addr: ${NACOS_ADDR:nacos:8848}
+        group: ${NACOS_GROUP:TEACLUB}
+        file-extension: yaml
+  datasource:
+    url: jdbc:mysql://${DB_HOST:mysql}:${DB_PORT:3306}/${DB_NAME:report_db}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
+    username: ${DB_USER:tc_report}
+    password: ${DB_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+  flyway:
+    enabled: false   # 报表服务自身无表（跨库只读聚合），无需迁移
+
+  data:
+    redis:
+      host: ${REDIS_HOST:redis}
+      port: ${REDIS_PORT:6379}
+      timeout: 3000ms
+      password: ${REDIS_PASSWORD:}
+  rabbitmq:
+    host: ${RABBITMQ_HOST:rabbitmq}
+    port: ${RABBITMQ_PORT:5672}
+    virtual-host: ${RABBITMQ_VHOST:/teaclub}
+    username: ${RABBITMQ_USER:teaclub}
+    password: ${RABBITMQ_PASSWORD:}
+
+teaclub:
+  messaging:
+    dlq-replay-enabled: true
+    dlq-queues: 
+    dlq-replay-ms: 15000
+    dlq-replay-initial-delay-ms: 15000
+    dlq-replay-batch: 20
+    dlq-replay-max-retry: 5
+
+  jwt:
+    admin-secret: ${JWT_ADMIN_SECRET:}
+    member-secret: ${JWT_MEMBER_SECRET:}
+  security:
+    internal-token: ${INTERNAL_TOKEN:teaclub-internal-default-token}
+
+logging:
+  level:
+    root: INFO
+    com.teaclub.cloud.report: DEBUG

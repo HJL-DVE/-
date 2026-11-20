@@ -12,7 +12,7 @@
 
   <artifactId>report-service</artifactId>
   <name>report-service</name>
-  <description>报表（预留）：经营数据统计</description>
+  <description>经营报表：总部/门店驾驶舱、销售/会员/储值/营销分析（跨库只读，经 Feign 聚合）</description>
 
   <dependencies>
     <!-- 公共组件 -->
@@ -24,6 +24,7 @@
       <groupId>com.teaclub</groupId>
       <artifactId>common-security</artifactId>
     </dependency>
+    <!-- 报表服务只读聚合，不发业务事件：不引 common-messaging，避免 AMQP 依赖 -->
 
     <!-- Web -->
     <dependency>
@@ -64,6 +65,12 @@
       <groupId>com.baomidou</groupId>
       <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
     </dependency>
+    <!-- 分页/乐观锁插件依赖 jsqlparser 模块（MyBatis-Plus 3.5.9+ 已拆分） -->
+    <dependency>
+      <groupId>com.baomidou</groupId>
+      <artifactId>mybatis-plus-jsqlparser</artifactId>
+      <version>${mybatis-plus.version}</version>
+    </dependency>
     <dependency>
       <groupId>com.mysql</groupId>
       <artifactId>mysql-connector-j</artifactId>
@@ -84,11 +91,7 @@
       <artifactId>spring-boot-starter-data-redis</artifactId>
     </dependency>
 
-    <!-- 消息（订单/钱包/支付等需要跨服务事件的模块使用） -->
-    <dependency>
-      <groupId>com.teaclub</groupId>
-      <artifactId>common-messaging</artifactId>
-    </dependency>
+    <!-- 报表服务只读聚合不发事件，不引 common-messaging（其 RabbitMqConfig 需要 AMQP 环境） -->
 
     <dependency>
       <groupId>org.projectlombok</groupId>
