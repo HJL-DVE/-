@@ -50,7 +50,8 @@
       </view>
 
       <view v-if="order.status === 'UNPAID'" class="card">
-        <button class="btn-primary" :loading="paying" @tap="payWallet">储值钱包支付</button>
+        <button class="btn-primary" :loading="payingWechat" @tap="payWechat">微信支付</button>
+        <button class="btn-plain wallet" :loading="paying" @tap="payWallet">储值钱包支付</button>
         <button class="btn-plain cancel" @tap="cancel">取消订单</button>
       </view>
     </block>
@@ -73,6 +74,7 @@ const paymentNo = ref('')
 const loading = ref(false)
 const error = ref('')
 const paying = ref(false)
+const payingWechat = ref(false)
 const polling = ref(false)
 const paymentStatus = ref('')
 const paymentAmount = ref<number | null>(null)
@@ -112,6 +114,43 @@ async function pollPayment() {
     console.error('[payment/orders]', e)
   } finally {
     polling.value = false
+  }
+}
+
+/**
+ * 微信支付（模拟）：本项目不接真实微信商户，
+ * 点击后创建支付单 → 调 mock/notify 视为支付成功 → 刷新订单。
+ * 金额与状态全部以后端为准，前端不参与金额计算。
+ */
+async function payWechat() {
+  if (!order.value) return
+  payingWechat.value = true
+  try {
+    let pn = ''
+    let amt: number | undefined
+    try {
+      const payment = await paymentApi.createPayment({ bizType: 'ORDER', bizNo: order.value.orderNo })
+      pn = payment && payment.paymentNo ? payment.paymentNo : ''
+      amt = payment && typeof payment.amount === 'number' ? payment.amount : undefined
+    } catch (e) {
+      // 已存在待支付单时后端可能拒绝重复创建：回退用页面上已有的支付单号
+      if (!paymentNo.value) throw e
+      pn = paymentNo.value
+      amt = paymentAmount.value ?? undefined
+    }
+    if (!pn) {
+      toast('创建支付单失败')
+      return
+    }
+    paymentNo.value = pn
+    await paymentApi.mockPayNotify({ paymentNo: pn, amount: amt })
+    toast('支付成功')
+    await pollPayment()
+    await load()
+  } catch (e) {
+    console.error('[pay-wechat]', e)
+  } finally {
+    payingWechat.value = false
   }
 }
 
@@ -188,6 +227,9 @@ async function cancel() {
 .remark {
   max-width: 420rpx;
   text-align: right;
+}
+.wallet {
+  margin-top: 16rpx;
 }
 .cancel {
   margin-top: 20rpx;
