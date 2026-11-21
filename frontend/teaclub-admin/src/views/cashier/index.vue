@@ -16,6 +16,31 @@
       <el-button :icon="Refresh" @click="reloadProducts">刷新商品</el-button>
     </div>
 
+    <el-alert
+      v-if="storeLoadError"
+      type="error"
+      :closable="false"
+      show-icon
+      style="margin-bottom: 12px"
+      title="门店列表加载失败，收银台需要门店上下文才能工作"
+    >
+      <template #default>
+        <div class="store-retry">
+          <span>{{ storeLoadError.message || '请检查网络后重试' }}</span>
+          <el-button size="small" type="primary" :loading="storeLoading" @click="initStores">重试</el-button>
+        </div>
+      </template>
+    </el-alert>
+
+    <el-alert
+      v-else-if="!appStore.currentStoreId && !storeLoading"
+      type="warning"
+      :closable="false"
+      show-icon
+      style="margin-bottom: 12px"
+      title="未选择门店：请先在右上角选择门店，商品与订单将按门店过滤"
+    />
+
     <el-row :gutter="14">
       <el-col :span="14">
         <el-card shadow="never" class="panel">
@@ -181,8 +206,8 @@
     <el-card shadow="never" class="panel" style="margin-top: 14px">
       <template #header>
         <div class="panel-head">
-          <strong>本店订单（GET /api/admin/order/orders）</strong>
-          <el-button link type="primary" :icon="Refresh" @click="loadOrders">刷新</el-button>
+          <strong>本店订单{{ appStore.currentStoreId ? '' : '（未选择门店）' }}</strong>
+          <el-button link type="primary" :icon="Refresh" :disabled="!appStore.currentStoreId" @click="loadOrders">刷新</el-button>
         </div>
       </template>
       <el-table :data="recentOrders" v-loading="orderLoading" size="small" border>
@@ -373,6 +398,23 @@ async function loadSpuCategoryMap(): Promise<void> {
 
 function onCategoryChange(): void {
   // 分类过滤在前端按 spuId -> categoryId 映射完成（store-products 返回不含 categoryId）
+}
+
+const storeLoading = ref(false)
+const storeLoadError = ref<{ code?: number; message?: string } | null>(null)
+
+async function initStores(): Promise<void> {
+  storeLoading.value = true
+  storeLoadError.value = null
+  try {
+    await appStore.loadStores(true)
+  } catch (e: unknown) {
+    const err = e as { code?: number; message?: string }
+    storeLoadError.value = { code: err?.code, message: err?.message }
+    appStore.setStore(0)
+  } finally {
+    storeLoading.value = false
+  }
 }
 
 async function reloadProducts(): Promise<void> {
@@ -678,12 +720,16 @@ const orderLoading = ref(false)
 const recentOrders = ref<OrderVO[]>([])
 
 async function loadOrders(): Promise<void> {
+  if (!appStore.currentStoreId) {
+    recentOrders.value = []
+    return
+  }
   orderLoading.value = true
   try {
     const page = await getOrderPage({
       pageNo: 1,
       pageSize: 10,
-      storeId: appStore.currentStoreId || undefined,
+      storeId: appStore.currentStoreId,
     })
     recentOrders.value = page.records || []
   } finally {
@@ -736,7 +782,12 @@ watch(
 )
 
 onMounted(async () => {
-  await appStore.loadStores().catch(() => undefined)
+  await initStores()
+  if (storeLoadError.value) {
+    // 门店加载失败：重试一次；仍失败则停留在引导态，不加载业务数据
+    await initStores()
+    if (storeLoadError.value) return
+  }
   await reloadProducts()
   await loadOrders()
 })
@@ -745,6 +796,12 @@ onMounted(async () => {
 <style scoped>
 .cashier-top {
   margin-bottom: 12px;
+}
+
+.store-retry {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .panel {

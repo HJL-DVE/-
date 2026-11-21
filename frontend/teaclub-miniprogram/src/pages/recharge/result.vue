@@ -26,7 +26,9 @@
     </view>
 
     <view class="card">
-      <button class="btn-primary" :loading="checking" @tap="refresh">手动刷新状态</button>
+      <button v-if="!paid" class="btn-primary" :loading="payingWechat" @tap="payWechat">微信支付</button>
+      <button class="btn-primary" v-else :loading="checking" @tap="refresh">手动刷新状态</button>
+      <button v-if="!paid" class="btn-plain next" :loading="checking" @tap="refresh">手动刷新状态</button>
       <button class="btn-plain next" @tap="goMember">查看会员中心</button>
     </view>
 
@@ -56,6 +58,7 @@ const rechargeStatus = ref('')
 const paymentStatus = ref('')
 const polling = ref(false)
 const checking = ref(false)
+const payingWechat = ref(false)
 const pollCount = ref(0)
 const stopReason = ref('')
 let timer: ReturnType<typeof setTimeout> | null = null
@@ -125,6 +128,41 @@ async function refresh() {
     }
   }
   checking.value = false
+}
+
+/**
+ * 微信支付（模拟）：本项目不接真实微信商户，点击即视为支付成功。
+ * 金额与状态全部以后端为准 —— 由 mock/notify 触发真实入账链路（支付单 SUCCESS → 充值单 PAID → 钱包入账）。
+ */
+async function payWechat() {
+  if (!rechargeNo.value) {
+    stopReason.value = '缺少充值单号，无法发起支付'
+    return
+  }
+  payingWechat.value = true
+  try {
+    let pn = paymentNo.value
+    let amt: number | undefined = recharge.value.actualAmount
+    if (!pn) {
+      const payment = await paymentApi.createPayment({ bizType: 'RECHARGE', bizNo: rechargeNo.value })
+      pn = payment && payment.paymentNo ? payment.paymentNo : ''
+      amt = payment && typeof payment.amount === 'number' ? payment.amount : amt
+    }
+    if (!pn) {
+      stopReason.value = '创建支付单失败，请稍后重试'
+      return
+    }
+    paymentNo.value = pn
+    await paymentApi.mockPayNotify({ paymentNo: pn, amount: amt })
+    await refresh()
+    if (paid.value) {
+      polling.value = false
+    }
+  } catch (e) {
+    console.error('[recharge pay-wechat]', e)
+  } finally {
+    payingWechat.value = false
+  }
 }
 
 function goMember() {
