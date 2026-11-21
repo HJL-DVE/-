@@ -102,6 +102,7 @@
               <view class="muted coupon-cond">
                 {{ (cp.thresholdAmount || 0) <= 0 ? '无门槛' : '满' + fen2yuan(cp.thresholdAmount || 0) + '可用' }}
               </view>
+              <view v-if="cp.usable === false" class="muted coupon-unusable">{{ cp.unusableReason || '本单不可用' }}</view>
             </view>
             <view class="coupon-mid">
               <view class="coupon-name">{{ cp.couponName || cp.couponTypeLabel || cp.couponType }}</view>
@@ -173,7 +174,14 @@ onLoad((opts) => {
 async function loadCoupons() {
   couponsLoading.value = true
   try {
-    coupons.value = (await marketingApi.getUsableCoupons()) || []
+    // 传订单金额：后端逐张判定门槛，不满足的标 usable=false（前端置灰并显示原因）
+    const amount = quote.value && typeof quote.value.totalAmount === 'number'
+      ? quote.value.totalAmount
+      : undefined
+    coupons.value = (await marketingApi.getUsableCoupons({
+      orderAmount: amount,
+      storeId: storeStore.currentStoreId || undefined,
+    })) || []
   } catch (e) {
     console.error('[coupons/usable]', e)
     coupons.value = []
@@ -398,6 +406,7 @@ function goLogin() {
 .coupon-left { width: 150rpx; }
 .coupon-amount { font-size: 32rpx; font-weight: 700; color: #ef4444; }
 .coupon-cond { font-size: 20rpx; margin-top: 4rpx; }
+.coupon-unusable { font-size: 20rpx; color: #f56c6c; margin-top: 2rpx; }
 .coupon-mid { flex: 1; padding: 0 12rpx; }
 .coupon-name { font-size: 26rpx; }
 .coupon-time { font-size: 20rpx; margin-top: 4rpx; }

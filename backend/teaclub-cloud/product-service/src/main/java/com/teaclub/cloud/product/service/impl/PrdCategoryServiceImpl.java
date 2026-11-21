@@ -1,5 +1,6 @@
 package com.teaclub.cloud.product.service.impl;
 
+import com.teaclub.cloud.product.storage.ImageUrlResolver;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.teaclub.cloud.core.api.ResultCode;
 import com.teaclub.cloud.security.context.LoginUser;
@@ -24,6 +25,7 @@ import java.util.stream.Collectors;
 public class PrdCategoryServiceImpl implements PrdCategoryService {
 
     private final PrdCategoryMapper categoryMapper;
+    private final ImageUrlResolver imageUrlResolver;
     private final PrdSpuMapper spuMapper;
 
     @Override
@@ -44,7 +46,7 @@ public class PrdCategoryServiceImpl implements PrdCategoryService {
             vo.setId(c.getId());
             vo.setParentId(c.getParentId());
             vo.setCategoryName(c.getCategoryName());
-            vo.setIconUrl(c.getIconUrl());
+            vo.setIconUrl(imageUrlResolver.resolve(c.getIconUrl()));
             vo.setSort(c.getSort());
             vo.setStatus(c.getStatus());
             vo.setProductCount(countMap.getOrDefault(c.getId(), 0L));

@@ -1,5 +1,6 @@
 package com.teaclub.cloud.product.service.impl;
 
+import com.teaclub.cloud.product.storage.ImageUrlResolver;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -30,6 +31,7 @@ import java.util.stream.Collectors;
 public class PrdStoreProductServiceImpl implements PrdStoreProductService {
 
     private final PrdStoreSpuMapper storeSpuMapper;
+    private final ImageUrlResolver imageUrlResolver;
     private final com.teaclub.cloud.product.client.AuthInternalClient authClient;
     private final PrdStoreSkuMapper storeSkuMapper;
     private final PrdSpuMapper spuMapper;
@@ -107,7 +109,7 @@ public class PrdStoreProductServiceImpl implements PrdStoreProductService {
         vo.setSpuId(spu.getId());
         vo.setSpuCode(spu.getSpuCode());
         vo.setSpuName(spu.getSpuName());
-        vo.setMainImage(spu.getMainImage());
+        vo.setMainImage(imageUrlResolver.resolve(spu.getMainImage()));
         vo.setBasePrice(spu.getBasePrice());
         vo.setMinPrice(spu.getMinPrice());
         vo.setSpuStatus(spu.getStatus());

@@ -27,6 +27,12 @@ const rc=(await req('POST','/api/wallet/recharges',{token:tok,body:{planId:plan.
 const pay=(await req('POST','/api/payment/create',{token:tok,body:{bizType:'RECHARGE',bizNo:rc.rechargeNo}})).data;
 await req('POST','/api/payment/mock/notify',{body:{paymentNo:pay.paymentNo,amount:pay.amount}});
 await sleep(2000);
+// 券可用性判定：传订单金额时后端逐张判定门槛，不满足标 usable=false
+const uMiss=(await req('GET','/api/marketing/coupons/usable?orderAmount=4200',{token:tok})).data||[];
+const over = uMiss.find(x=>x.thresholdAmount>4200);
+chk('超门槛券标不可用',!over||over.usable===false, over? ('usable='+over.usable+' 原因='+over.unusableReason) : '无超门槛券');
+chk('券名不为空',uMiss.every(x=>!!x.couponName),uMiss.map(x=>x.couponName).join(' | ').slice(0,60));
+
 const items=[{skuId:1,quantity:3}];
 const q0=(await req('POST','/api/order/quote',{token:tok,body:{storeId:1,items}})).data;
 chk('不带券试算抵扣为0',q0?.couponAmount===0,'应付='+q0?.payableAmount/100);

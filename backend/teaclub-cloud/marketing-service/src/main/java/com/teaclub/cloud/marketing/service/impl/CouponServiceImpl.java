@@ -236,8 +236,19 @@ public class CouponServiceImpl implements CouponService {
     }
 
     @Override
-    public List<CouponVO> listUsable(Long memberId) {
-        return couponMapper.selectUsable(memberId).stream().map(c -> toVO(c, null)).toList();
+    public List<CouponVO> listUsable(Long memberId, Long orderAmount, Long storeId) {
+        return couponMapper.selectUsable(memberId).stream().map(c -> {
+            CouponVO vo = toVO(c, null);
+            // 传了订单金额才做门槛判定；不满足则标 unusable，前端置灰
+            if (orderAmount != null && orderAmount > 0) {
+                long threshold = c.getThresholdAmount() == null ? 0L : c.getThresholdAmount();
+                if (orderAmount < threshold) {
+                    vo.setUsable(false);
+                    vo.setUnusableReason("满" + (threshold / 100) + "元可用");
+                }
+            }
+            return vo;
+        }).toList();
     }
 
     // ==================== 试算 ====================
@@ -527,6 +538,13 @@ public class CouponServiceImpl implements CouponService {
     }
 
     private CouponVO toVO(MktCoupon c, String couponName) {
+        // 券名来自模板；为 null 时回查一次，避免前端显示空白
+        if (couponName == null && c.getTemplateId() != null) {
+            MktCouponTemplate tpl = templateMapper.selectById(c.getTemplateId());
+            if (tpl != null) {
+                couponName = tpl.getCouponName();
+            }
+        }
         CouponVO vo = new CouponVO();
         vo.setId(c.getId());
         vo.setCouponNo(c.getCouponNo());

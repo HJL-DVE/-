@@ -46,8 +46,13 @@ public interface CouponService {
     /** 会员券列表。status 为空则返回全部。 */
     List<CouponVO> listMine(Long memberId, String status, int limit);
 
-    /** 会员可用券（未使用 + 有效期内）。 */
-    List<CouponVO> listUsable(Long memberId);
+    /**
+     * 会员可用券列表。
+     *
+     * @param orderAmount 订单金额（分）；传入时逐张判定门槛是否满足，
+     *                    不满足的券 usable=false（前端置灰），避免"显示可用实则不可用"
+     */
+    List<CouponVO> listUsable(Long memberId, Long orderAmount, Long storeId);
 
     /**
      * 试算：给定订单金额与商品，判断该券能抵多少。

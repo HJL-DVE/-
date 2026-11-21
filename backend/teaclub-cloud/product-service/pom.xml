@@ -116,7 +116,13 @@
       <artifactId>spring-boot-starter-test</artifactId>
       <scope>test</scope>
     </dependency>
-  </dependencies>
+      <!-- 阿里云 OSS：teaclub.storage.type=oss 时使用 -->
+        <dependency>
+            <groupId>com.aliyun.oss</groupId>
+            <artifactId>aliyun-sdk-oss</artifactId>
+            <version>3.17.4</version>
+        </dependency>
+    </dependencies>
 
   <build>
     <plugins>

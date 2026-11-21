@@ -1,5 +1,6 @@
 package com.teaclub.cloud.product.service.impl;
 
+import com.teaclub.cloud.product.storage.ImageUrlResolver;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -33,6 +34,7 @@ import java.util.stream.Collectors;
 public class PrdSpuServiceImpl implements PrdSpuService {
 
     private final PrdSpuMapper spuMapper;
+    private final ImageUrlResolver imageUrlResolver;
     private final PrdSkuMapper skuMapper;
     private final PrdCategoryMapper categoryMapper;
 
@@ -80,7 +82,7 @@ public class PrdSpuServiceImpl implements PrdSpuService {
         vo.setSpuName(s.getSpuName());
         vo.setSubtitle(s.getSubtitle());
         vo.setDescription(s.getDescription());
-        vo.setMainImage(s.getMainImage());
+        vo.setMainImage(imageUrlResolver.resolve(s.getMainImage()));
         vo.setImagesJson(s.getImagesJson());
         vo.setBasePrice(s.getBasePrice());
         vo.setMinPrice(s.getMinPrice());
@@ -97,7 +99,7 @@ public class PrdSpuServiceImpl implements PrdSpuService {
             kv.setSpecJson(k.getSpecJson());
             kv.setPrice(k.getPrice());
             kv.setCostPrice(k.getCostPrice());
-            kv.setImageUrl(k.getImageUrl());
+            kv.setImageUrl(imageUrlResolver.resolve(k.getImageUrl()));
             kv.setSort(k.getSort());
             kv.setStatus(k.getStatus());
             return kv;

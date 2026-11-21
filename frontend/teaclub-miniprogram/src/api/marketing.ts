@@ -18,6 +18,8 @@ export interface CouponItem {
   validEnd?: string | null
   obtainTime?: string | null
   usable?: boolean
+  /** 不可用原因（usable=false 时有值） */
+  unusableReason?: string | null
 }
 
 /** GET /api/marketing/coupons/mine?status=&limit= */
@@ -51,9 +53,9 @@ export function getAvailableCoupons(params?: {
   return http.get<CouponTemplateItem[]>('/api/marketing/coupons/available', params)
 }
 
-/** GET /api/marketing/coupons/usable */
-export function getUsableCoupons() {
-  return http.get<CouponItem[]>('/api/marketing/coupons/usable')
+/** GET /api/marketing/coupons/usable —— 传 orderAmount 时后端逐张判定门槛 */
+export function getUsableCoupons(params?: { orderAmount?: number; storeId?: number }) {
+  return http.get<CouponItem[]>('/api/marketing/coupons/usable', params)
 }
 
 /**

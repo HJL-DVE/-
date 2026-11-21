@@ -76,9 +76,23 @@ mybatis-plus:
   mapper-locations: classpath*:/mapper/**/*.xml
 
 teaclub:
-  # 商品图片上传目录（容器内路径，需与 nginx 共享卷）
+  # 商品图片上传目录（容器内路径，需与 nginx 共享卷）—— 仅 storage.type=local 时使用
   upload:
     dir: ${UPLOAD_DIR:/app/uploads}
+
+  # 文件存储：local（Docker 卷，默认）| oss（阿里云对象存储）
+  storage:
+    type: ${STORAGE_TYPE:local}
+    local-dir: ${UPLOAD_DIR:/app/uploads}
+    local-url-prefix: /static/uploads
+    oss:
+      endpoint: ${OSS_ENDPOINT:}
+      bucket: ${OSS_BUCKET:}
+      access-key-id: ${OSS_ACCESS_KEY_ID:}
+      access-key-secret: ${OSS_ACCESS_KEY_SECRET:}
+      # Bucket 为公共读，图片走公网直连；
+      # 若绑定了自定义域名/CDN，填这里，优先使用（留空则用 bucket.endpoint）
+      public-domain: ${OSS_PUBLIC_DOMAIN:}
   jwt:
     admin-secret: ${JWT_ADMIN_SECRET:}
     member-secret: ${JWT_MEMBER_SECRET:}

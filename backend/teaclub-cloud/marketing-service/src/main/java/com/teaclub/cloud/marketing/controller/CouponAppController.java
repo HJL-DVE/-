@@ -50,10 +50,12 @@ public class CouponAppController {
         return Result.ok(couponService.listMine(memberId, status, limit == null ? 50 : limit));
     }
 
-    @Operation(summary = "我的可用优惠券")
+    @Operation(summary = "我的可用优惠券（可传订单金额，逐张判定是否真可用于本单）")
     @GetMapping("/usable")
-    public Result<List<CouponVO>> usable() {
+    public Result<List<CouponVO>> usable(
+            @RequestParam(required = false) Long orderAmount,
+            @RequestParam(required = false) Long storeId) {
         Long memberId = UserContext.requireMemberId();
-        return Result.ok(couponService.listUsable(memberId));
+        return Result.ok(couponService.listUsable(memberId, orderAmount, storeId));
     }
 }

@@ -1,5 +1,6 @@
 package com.teaclub.cloud.product.controller;
 
+import com.teaclub.cloud.product.storage.ImageUrlResolver;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.teaclub.cloud.core.api.PageResult;
 import com.teaclub.cloud.core.api.Result;
@@ -67,6 +68,7 @@ public class ProductAppController {
     private static final int MAX_HOT_LIMIT = 20;
 
     private final PrdStoreSpuMapper storeSpuMapper;
+    private final ImageUrlResolver imageUrlResolver;
     private final PrdStoreSkuMapper storeSkuMapper;
     private final PrdSpuMapper spuMapper;
     private final PrdSkuMapper skuMapper;
@@ -146,7 +148,7 @@ public class ProductAppController {
         AppSpuDetailVO.Spu spuVO = new AppSpuDetailVO.Spu();
         spuVO.setSpuId(spu.getId());
         spuVO.setSpuName(spu.getSpuName());
-        spuVO.setImageUrl(spu.getMainImage());
+        spuVO.setImageUrl(imageUrlResolver.resolve(spu.getMainImage()));
         spuVO.setDescription(spu.getDescription());
         spuVO.setCategoryId(spu.getCategoryId());
 

@@ -30,4 +30,7 @@ public class CouponVO {
     private Long discountAmount;
     @Schema(description = "是否当前可用（未使用 + 在有效期内）")
     private Boolean usable;
+
+    /** 不可用原因（例如 满30元可用），仅 usable=false 时有值 */
+    private String unusableReason;
 }

@@ -222,6 +222,13 @@ services:
       DB_PASSWORD: ${DB_PASSWORD_PRODUCT}
       # 商品图片上传目录（与 admin-web 共享同一卷，nginx 直接对外提供）
       UPLOAD_DIR: /app/uploads
+      # 文件存储介质：local | oss
+      STORAGE_TYPE: ${STORAGE_TYPE:-local}
+      OSS_ENDPOINT: ${OSS_ENDPOINT:-}
+      OSS_BUCKET: ${OSS_BUCKET:-}
+      OSS_ACCESS_KEY_ID: ${OSS_ACCESS_KEY_ID:-}
+      OSS_ACCESS_KEY_SECRET: ${OSS_ACCESS_KEY_SECRET:-}
+      OSS_PUBLIC_DOMAIN: ${OSS_PUBLIC_DOMAIN:-}
     ports:
       - "9003:9003"
     volumes:
