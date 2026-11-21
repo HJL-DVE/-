@@ -66,3 +66,9 @@ export function updateCategory(id: number, data: { categoryName?: string; sort?:
 export function deleteCategory(id: number) {
   return http.del<void>('/api/admin/product/categories/' + id)
 }
+// ===== 图片上传 =====
+
+/** 上传商品图片，返回可直接落库的相对路径 */
+export function uploadProductImage(file: File): Promise<{ url: string; name: string; size: number }> {
+  return http.upload<{ url: string; name: string; size: number }>('/api/admin/product/upload/image', file)
+}

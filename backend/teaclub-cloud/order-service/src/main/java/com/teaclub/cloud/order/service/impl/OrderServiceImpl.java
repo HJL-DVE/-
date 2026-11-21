@@ -52,13 +52,51 @@ public class OrderServiceImpl implements OrderService {
     private final com.teaclub.cloud.order.client.AuthInternalClient authClient;
     private final com.teaclub.cloud.order.saga.PaymentSagaService sagaService;
     private final com.teaclub.cloud.messaging.outbox.OutboxService outboxService;
+    private final com.teaclub.cloud.order.client.CouponInternalClient couponClient;
 
     @Override
     public OrderQuoteVO quote(OrderQuoteRequest request) {
         LoginUser current = UserContext.require();
         assertStoreAccessible(request.getStoreId());
+        long couponDiscount = resolveCouponDiscount(request.getMemberCouponId(),
+                request.getMemberId(), request.getStoreId(), request.getItems());
         return calculator.calculate(current.getBrandId(), request.getStoreId(), request.getMemberId(),
-                request.getItems(), 0L);
+                request.getItems(), couponDiscount);
+    }
+
+    /**
+     * 解析券抵扣金额：调 marketing-service 试算（券的真伪/归属/门槛/有效期全由营销服务判定）。
+     *
+     * <p>未传券、券不可用、或营销服务不可用一律返回 0 —— 让订单仍可正常下单，
+     * 而不是因为一张券失败阻断整笔交易。
+     */
+    private long resolveCouponDiscount(Long memberCouponId, Long memberId, Long storeId,
+                                       java.util.List<com.teaclub.cloud.order.dto.OrderItemRequest> items) {
+        if (memberCouponId == null) {
+            return 0L;
+        }
+        try {
+            long baseAmount = calculator.calculate(
+                    UserContext.require().getBrandId(), storeId, memberId, items, 0L).getTotalAmount();
+            var resp = couponClient.quoteById(memberCouponId, memberId, storeId, baseAmount);
+            if (resp == null || resp.getCode() != 0 || resp.getData() == null) {
+                log.warn("券试算失败，按无券处理 memberCouponId={} code={}", memberCouponId,
+                        resp == null ? null : resp.getCode());
+                return 0L;
+            }
+            var data = resp.getData();
+            Object avail = data.get("available");
+            if (!(avail instanceof Boolean b) || !b) {
+                log.info("券不可用，按无券处理 memberCouponId={} reason={}",
+                        memberCouponId, data.get("reason"));
+                return 0L;
+            }
+            Object d = data.get("discountAmount");
+            return d instanceof Number n ? n.longValue() : 0L;
+        } catch (Exception e) {
+            log.warn("调用券试算异常，按无券处理 memberCouponId={} err={}", memberCouponId, e.getMessage());
+            return 0L;
+        }
     }
 
     private void assertStoreAccessible(Long storeId) {
@@ -79,9 +117,12 @@ public class OrderServiceImpl implements OrderService {
         assertStoreAccessible(request.getStoreId());
 
         // ===== 金额由服务端重算，忽略任何客户端金额 =====
+        // 券抵扣金额由 marketing-service 试算（券的真伪/归属/门槛/有效期全由营销服务判定）
+        long couponDiscount = resolveCouponDiscount(request.getMemberCouponId(),
+                request.getMemberId(), request.getStoreId(), request.getItems());
         OrderQuoteVO quote = calculator.calculate(
                 current.getBrandId(), request.getStoreId(), request.getMemberId(),
-                request.getItems(), 0L);
+                request.getItems(), couponDiscount);
 
         String orderNo = BizNoGenerator.orderNo();
         OmsOrder order = new OmsOrder();
@@ -108,6 +149,20 @@ public class OrderServiceImpl implements OrderService {
         order.setRemark(request.getRemark());
         order.setOperatorId(current.getUserId());
         orderMapper.insert(order);
+
+        // 券锁定：把 UNUSED → LOCKED 并绑定本单号。锁不上则整单失败回滚
+        // （不允许"金额里抵扣了但券没锁"，否则支付后无法核销，券会被重复使用）
+        if (request.getMemberCouponId() != null && quote.getCouponAmount() != null
+                && quote.getCouponAmount() > 0) {
+            var lockResp = couponClient.lockByCouponId(request.getMemberCouponId(),
+                    request.getMemberId(), orderNo);
+            if (lockResp == null || lockResp.getCode() != 0 || !Boolean.TRUE.equals(lockResp.getData())) {
+                throw new BizException(ResultCode.BAD_REQUEST,
+                        "优惠券锁定失败（可能已被占用或已过期），请重新选择优惠券");
+            }
+            log.info("券已锁定 orderNo={} couponId={} 抵扣={}分",
+                    orderNo, request.getMemberCouponId(), quote.getCouponAmount());
+        }
 
         // 明细落库（快照）
         for (OrderItemVO item : quote.getItems()) {
@@ -217,6 +272,24 @@ public class OrderServiceImpl implements OrderService {
 
             // 订单已更新，Saga 完成
             sagaService.markCompleted(saga.getId());
+
+            // 券核销：订单支付成功后把 LOCKED 券置 USED（幂等；失败只记日志，不回滚支付）
+            if (order.getMemberCouponId() != null && order.getCouponAmount() != null
+                    && order.getCouponAmount() > 0) {
+                try {
+                    var useResp = couponClient.useByCouponId(order.getMemberCouponId(),
+                            orderNo, order.getCouponAmount());
+                    if (useResp == null || useResp.getCode() != 0) {
+                        log.warn("券核销失败 orderNo={} couponId={} code={}", orderNo,
+                                order.getMemberCouponId(), useResp == null ? null : useResp.getCode());
+                    } else {
+                        log.info("券已核销 orderNo={} couponId={} 抵扣={}分",
+                                orderNo, order.getMemberCouponId(), order.getCouponAmount());
+                    }
+                } catch (Exception e) {
+                    log.error("券核销异常 orderNo={} couponId={}", orderNo, order.getMemberCouponId(), e);
+                }
+            }
 
             // 领域事件：订单已支付（与订单状态同一本地事务）
             Map<String, Object> paidEvent = new java.util.HashMap<>();

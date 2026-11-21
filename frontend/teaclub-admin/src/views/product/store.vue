@@ -14,6 +14,7 @@
         <el-input v-model="keyword" placeholder="商品名称/编码" clearable style="width: 200px" @keyup.enter="search" />
         <el-button type="primary" :icon="Search" @click="search">查询</el-button>
         <el-button :icon="Refresh" @click="load">刷新</el-button>
+        <el-button type="success" :icon="Plus" @click="openAdd">添加商品</el-button>
         <div class="toolbar-spacer" />
         <span class="text-muted">
           GET /api/admin/product/store-products?storeId={{ appStore.currentStoreId }} · 共 {{ total }} 条
@@ -89,6 +90,161 @@
       </div>
     </div>
 
+    <!-- 商品管理弹窗：可从总部选品上架，也可现场新建商品（含图片） -->
+    <el-dialog v-model="addVisible" title="商品管理" width="820px" destroy-on-close>
+      <el-alert
+        type="info"
+        :closable="false"
+        show-icon
+        style="margin-bottom: 12px"
+        :title="'当前门店：' + (appStore.currentStoreName || '未选择') + '，添加后即可在本店收银台售卖'"
+      />
+
+      <el-tabs v-model="addTab">
+        <!-- ============ 选现有商品 ============ -->
+        <el-tab-pane label="从总部商品中选择" name="existing">
+          <div style="display: flex; gap: 8px; margin-bottom: 10px">
+            <el-input v-model="addKeyword" placeholder="商品名称/编码" clearable style="width: 220px" @keyup.enter="loadCandidates" />
+            <el-select v-model="addCategoryId" placeholder="全部分类" clearable style="width: 160px" @change="loadCandidates">
+              <el-option v-for="cat in categoryOptions" :key="cat.id" :label="cat.categoryName" :value="cat.id" />
+            </el-select>
+            <el-button type="primary" :icon="Search" @click="loadCandidates">查询</el-button>
+          </div>
+
+          <el-table
+            :data="candidates"
+            v-loading="addLoading"
+            border
+            size="small"
+            max-height="380"
+            row-key="id"
+            @selection-change="onCandidateSelect"
+          >
+            <el-table-column type="selection" width="46" :selectable="isCandidateSelectable" />
+            <el-table-column label="图片" width="70" align="center">
+              <template #default="{ row }">
+                <el-image v-if="row.mainImage" :src="row.mainImage" fit="cover" style="width: 40px; height: 40px; border-radius: 4px" />
+                <span v-else class="text-muted">-</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="spuCode" label="编码" width="110" />
+            <el-table-column prop="spuName" label="商品名称" min-width="150" show-overflow-tooltip />
+            <el-table-column label="分类" width="110">
+              <template #default="{ row }">{{ row.categoryName || '-' }}</template>
+            </el-table-column>
+            <el-table-column label="基础价" width="90" align="right">
+              <template #default="{ row }">{{ fenToYuan(row.basePrice) }}</template>
+            </el-table-column>
+            <el-table-column label="状态" width="90">
+              <template #default="{ row }">
+                <el-tag v-if="row.added" size="small" type="info">已在本店</el-tag>
+                <el-tag v-else size="small" type="success">可添加</el-tag>
+              </template>
+            </el-table-column>
+          </el-table>
+
+          <template #footer>
+            <span style="float: left; line-height: 32px; color: #909399">
+              已选 {{ selectedCandidates.length }} 个商品
+            </span>
+            <el-button @click="addVisible = false">取消</el-button>
+            <el-button type="primary" :loading="addSubmitting" :disabled="!selectedCandidates.length" @click="submitAdd">
+              添加到本门店
+            </el-button>
+          </template>
+        </el-tab-pane>
+
+        <!-- ============ 新建商品 ============ -->
+        <el-tab-pane label="新建商品" name="create">
+          <el-form :model="newSpu" label-width="100px" size="default">
+            <el-row :gutter="12">
+              <el-col :span="12">
+                <el-form-item label="商品名称" required>
+                  <el-input v-model="newSpu.spuName" placeholder="如：杨枝甘露" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="12">
+                <el-form-item label="商品编码" required>
+                  <el-input v-model="newSpu.spuCode" placeholder="留空自动生成" />
+                </el-form-item>
+              </el-col>
+            </el-row>
+
+            <el-row :gutter="12">
+              <el-col :span="12">
+                <el-form-item label="所属分类" required>
+                  <el-select v-model="newSpu.categoryId" placeholder="选择分类" style="width: 100%">
+                    <el-option v-for="cat in categoryOptions" :key="cat.id" :label="cat.categoryName" :value="cat.id" />
+                  </el-select>
+                </el-form-item>
+              </el-col>
+              <el-col :span="12">
+                <el-form-item label="单位">
+                  <el-input v-model="newSpu.unit" placeholder="杯" />
+                </el-form-item>
+              </el-col>
+            </el-row>
+
+            <el-row :gutter="12">
+              <el-col :span="12">
+                <el-form-item label="售价（元）" required>
+                  <el-input-number v-model="newSpu.basePriceYuan" :min="0" :precision="2" :step="0.5" style="width: 100%" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="12">
+                <el-form-item label="最低保护价">
+                  <el-input-number v-model="newSpu.minPriceYuan" :min="0" :precision="2" :step="0.5" style="width: 100%" />
+                </el-form-item>
+              </el-col>
+            </el-row>
+
+            <el-form-item label="商品图片">
+              <div class="upload-row">
+                <el-image
+                  v-if="newSpu.mainImage"
+                  :src="newSpu.mainImage"
+                  fit="cover"
+                  style="width: 84px; height: 84px; border-radius: 6px; border: 1px solid #dcdfe6"
+                />
+                <div v-else class="upload-placeholder">暂无图片</div>
+                <div>
+                  <el-button :loading="uploading" @click="pickImage">上传图片</el-button>
+                  <el-button v-if="newSpu.mainImage" link type="danger" @click="newSpu.mainImage = ''">移除</el-button>
+                  <div class="text-muted" style="font-size: 12px; margin-top: 4px">支持 jpg/png/webp/gif，≤10MB（原图直传）</div>
+                </div>
+              </div>
+              <input ref="fileInputRef" type="file" accept="image/*" style="display: none" @change="onFileChange" />
+            </el-form-item>
+
+            <el-form-item label="商品描述">
+              <el-input v-model="newSpu.description" type="textarea" :rows="2" placeholder="可选" />
+            </el-form-item>
+
+            <el-form-item label="规格">
+              <div style="width: 100%">
+                <div v-for="(sku, idx) in newSpu.skus" :key="idx" class="sku-row">
+                  <el-input v-model="sku.skuName" placeholder="规格名（如 大杯/中杯）" style="width: 180px" />
+                  <el-input-number v-model="sku.priceYuan" :min="0" :precision="2" :step="0.5" style="width: 140px" />
+                  <el-button link type="danger" :disabled="newSpu.skus.length <= 1" @click="removeSku(idx)">删除</el-button>
+                </div>
+                <el-button link type="primary" @click="addSku">+ 添加规格</el-button>
+                <div class="text-muted" style="font-size: 12px">
+                  至少一个规格；不填规格名时自动用「默认规格」
+                </div>
+              </div>
+            </el-form-item>
+          </el-form>
+
+          <template #footer>
+            <el-button @click="addVisible = false">取消</el-button>
+            <el-button type="primary" :loading="creating" @click="submitCreate">
+              创建并上架到本店
+            </el-button>
+          </template>
+        </el-tab-pane>
+      </el-tabs>
+    </el-dialog>
+
     <el-dialog v-model="priceVisible" title="修改门店售价" width="420px">
       <el-form label-width="100px">
         <el-form-item label="商品">{{ priceForm.spuName }}</el-form-item>
@@ -111,11 +267,20 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Refresh, Search } from '@element-plus/icons-vue'
-import { getStoreProducts, removeStoreSpu, setStoreSkuPrice, shelfStoreSpu } from '@/api/product'
+import { Plus, Refresh, Search } from '@element-plus/icons-vue'
+import {
+  createSpu,
+  getCategoryTree,
+  getSpuPage,
+  getStoreProducts,
+  removeStoreSpu,
+  setStoreSkuPrice,
+  shelfStoreSpu,
+  uploadProductImage,
+} from '@/api/product'
 import { useAppStore } from '@/stores/app'
 import { fenToYuan, yuanToFen } from '@/utils/format'
-import type { StoreSkuVO, StoreSpuVO } from '@/api/types'
+import type { CategoryVO, SpuVO, StoreSkuVO, StoreSpuVO } from '@/api/types'
 
 const appStore = useAppStore()
 
@@ -125,6 +290,219 @@ const total = ref(0)
 const keyword = ref('')
 const pageNo = ref(1)
 const pageSize = ref(20)
+
+// ---------- 添加商品到门店 ----------
+const addVisible = ref(false)
+const addLoading = ref(false)
+const addSubmitting = ref(false)
+const addKeyword = ref('')
+const addCategoryId = ref<number | undefined>(undefined)
+const candidates = ref<(SpuVO & { added?: boolean })[]>([])
+const selectedCandidates = ref<(SpuVO & { added?: boolean })[]>([])
+const categoryOptions = ref<CategoryVO[]>([])
+
+function openAdd(): void {
+  if (!appStore.currentStoreId) {
+    ElMessage.warning('请先选择门店')
+    return
+  }
+  addVisible.value = true
+  addTab.value = 'existing'
+  addKeyword.value = ''
+  addCategoryId.value = undefined
+  selectedCandidates.value = []
+  resetNewSpu()
+  loadCandidates()
+  loadCategories()
+}
+
+async function loadCategories(): Promise<void> {
+  if (categoryOptions.value.length) return
+  try {
+    categoryOptions.value = await getCategoryTree()
+  } catch {
+    categoryOptions.value = []
+  }
+}
+
+/** 候选商品 = 总部在售 SPU，标记哪些已在本门店 */
+async function loadCandidates(): Promise<void> {
+  addLoading.value = true
+  try {
+    const page = await getSpuPage({
+      keyword: addKeyword.value || undefined,
+      categoryId: addCategoryId.value,
+      pageNo: 1,
+      pageSize: 200,
+    })
+    // 已在本门店的 SPU 集合
+    const existing = new Set(records.value.map((r) => r.spuId))
+    candidates.value = (page.records || []).map((s) => ({ ...s, added: existing.has(s.id) }))
+  } catch (e) {
+    ElMessage.error('商品列表加载失败')
+  } finally {
+    addLoading.value = false
+  }
+}
+
+// ---------- 新建商品 ----------
+const addTab = ref<'existing' | 'create'>('existing')
+const creating = ref(false)
+const uploading = ref(false)
+const fileInputRef = ref<HTMLInputElement | null>(null)
+
+interface NewSkuForm {
+  skuName: string
+  priceYuan: number
+}
+const newSpu = reactive({
+  spuName: '',
+  spuCode: '',
+  categoryId: undefined as number | undefined,
+  unit: '杯',
+  basePriceYuan: 0,
+  minPriceYuan: 0,
+  mainImage: '',
+  description: '',
+  skus: [{ skuName: '', priceYuan: 0 }] as NewSkuForm[],
+})
+
+function resetNewSpu(): void {
+  newSpu.spuName = ''
+  newSpu.spuCode = ''
+  newSpu.categoryId = undefined
+  newSpu.unit = '杯'
+  newSpu.basePriceYuan = 0
+  newSpu.minPriceYuan = 0
+  newSpu.mainImage = ''
+  newSpu.description = ''
+  newSpu.skus = [{ skuName: '', priceYuan: 0 }]
+}
+
+function addSku(): void {
+  newSpu.skus.push({ skuName: '', priceYuan: 0 })
+}
+
+function removeSku(idx: number): void {
+  if (newSpu.skus.length <= 1) return
+  newSpu.skus.splice(idx, 1)
+}
+
+function pickImage(): void {
+  fileInputRef.value?.click()
+}
+
+async function onFileChange(e: Event): Promise<void> {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  if (file.size > 10 * 1024 * 1024) {
+    ElMessage.error('图片不能超过 10MB')
+    input.value = ''
+    return
+  }
+  uploading.value = true
+  try {
+    const res = await uploadProductImage(file)
+    newSpu.mainImage = res.url
+    ElMessage.success('图片已上传')
+  } catch {
+    ElMessage.error('图片上传失败')
+  } finally {
+    uploading.value = false
+    input.value = ''
+  }
+}
+
+/** 创建商品（SPU + SKU）并上架到当前门店 */
+async function submitCreate(): Promise<void> {
+  if (!appStore.currentStoreId) {
+    ElMessage.warning('请先选择门店')
+    return
+  }
+  if (!newSpu.spuName.trim()) {
+    ElMessage.warning('请填写商品名称')
+    return
+  }
+  if (!newSpu.categoryId) {
+    ElMessage.warning('请选择商品分类')
+    return
+  }
+  if (!newSpu.basePriceYuan || newSpu.basePriceYuan <= 0) {
+    ElMessage.warning('请填写商品售价')
+    return
+  }
+  const validSkus = newSpu.skus.filter((s) => s.priceYuan > 0)
+  if (!validSkus.length) {
+    ElMessage.warning('至少填写一个规格的售价')
+    return
+  }
+
+  creating.value = true
+  try {
+    const basePrice = yuanToFen(newSpu.basePriceYuan)
+    // 编码留空时服务端会生成，这里给个稳定的默认值兜底
+    const spuCode = newSpu.spuCode.trim() || 'SPU' + Date.now()
+    const spuId = await createSpu({
+      categoryId: newSpu.categoryId,
+      spuCode,
+      spuName: newSpu.spuName.trim(),
+      unit: newSpu.unit || '杯',
+      basePrice,
+      minPrice: newSpu.minPriceYuan ? yuanToFen(newSpu.minPriceYuan) : basePrice,
+      mainImage: newSpu.mainImage || null,
+      description: newSpu.description || null,
+      status: 'ON_SALE',
+      sort: 0,
+      skus: validSkus.map((s, i) => ({
+        skuCode: spuCode + '-S' + (i + 1),
+        skuName: s.skuName.trim() || '默认规格',
+        price: yuanToFen(s.priceYuan),
+        costPrice: 0,
+        imageUrl: newSpu.mainImage || null,
+        sort: i,
+        status: 'ENABLED',
+      })),
+    })
+    // 创建后立即上架到当前门店
+    if (spuId) await shelfStoreSpu(appStore.currentStoreId, spuId, 1)
+    ElMessage.success('商品已创建并上架到本店')
+    resetNewSpu()
+    addVisible.value = false
+    await load()
+  } catch (e: unknown) {
+    const err = e as { message?: string }
+    ElMessage.error(err?.message || '创建失败，请检查编码是否重复')
+  } finally {
+    creating.value = false
+  }
+}
+
+function isCandidateSelectable(row: SpuVO & { added?: boolean }): boolean {
+  return !row.added
+}
+
+function onCandidateSelect(rows: (SpuVO & { added?: boolean })[]): void {
+  selectedCandidates.value = rows
+}
+
+async function submitAdd(): Promise<void> {
+  if (!appStore.currentStoreId || !selectedCandidates.value.length) return
+  addSubmitting.value = true
+  try {
+    // 逐个上架（shelf 在关系不存在时会自动创建门店商品关系）
+    for (const spu of selectedCandidates.value) {
+      await shelfStoreSpu(appStore.currentStoreId, spu.id, 1)
+    }
+    ElMessage.success('已添加 ' + selectedCandidates.value.length + ' 个商品到本门店')
+    addVisible.value = false
+    await load()
+  } catch (e) {
+    ElMessage.error('添加失败，请重试')
+  } finally {
+    addSubmitting.value = false
+  }
+}
 
 async function load(): Promise<void> {
   if (!appStore.currentStoreId) {

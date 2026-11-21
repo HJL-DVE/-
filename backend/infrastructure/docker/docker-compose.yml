@@ -220,8 +220,12 @@ services:
       DB_USER: tc_product
       DB_NAME: product_db
       DB_PASSWORD: ${DB_PASSWORD_PRODUCT}
+      # 商品图片上传目录（与 admin-web 共享同一卷，nginx 直接对外提供）
+      UPLOAD_DIR: /app/uploads
     ports:
       - "9003:9003"
+    volumes:
+      - teaclub-uploads:/app/uploads
     depends_on:
       mysql: { condition: service_healthy }
       nacos: { condition: service_healthy }
@@ -353,6 +357,8 @@ volumes:
     name: teaclub-nacos-logs
   rabbitmq-data:
     name: teaclub-rabbitmq-data
+  teaclub-uploads:
+    name: teaclub-uploads
 
 networks:
   teaclub-net:

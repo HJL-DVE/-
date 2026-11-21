@@ -6,8 +6,12 @@ export interface OrderItemPayload {
   quantity: number
 }
 
-/** POST /api/order/quote —— 金额必须由服务端算 */
-export function quoteOrder(payload: { storeId: number | string; items: OrderItemPayload[] }) {
+/** POST /api/order/quote —— 金额必须由服务端算（memberCouponId 可选，抵扣由服务端判定） */
+export function quoteOrder(payload: {
+  storeId: number | string
+  items: OrderItemPayload[]
+  memberCouponId?: number
+}) {
   return http.post<OrderQuote>('/api/order/quote', payload)
 }
 
@@ -17,6 +21,7 @@ export function createOrder(payload: {
   items: OrderItemPayload[]
   remark?: string
   orderSource?: string
+  memberCouponId?: number
 }) {
   return http.post<OrderInfo>('/api/order/orders', payload)
 }

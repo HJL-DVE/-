@@ -9,6 +9,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -80,6 +81,28 @@ public class GlobalExceptionHandler {
     })
     public Result<Void> handleAccessDenied(Exception e) {
         return Result.fail(ResultCode.FORBIDDEN, "没有该操作权限");
+    }
+
+    /**
+     * 上传文件超过 Spring multipart 上限。
+     *
+     * <p>不加这段时，超限会落到 {@link #handleOther} 返回「系统内部错误」，
+     * 用户看不出是自己文件太大。这里转成可读提示，并给出实际上限。
+     */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public Result<Void> handleMaxUploadSize(MaxUploadSizeExceededException e, HttpServletRequest req) {
+        String limit = "10MB";
+        try {
+            String v = e.getMostSpecificCause().getMessage();
+            if (v != null && v.contains("exceeded")) {
+                limit = "10MB";
+            }
+        } catch (Exception ignored) {
+            // 取不到具体上限时用默认提示
+        }
+        log.warn("[上传超限] uri={} msg={}", req.getRequestURI(), e.getMessage());
+        return Result.fail(ResultCode.PARAM_INVALID,
+                "上传文件过大，单张图片不能超过 " + limit + "，请压缩后重试");
     }
 
     @ExceptionHandler(Exception.class)

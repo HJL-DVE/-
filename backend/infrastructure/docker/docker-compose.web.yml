@@ -27,6 +27,9 @@ services:
       dockerfile: deploy/web/Dockerfile
     ports:
       - "${WEB_PORT:-8080}:80"
+    volumes:
+      # 与 product-service 共享上传目录，nginx 直接对外提供 /static/uploads/**
+      - teaclub-uploads:/usr/share/nginx/html/static/uploads:ro
     depends_on:
       gateway-service:
         condition: service_healthy
@@ -37,3 +40,8 @@ services:
       timeout: 3s
       retries: 3
       start_period: 10s
+
+volumes:
+  teaclub-uploads:
+    external: true
+    name: teaclub-uploads

@@ -2,6 +2,9 @@ server:
   port: ${SERVER_PORT:9000}
 
 spring:
+  # 图片原图直传：放宽 WebFlux 内存缓冲上限（默认 256KB 会截断大文件）
+  codec:
+    max-in-memory-size: 12MB
   application:
     name: gateway-service
   profiles:

@@ -43,6 +43,15 @@
       </view>
 
       <view class="card">
+        <view class="row-between" @tap="openCouponPicker">
+          <text class="section-title">优惠券</text>
+          <text :class="couponText === '不使用优惠券' ? 'muted' : 'coupon-picked'">
+            {{ couponText }} >
+          </text>
+        </view>
+      </view>
+
+      <view class="card">
         <view class="section-title">支付方式</view>
         <view class="pay-option" :class="{ active: payMode === 'WALLET' }" @tap="payMode = 'WALLET'">
           <view>
@@ -67,17 +76,56 @@
         <button class="btn-primary submit" :loading="submitting" @tap="submit">提交订单</button>
       </view>
     </block>
+    <!-- 优惠券选择 -->
+    <view v-if="couponPickerVisible" class="mask" @tap="closeCouponPicker">
+      <view class="sheet" @tap.stop>
+        <view class="sheet-title">选择优惠券</view>
+        <scroll-view scroll-y class="sheet-body">
+          <view class="coupon-row none" :class="{ active: !selectedCouponId }" @tap="pickCoupon(null)">
+            <text>不使用优惠券</text>
+            <text v-if="!selectedCouponId" class="check">✓</text>
+          </view>
+          <view v-if="couponsLoading" class="muted sheet-hint">加载中…</view>
+          <view v-else-if="coupons.length === 0" class="muted sheet-hint">暂无可用优惠券</view>
+          <view
+            v-for="cp in coupons"
+            :key="cp.id"
+            class="coupon-row"
+            :class="{ active: selectedCouponId === cp.id, disabled: !cp.usable }"
+            @tap="cp.usable !== false && pickCoupon(cp)"
+          >
+            <view class="coupon-left">
+              <view class="coupon-amount" v-if="cp.couponType === 'DISCOUNT'">
+                {{ ((cp.discountRate || 10000) / 1000).toFixed(1) }}折
+              </view>
+              <view class="coupon-amount" v-else>¥{{ fen2yuan(cp.faceValue || 0) }}</view>
+              <view class="muted coupon-cond">
+                {{ (cp.thresholdAmount || 0) <= 0 ? '无门槛' : '满' + fen2yuan(cp.thresholdAmount || 0) + '可用' }}
+              </view>
+            </view>
+            <view class="coupon-mid">
+              <view class="coupon-name">{{ cp.couponName || cp.couponTypeLabel || cp.couponType }}</view>
+              <view class="muted coupon-time" v-if="cp.validEnd">有效期至 {{ (cp.validEnd || '').slice(0, 10) }}</view>
+            </view>
+            <text v-if="selectedCouponId === cp.id" class="check">✓</text>
+          </view>
+        </scroll-view>
+        <button class="btn-primary sheet-close" @tap="closeCouponPicker">完成</button>
+      </view>
+    </view>
   </view>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { useAuthStore } from '@/stores/auth'
 import { useStoreStore } from '@/stores/store'
 import { specRemark, useCartStore } from '@/stores/cart'
 import * as orderApi from '@/api/order'
 import * as paymentApi from '@/api/payment'
+import * as marketingApi from '@/api/marketing'
+import type { CouponItem } from '@/api/marketing'
 import type { OrderQuote } from '@/api/types'
 import { fen2yuan } from '@/utils/money'
 import { toast } from '@/utils/request'
@@ -92,6 +140,21 @@ const quoteError = ref('')
 const payMode = ref<'WALLET' | 'WECHAT'>('WALLET')
 const submitting = ref(false)
 
+// ===== 优惠券 =====
+const coupons = ref<CouponItem[]>([])
+const couponsLoading = ref(false)
+const couponPickerVisible = ref(false)
+const selectedCouponId = ref<number | null>(null)
+const couponText = computed(() => {
+  if (!selectedCouponId.value) return '不使用优惠券'
+  const cp = coupons.value.find((x) => x.id === selectedCouponId.value)
+  if (!cp) return '已选优惠券'
+  const label = cp.couponType === 'DISCOUNT'
+    ? ((cp.discountRate || 10000) / 1000).toFixed(1) + '折'
+    : '¥' + fen2yuan(cp.faceValue || 0)
+  return (cp.couponName || cp.couponTypeLabel || '优惠券') + '（' + label + '）'
+})
+
 onLoad((opts) => {
   const isBuyNow = opts && opts.mode === 'buynow'
   if (isBuyNow) {
@@ -100,8 +163,40 @@ onLoad((opts) => {
   } else {
     cartStore.setStore(storeStore.currentStoreId)
   }
-  if (authStore.isLoggedIn) loadQuote()
+  if (authStore.isLoggedIn) {
+    loadQuote()
+    loadCoupons()
+  }
 })
+
+/** 拉取会员可用券（后端按门槛/有效期过滤，usable 字段标明是否可用于本单） */
+async function loadCoupons() {
+  couponsLoading.value = true
+  try {
+    coupons.value = (await marketingApi.getUsableCoupons()) || []
+  } catch (e) {
+    console.error('[coupons/usable]', e)
+    coupons.value = []
+  } finally {
+    couponsLoading.value = false
+  }
+}
+
+function openCouponPicker() {
+  couponPickerVisible.value = true
+  if (coupons.value.length === 0) loadCoupons()
+}
+
+function closeCouponPicker() {
+  couponPickerVisible.value = false
+}
+
+/** 选券后立即重新试算：抵扣金额由服务端算，前端不参与 */
+async function pickCoupon(cp: CouponItem | null) {
+  selectedCouponId.value = cp ? cp.id : null
+  couponPickerVisible.value = false
+  await loadQuote()
+}
 
 async function loadQuote() {
   if (storeStore.currentStoreId === null) {
@@ -116,7 +211,11 @@ async function loadQuote() {
   quoteLoading.value = true
   quoteError.value = ''
   try {
-    quote.value = await orderApi.quoteOrder({ storeId: storeStore.currentStoreId, items })
+    quote.value = await orderApi.quoteOrder({
+      storeId: storeStore.currentStoreId,
+      items,
+      memberCouponId: selectedCouponId.value || undefined,
+    })
   } catch (e) {
     quoteError.value = e instanceof Error ? e.message : '试算失败'
   } finally {
@@ -145,6 +244,7 @@ async function submit() {
       items,
       remark: cartStore.toRemark(),
       orderSource: 'MINIAPP',
+      memberCouponId: selectedCouponId.value || undefined,
     })
     const orderNo = order && order.orderNo ? order.orderNo : ''
     if (!orderNo) {
@@ -272,6 +372,36 @@ function goLogin() {
 .submit {
   width: 300rpx;
 }
+.coupon-picked { color: #16a34a; font-size: 24rpx; }
+.mask {
+  position: fixed; left: 0; right: 0; top: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.45); z-index: 100;
+  display: flex; align-items: flex-end;
+}
+.sheet {
+  width: 100%; background: #fff;
+  border-radius: 24rpx 24rpx 0 0;
+  padding: 24rpx 24rpx 40rpx;
+  max-height: 70vh; display: flex; flex-direction: column;
+}
+.sheet-title { font-size: 30rpx; font-weight: 600; text-align: center; margin-bottom: 16rpx; }
+.sheet-body { flex: 1; max-height: 50vh; }
+.sheet-hint { text-align: center; padding: 40rpx 0; font-size: 24rpx; }
+.sheet-close { margin-top: 20rpx; }
+.coupon-row {
+  display: flex; align-items: center;
+  padding: 20rpx 16rpx; border-bottom: 1rpx solid #f3f4f6;
+}
+.coupon-row.none { justify-content: space-between; font-size: 26rpx; }
+.coupon-row.active { background: #f0fdf4; }
+.coupon-row.disabled { opacity: 0.45; }
+.coupon-left { width: 150rpx; }
+.coupon-amount { font-size: 32rpx; font-weight: 700; color: #ef4444; }
+.coupon-cond { font-size: 20rpx; margin-top: 4rpx; }
+.coupon-mid { flex: 1; padding: 0 12rpx; }
+.coupon-name { font-size: 26rpx; }
+.coupon-time { font-size: 20rpx; margin-top: 4rpx; }
+.check { color: #16a34a; font-size: 30rpx; font-weight: 700; }
 .retry {
   margin-top: 20rpx;
 }

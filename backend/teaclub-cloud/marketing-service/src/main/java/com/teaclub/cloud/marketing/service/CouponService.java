@@ -57,12 +57,19 @@ public interface CouponService {
     CouponQuoteVO quote(String couponNo, Long memberId, Long storeId,
                         long orderAmount, List<Long> spuIds);
 
+    /** 按券实例 ID 试算（订单服务的 memberCouponId 即此 ID）。 */
+    CouponQuoteVO quoteById(Long couponId, Long memberId, Long storeId,
+                           long orderAmount, List<Long> spuIds);
+
     /**
      * 锁定券（下单占位）。
      *
      * <p>已锁定且订单号相同则视为幂等成功（重复调用不报错）。
      */
     boolean lock(String couponNo, Long memberId, String orderNo);
+
+    /** 按券实例 ID 锁定（订单服务只有 memberCouponId）。 */
+    boolean lockById(Long couponId, Long memberId, String orderNo);
 
     /**
      * 核销券（支付成功）。
@@ -71,6 +78,9 @@ public interface CouponService {
      * 其他状态不匹配 → 返回 false。
      */
     boolean use(String couponNo, String orderNo, Long discountAmount);
+
+    /** 按券实例 ID 核销（订单服务只有 memberCouponId）。 */
+    boolean useById(Long couponId, String orderNo, Long discountAmount);
 
     /**
      * 释放券（订单取消）。

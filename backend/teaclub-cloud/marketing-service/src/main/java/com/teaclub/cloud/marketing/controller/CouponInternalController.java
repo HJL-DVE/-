@@ -42,6 +42,16 @@ public class CouponInternalController {
         return Result.ok(couponService.quote(couponNo, memberId, storeId, orderAmount, spuIds));
     }
 
+    @Operation(summary = "按券ID试算抵扣金额（订单服务用 memberCouponId 调用）")
+    @PostMapping("/quote-by-id")
+    public Result<CouponQuoteVO> quoteById(@RequestParam Long couponId,
+                                           @RequestParam Long memberId,
+                                           @RequestParam(required = false) Long storeId,
+                                           @RequestParam Long orderAmount,
+                                           @RequestParam(required = false) List<Long> spuIds) {
+        return Result.ok(couponService.quoteById(couponId, memberId, storeId, orderAmount, spuIds));
+    }
+
     @Operation(summary = "锁定券（下单占位）")
     @PostMapping("/lock")
     public Result<Boolean> lock(@RequestParam String couponNo,
@@ -50,12 +60,28 @@ public class CouponInternalController {
         return Result.ok(couponService.lock(couponNo, memberId, orderNo));
     }
 
+    @Operation(summary = "按券ID锁定（下单占位）")
+    @PostMapping("/lock-by-id")
+    public Result<Boolean> lockById(@RequestParam Long couponId,
+                                    @RequestParam Long memberId,
+                                    @RequestParam String orderNo) {
+        return Result.ok(couponService.lockById(couponId, memberId, orderNo));
+    }
+
     @Operation(summary = "核销券（支付成功，幂等）")
     @PostMapping("/use")
     public Result<Boolean> use(@RequestParam String couponNo,
                                @RequestParam String orderNo,
                                @RequestParam(required = false) Long discountAmount) {
         return Result.ok(couponService.use(couponNo, orderNo, discountAmount));
+    }
+
+    @Operation(summary = "按券ID核销（支付成功，幂等）")
+    @PostMapping("/use-by-id")
+    public Result<Boolean> useById(@RequestParam Long couponId,
+                                   @RequestParam String orderNo,
+                                   @RequestParam Long discountAmount) {
+        return Result.ok(couponService.useById(couponId, orderNo, discountAmount));
     }
 
     @Operation(summary = "释放券（订单取消）")

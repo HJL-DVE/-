@@ -13,6 +13,7 @@
       <el-tag type="success" effect="plain">收银工作台</el-tag>
       <span class="text-muted">金额一律由 POST /api/admin/order/quote 服务端计算，前端只做展示</span>
       <div class="toolbar-spacer" />
+      <el-button type="primary" plain @click="goAddProducts">管理商品</el-button>
       <el-button :icon="Refresh" @click="reloadProducts">刷新商品</el-button>
     </div>
 
@@ -67,7 +68,15 @@
               <el-tag v-if="spu.isOnSale !== 1" size="small" type="info">已下架</el-tag>
               <el-tag v-else size="small" type="success">{{ (spu.skus || []).length }} 规格</el-tag>
             </div>
-            <el-empty v-if="!productLoading && !filteredProducts.length" description="当前门店无可售商品" :image-size="70" />
+            <el-empty
+              v-if="!productLoading && !filteredProducts.length"
+              :description="appStore.currentStoreId ? '当前门店无可售商品' : '请先选择门店'"
+              :image-size="70"
+            >
+              <el-button v-if="appStore.currentStoreId" type="primary" @click="goAddProducts">
+                去添加商品
+              </el-button>
+            </el-empty>
           </div>
         </el-card>
       </el-col>
@@ -316,6 +325,7 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
 import QRCode from 'qrcode'
+import { useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import { getCategoryTree, getSpuPage, getStoreProducts } from '@/api/product'
 import { getMemberByCode, getMemberByPhone } from '@/api/member'
@@ -346,6 +356,7 @@ import type {
 } from '@/api/types'
 
 const appStore = useAppStore()
+const router = useRouter()
 
 // ---------- 商品 ----------
 const keyword = ref('')
@@ -429,6 +440,15 @@ async function initStores(): Promise<void> {
   } finally {
     storeLoading.value = false
   }
+}
+
+/** 跳转到「门店商品」页添加/管理本店商品 */
+function goAddProducts(): void {
+  if (!appStore.currentStoreId) {
+    ElMessage.warning('请先选择门店')
+    return
+  }
+  router.push('/product/store')
 }
 
 async function reloadProducts(): Promise<void> {

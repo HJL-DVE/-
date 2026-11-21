@@ -243,6 +243,21 @@ public class CouponServiceImpl implements CouponService {
     // ==================== 试算 ====================
 
     @Override
+    public CouponQuoteVO quoteById(Long couponId, Long memberId, Long storeId,
+                                   long orderAmount, List<Long> spuIds) {
+        MktCoupon coupon = couponId == null ? null : couponMapper.selectById(couponId);
+        if (coupon == null) {
+            CouponQuoteVO vo = new CouponQuoteVO();
+            vo.setAvailable(false);
+            vo.setReasonCode("COUPON_NOT_FOUND");
+            vo.setReason("优惠券不存在");
+            vo.setDiscountAmount(0L);
+            return vo;
+        }
+        return quote(coupon.getCouponNo(), memberId, storeId, orderAmount, spuIds);
+    }
+
+    @Override
     public CouponQuoteVO quote(String couponNo, Long memberId, Long storeId,
                                long orderAmount, List<Long> spuIds) {
         CouponQuoteVO vo = new CouponQuoteVO();
@@ -401,6 +416,28 @@ public class CouponServiceImpl implements CouponService {
         writeLog(c, CouponLogAction.LOCK, orderNo, null, CouponStatus.UNUSED.name(),
                 CouponStatus.LOCKED.name());
         return true;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public boolean lockById(Long couponId, Long memberId, String orderNo) {
+        MktCoupon coupon = couponId == null ? null : couponMapper.selectById(couponId);
+        if (coupon == null) {
+            log.warn("[COUPON] 锁定时券不存在 couponId={} orderNo={}", couponId, orderNo);
+            return false;
+        }
+        return lock(coupon.getCouponNo(), memberId, orderNo);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public boolean useById(Long couponId, String orderNo, Long discountAmount) {
+        MktCoupon coupon = couponId == null ? null : couponMapper.selectById(couponId);
+        if (coupon == null) {
+            log.warn("[COUPON] 核销时券不存在 couponId={} orderNo={}", couponId, orderNo);
+            return false;
+        }
+        return use(coupon.getCouponNo(), orderNo, discountAmount);
     }
 
     @Override
