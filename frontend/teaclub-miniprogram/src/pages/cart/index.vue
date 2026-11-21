@@ -62,7 +62,7 @@ onShow(() => {
 })
 
 function goStoreList() {
-  uni.navigateTo({ url: '/pages/store/list' })
+  uni.switchTab({ url: '/pages/store/list' })
 }
 function goProductList() {
   uni.navigateTo({ url: '/pages/product/list' })

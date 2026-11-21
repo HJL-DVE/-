@@ -71,7 +71,7 @@ public class PrdCategoryServiceImpl implements PrdCategoryService {
         vo.setId(c.getId());
         vo.setParentId(c.getParentId());
         vo.setCategoryName(c.getCategoryName());
-        vo.setIconUrl(c.getIconUrl());
+        vo.setIconUrl(imageUrlResolver.resolve(c.getIconUrl()));
         vo.setSort(c.getSort());
         vo.setStatus(c.getStatus());
         return vo;

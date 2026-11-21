@@ -188,7 +188,8 @@ onShow(async () => {
 })
 
 function goStoreList() {
-  uni.navigateTo({ url: '/pages/store/list' })
+  // store/list 是 tabBar 页面，navigateTo 会静默失败，必须用 switchTab
+  uni.switchTab({ url: '/pages/store/list' })
 }
 function goRecharge() {
   uni.navigateTo({ url: '/pages/recharge/index' })

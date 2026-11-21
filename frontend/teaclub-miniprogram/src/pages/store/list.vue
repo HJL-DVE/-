@@ -74,6 +74,10 @@ function hours(store: StoreItem) {
 function selectStore(id: number) {
   storeStore.setCurrentStore(id)
   uni.showToast({ title: '已切换门店', icon: 'none' })
+  // 选完自动回首页（本页是 tabBar 页，用 switchTab 而非 navigateBack）
+  setTimeout(() => {
+    uni.switchTab({ url: '/pages/index/index' })
+  }, 600)
 }
 
 function goDetail(id: number) {

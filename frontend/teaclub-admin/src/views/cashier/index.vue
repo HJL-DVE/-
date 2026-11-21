@@ -59,6 +59,21 @@
 
           <div v-loading="productLoading" class="product-grid">
             <div v-for="spu in filteredProducts" :key="spu.id" class="product-card" @click="pickSpu(spu)">
+              <div class="product-thumb">
+                <el-image
+                  v-if="spu.mainImage"
+                  :src="spu.mainImage"
+                  fit="cover"
+                  :preview-src-list="[spu.mainImage]"
+                  preview-teleported
+                  @click.stop
+                >
+                  <template #error>
+                    <div class="thumb-fallback">{{ spu.spuName.slice(0, 1) }}</div>
+                  </template>
+                </el-image>
+                <div v-else class="thumb-fallback">{{ spu.spuName.slice(0, 1) }}</div>
+              </div>
               <div class="product-name">{{ spu.spuName }}</div>
               <div class="product-code mono">{{ spu.spuCode }}</div>
               <div class="product-price">
@@ -948,12 +963,49 @@ onMounted(async () => {
 .product-card {
   border: 1px solid #ebeef5;
   border-radius: 8px;
-  padding: 10px;
+  padding: 8px;
   cursor: pointer;
   transition: all 0.15s;
   display: flex;
   flex-direction: column;
   gap: 4px;
+  overflow: hidden;
+}
+
+/* 商品缩略图：固定 4:3 比例，图片裁切填充 */
+.product-thumb {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #f5f7fa;
+  margin-bottom: 2px;
+}
+
+.product-thumb :deep(.el-image) {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.product-thumb :deep(.el-image img) {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* 无图/加载失败时的占位：显示商品名首字 */
+.thumb-fallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #f0f9f4, #e8f5e9);
+  color: #67c23a;
+  font-size: 26px;
+  font-weight: 700;
+  user-select: none;
 }
 
 .product-card:hover {

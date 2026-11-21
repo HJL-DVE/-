@@ -1,5 +1,6 @@
 package com.teaclub.cloud.product.controller;
 
+import com.teaclub.cloud.product.storage.ImageUrlResolver;
 import com.teaclub.cloud.core.api.Result;
 import com.teaclub.cloud.product.entity.PrdSku;
 import com.teaclub.cloud.product.entity.PrdSpu;
@@ -45,6 +46,7 @@ import java.util.stream.Collectors;
 public class ProductInternalController {
 
     private final PrdSkuMapper skuMapper;
+    private final ImageUrlResolver imageUrlResolver;
     private final PrdSpuMapper spuMapper;
     private final PrdStoreSkuMapper storeSkuMapper;
     private final PrdStoreSpuMapper storeSpuMapper;
@@ -133,7 +135,7 @@ public class ProductInternalController {
                 m.put("spuName", spu.getSpuName());
                 m.put("spuCode", spu.getSpuCode());
                 m.put("spuStatus", spu.getStatus());
-                m.put("mainImage", spu.getMainImage());
+                m.put("mainImage", imageUrlResolver.resolve(spu.getMainImage()));
                 m.put("unit", spu.getUnit());
             }
 
@@ -179,7 +181,7 @@ public class ProductInternalController {
             if (spu != null) {
                 m.put("spuName", spu.getSpuName());
                 m.put("spuCode", spu.getSpuCode());
-                m.put("mainImage", spu.getMainImage());
+                m.put("mainImage", imageUrlResolver.resolve(spu.getMainImage()));
                 m.put("unit", spu.getUnit());
             }
             return m;

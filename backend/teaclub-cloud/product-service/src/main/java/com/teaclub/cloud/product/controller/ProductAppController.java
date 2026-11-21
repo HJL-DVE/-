@@ -88,7 +88,8 @@ public class ProductAppController {
                 .filter(c -> CATEGORY_ENABLED.equals(c.getStatus()))
                 .sorted(Comparator.comparingInt((PrdCategory c) -> c.getSort() == null ? 0 : c.getSort())
                         .thenComparing(PrdCategory::getId))
-                .map(c -> new AppCategoryVO(c.getId(), c.getCategoryName(), c.getIconUrl(), c.getSort()))
+                .map(c -> new AppCategoryVO(c.getId(), c.getCategoryName(),
+                        imageUrlResolver.resolve(c.getIconUrl()), c.getSort()))
                 .collect(Collectors.toList());
         return Result.ok(categories);
     }
@@ -230,7 +231,8 @@ public class ProductAppController {
         Map<Long, String> categoryNames = categoryNames(spus);
         List<AppSpuItemVO> items = new ArrayList<>(spus.size());
         for (PrdSpu spu : spus) {
-            items.add(new AppSpuItemVO(spu.getId(), spu.getSpuName(), spu.getMainImage(),
+            items.add(new AppSpuItemVO(spu.getId(), spu.getSpuName(),
+                    imageUrlResolver.resolve(spu.getMainImage()),
                     minPrices.get(spu.getId()), spu.getCategoryId(), categoryNames.get(spu.getCategoryId())));
         }
         return items;
