@@ -14,6 +14,7 @@
           <view class="muted">{{ storeStore.currentStore ? storeStore.currentStore.address || '' : '请选择门店后下单' }}</view>
         </view>
         <view class="switch-btn">切换门店</view>
+        <view class="ver-tag">v2026.1121-b</view>
       </view>
       <view v-if="storeStore.currentStore" class="store-meta">
         <text class="tag" :class="isOpen ? 'tag-open' : 'tag-close'">{{ storeStore.currentStoreStatusText }}</text>
@@ -243,6 +244,11 @@ function goProductDetail(spuId: number) {
 }
 .hours {
   margin-left: 16rpx;
+}
+.ver-tag {
+  font-size: 16rpx;
+  color: #d1d5db;
+  margin-top: 4rpx;
 }
 .switch-btn {
   font-size: 24rpx;

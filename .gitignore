@@ -58,3 +58,6 @@ backend/infrastructure/docker/.env.docker
 backend/infrastructure/test/*-smoke.json
 backend/infrastructure/test/*.out.txt
 backend/infrastructure/test/inv*.txt
+
+# 数据库备份（体积大且含历史数据，不进仓库）
+backup/
