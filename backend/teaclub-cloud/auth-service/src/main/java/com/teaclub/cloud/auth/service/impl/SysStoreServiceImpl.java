@@ -77,6 +77,9 @@ public class SysStoreServiceImpl implements SysStoreService {
         LambdaQueryWrapper<SysStore> wrapper = Wrappers.<SysStore>lambdaQuery()
                 .eq(SysStore::getBrandId, current.getBrandId())
                 .eq(SysStore::getStatus, "OPEN")
+                // 旗舰店恒排最前（前端取 stores[0] 作为默认门店），其余按排序号
+                .orderByDesc(SysStore::getIsFlagship)
+                .orderByAsc(SysStore::getStoreSort)
                 .orderByAsc(SysStore::getId);
         if (!scope.isAll()) {
             wrapper.in(SysStore::getId, scope.getStoreIds());
@@ -101,6 +104,8 @@ public class SysStoreServiceImpl implements SysStoreService {
         vo.setBusinessHours(s.getBusinessHours());
         vo.setOpenDate(s.getOpenDate());
         vo.setStatus(s.getStatus());
+        vo.setIsFlagship(s.getIsFlagship());
+        vo.setStoreSort(s.getStoreSort());
         vo.setRemark(s.getRemark());
         vo.setCreateTime(s.getCreateTime());
         vo.setUpdateTime(s.getUpdateTime());

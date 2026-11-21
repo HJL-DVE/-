@@ -24,6 +24,12 @@ const baseRoutes: RouteRecordRaw[] = [
 
 const errorRoutes: RouteRecordRaw[] = [
   {
+    path: '/pay/confirm',
+    name: 'pay-confirm',
+    component: () => import('@/views/pay/confirm.vue'),
+    meta: { public: true, title: '支付确认' },
+  },
+  {
     path: '/403',
     name: 'forbidden',
     component: () => import('@/views/error/403.vue'),
@@ -88,8 +94,19 @@ export function resetDynamicRoutes(): void {
 router.beforeEach(async (to) => {
   const userStore = useUserStore()
 
-  // 仅 /login 免登录；其余（含 403/404）都要求已登录，
-  // 否则刷新或深链会先命中 catch-all 路由的 public 标记而绕过动态路由注册
+  // 免登录白名单：按**显式路径**放行，不能用 meta.public 判断。
+  // 原因：catch-all 404 路由也标了 public，一旦按 meta 放行，
+  // 刷新或深链会先命中 404 而绕过下方动态路由注册，导致登录后仍显示 404。
+  // 扫码支付确认页（/pay/confirm）由顾客手机打开，没有后台账号，因此单独豁免。
+  const PUBLIC_PATHS = new Set(['/login', '/pay/confirm'])
+  if (PUBLIC_PATHS.has(to.path)) {
+    if (to.path === '/login' && userStore.token) {
+      const redirect = typeof to.query.redirect === 'string' ? to.query.redirect : '/'
+      return { path: redirect }
+    }
+    return true
+  }
+
   if (to.path === '/login') {
     if (userStore.token) {
       const redirect = typeof to.query.redirect === 'string' ? to.query.redirect : '/'

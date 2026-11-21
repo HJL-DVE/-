@@ -4,6 +4,7 @@
       <view class="status-icon">{{ paid ? '✓' : '!' }}</view>
       <view class="status-text">{{ paid ? '充值已到账' : '等待支付到账' }}</view>
       <view class="status-sub">{{ rechargeNo }}</view>
+      <view class="build-tag">build {{ BUILD_TAG }}</view>
     </view>
 
     <view class="card">
@@ -46,6 +47,8 @@ import * as paymentApi from '@/api/payment'
 import type { RechargeOrder, WalletAccount } from '@/api/types'
 import { fen2yuan } from '@/utils/money'
 
+// 构建标记：用于确认开发者工具加载的是哪一份产物（排查缓存问题）
+const BUILD_TAG = 'RCPAY-2'
 const PAID_VALUES = ['SUCCESS', 'PAID', 'CREDITED', 'COMPLETED']
 const MAX_POLL = 20
 const INTERVAL = 2000
@@ -199,6 +202,11 @@ function goMember() {
   margin-top: 10rpx;
   font-size: 22rpx;
   opacity: 0.9;
+}
+.build-tag {
+  margin-top: 6rpx;
+  font-size: 18rpx;
+  opacity: 0.6;
 }
 .section-title {
   font-size: 28rpx;

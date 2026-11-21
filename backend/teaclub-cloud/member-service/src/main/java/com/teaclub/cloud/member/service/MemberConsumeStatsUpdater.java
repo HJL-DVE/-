@@ -76,8 +76,68 @@ public class MemberConsumeStatsUpdater {
             log.info("[ORDER_PAID] 会员消费档案已更新 memberId={} +{} 分 orderNo={} eventId={}",
                     memberId, paidAmount, orderNo, eventId);
         }
+
+        // ---- 等级自动升级：累计消费变化后重算（只升不降）----
+        try {
+            upgradeLevel(memberId);
+        } catch (Exception e) {
+            // 升级失败不影响消费档案（档案是资金事实，等级是派生结果）
+            log.error("[ORDER_PAID] 等级重算失败 memberId={}", memberId, e);
+        }
+
         return true;
     }
+
+    /**
+     * 按累计消费金额重算会员等级（<b>只升不降</b>）。
+     *
+     * <p>规则：取所有 {@code upgrade_type=CONSUME_AMOUNT} 且 {@code upgrade_threshold <= 累计消费}
+     * 的启用等级中 level_no 最大的一个；若大于当前等级才更新。
+     *
+     * <p>只升不降：退款不会降级（避免会员感知突变），如需降级应单独做运营策略。
+     */
+    private void upgradeLevel(Long memberId) {
+        Map<String, Object> row = jdbcTemplate.queryForMap(
+                "SELECT level_id, total_consume_amount FROM mem_member WHERE id = ? AND deleted = 0",
+                memberId);
+        Object currentLevelId = row.get("level_id");
+        long consume = row.get("total_consume_amount") instanceof Number n ? n.longValue() : 0L;
+
+        // 命中的最高等级
+        java.util.List<Map<String, Object>> hit = jdbcTemplate.queryForList(
+                "SELECT l.id, l.level_no FROM mem_member_level l "
+                        + "WHERE l.deleted = 0 AND l.status = 'ENABLED' "
+                        + "  AND l.upgrade_type = 'CONSUME_AMOUNT' "
+                        + "  AND l.brand_id = (SELECT brand_id FROM mem_member WHERE id = ?) "
+                        + "  AND l.upgrade_threshold <= ? "
+                        + "ORDER BY l.level_no DESC LIMIT 1",
+                memberId, consume);
+        if (hit.isEmpty()) {
+            return;
+        }
+        Long targetId = ((Number) hit.get(0).get("id")).longValue();
+        int targetNo = ((Number) hit.get(0).get("level_no")).intValue();
+
+        if (currentLevelId != null && ((Number) currentLevelId).longValue() == targetId) {
+            return;
+        }
+        // 当前等级序号
+        Integer currentNo = null;
+        if (currentLevelId != null) {
+            java.util.List<Integer> nos = jdbcTemplate.queryForList(
+                    "SELECT level_no FROM mem_member_level WHERE id = ?", Integer.class,
+                    ((Number) currentLevelId).longValue());
+            currentNo = nos.isEmpty() ? null : nos.get(0);
+        }
+        if (currentNo != null && targetNo <= currentNo) {
+            // 目标等级不高于当前 → 不降级
+            return;
+        }
+        jdbcTemplate.update("UPDATE mem_member SET level_id = ? WHERE id = ?", targetId, memberId);
+        log.info("[LEVEL-UP] 会员升级 memberId={} 累计消费={}分 等级 {} -> {}",
+                memberId, consume, currentNo == null ? "-" : String.valueOf(currentNo), targetNo);
+    }
+
 
     private static Long toLong(Object v) {
         if (v == null) {

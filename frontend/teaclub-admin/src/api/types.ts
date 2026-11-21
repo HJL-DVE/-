@@ -69,6 +69,10 @@ export interface StoreVO {
   businessHours?: string | null
   openDate?: string | null
   status: string
+  /** 是否旗舰店：0 否 1 是（品牌内唯一） */
+  isFlagship?: number | null
+  /** 门店排序号，越小越靠前 */
+  storeSort?: number | null
   remark?: string | null
   createTime?: string | null
   updateTime?: string | null

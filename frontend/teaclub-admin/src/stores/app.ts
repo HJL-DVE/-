@@ -33,7 +33,9 @@ export const useAppStore = defineStore('app', () => {
     stores.value = list || []
     storesLoaded.value = true
     if (!stores.value.some((item) => item.id === currentStoreId.value)) {
-      setStore(stores.value[0]?.id ?? 0)
+      // 默认门店：优先旗舰店（isFlagship=1），否则列表第一家（后端已按旗舰店→排序号排好）
+      const flagship = stores.value.find((item) => item.isFlagship === 1)
+      setStore(flagship?.id ?? stores.value[0]?.id ?? 0)
     }
     return stores.value
   }

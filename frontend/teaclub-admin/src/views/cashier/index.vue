@@ -72,8 +72,8 @@
         </el-card>
       </el-col>
 
-      <el-col :span="10">
-        <el-card shadow="never" class="panel">
+      <el-col :span="10" class="right-col">
+        <el-card shadow="never" class="panel member-panel">
           <template #header>
             <div class="panel-head">
               <strong>会员</strong>
@@ -128,7 +128,7 @@
           <el-empty v-else-if="!memberError" description="散客收银（可选会员）" :image-size="50" />
         </el-card>
 
-        <el-card shadow="never" class="panel" style="margin-top: 14px">
+        <el-card shadow="never" class="panel cart-panel">
           <template #header>
             <div class="panel-head">
               <strong>购物车（{{ cart.length }}）</strong>
@@ -203,7 +203,7 @@
       </el-col>
     </el-row>
 
-    <el-card shadow="never" class="panel" style="margin-top: 14px">
+    <el-card shadow="never" class="panel order-panel" style="margin-top: 14px">
       <template #header>
         <div class="panel-head">
           <strong>本店订单{{ appStore.currentStoreId ? '' : '（未选择门店）' }}</strong>
@@ -211,30 +211,30 @@
         </div>
       </template>
       <el-table :data="recentOrders" v-loading="orderLoading" size="small" border>
-        <el-table-column prop="orderNo" label="订单号" min-width="180" show-overflow-tooltip />
-        <el-table-column label="会员" min-width="120">
+        <el-table-column prop="orderNo" label="订单号" min-width="170" show-overflow-tooltip />
+        <el-table-column label="会员" min-width="100">
           <template #default="{ row }">{{ row.memberName || row.memberPhone || '散客' }}</template>
         </el-table-column>
-        <el-table-column label="应付" width="100" align="right">
+        <el-table-column label="应付" width="84" align="right">
           <template #default="{ row }">{{ fenToYuan(row.payableAmount) }}</template>
         </el-table-column>
-        <el-table-column label="实付" width="100" align="right">
+        <el-table-column label="实付" width="84" align="right">
           <template #default="{ row }"><span class="money">{{ fenToYuan(row.paidAmount) }}</span></template>
         </el-table-column>
-        <el-table-column label="状态" width="100">
+        <el-table-column label="状态" width="90">
           <template #default="{ row }">
             <el-tag size="small" :type="ORDER_STATUS_TAG[row.status] || 'info'">
               {{ row.statusLabel || ORDER_STATUS_LABEL[row.status] || row.status }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="支付渠道" width="120">
+        <el-table-column label="支付渠道" width="100">
           <template #default="{ row }">{{ PAY_CHANNEL_LABEL[row.payChannel] || row.payChannel || '-' }}</template>
         </el-table-column>
-        <el-table-column label="时间" width="170">
+        <el-table-column label="时间" width="150">
           <template #default="{ row }">{{ formatDateTime(row.createTime) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="150" fixed="right">
+        <el-table-column label="操作" width="130">
           <template #default="{ row }">
             <el-button
               v-if="['PAID', 'COMPLETED', 'REFUNDING'].includes(row.status) && row.refundedAmount < row.paidAmount"
@@ -264,10 +264,23 @@
       </el-table>
     </el-dialog>
 
-    <el-dialog v-model="qrVisible" title="微信 Native 扫码支付" width="420px" :close-on-click-modal="false" @closed="stopPolling">
+    <el-dialog v-model="qrVisible" title="扫码支付" width="430px" :close-on-click-modal="false" @closed="stopPolling">
       <div class="qr-box">
-        <img v-if="qrDataUrl" :src="qrDataUrl" alt="微信支付二维码" width="240" height="240" />
+        <img v-if="qrDataUrl" :src="qrDataUrl" alt="支付二维码" width="240" height="240" />
         <el-skeleton v-else :rows="4" animated />
+
+        <p class="qr-tip">手机扫码打开支付页 → 点「确认支付」完成付款</p>
+
+        <el-button
+          type="success"
+          size="large"
+          class="qr-pay-btn"
+          :loading="mockPaying"
+          @click="mockConfirmPay"
+        >
+          确认支付 {{ fenToYuan(payAmount) }} 元
+        </el-button>
+
         <div class="qr-meta">
           <div>支付单号：<span class="mono">{{ paymentNo }}</span></div>
           <div>金额：<span class="money">{{ fenToYuan(payAmount) }} 元</span></div>
@@ -275,7 +288,8 @@
             <el-tag size="small" :type="tagTypeByStatus(payStatus)">{{ PAY_STATUS_LABEL[payStatus] || payStatus }}</el-tag>
           </div>
         </div>
-        <div class="text-muted">每 3 秒轮询 GET /api/admin/payment/orders/{paymentNo}/query</div>
+
+        <div class="text-muted">每 3 秒轮询支付结果，支付成功自动关窗</div>
       </div>
       <template #footer>
         <el-button @click="qrVisible = false">关闭</el-button>
@@ -659,12 +673,37 @@ async function payWithNative(): Promise<void> {
     paymentNo.value = pay.paymentNo
     payAmount.value = pay.amount
     payStatus.value = pay.status
-    qrDataUrl.value = pay.codeUrl ? await QRCode.toDataURL(pay.codeUrl, { width: 240, margin: 1 }) : ''
+    // 二维码内容指向本机局域网的支付确认页（手机与收银台须在同一局域网）
+    const confirmUrl = buildConfirmUrl(pay.paymentNo)
+    qrDataUrl.value = confirmUrl ? await QRCode.toDataURL(confirmUrl, { width: 240, margin: 1 }) : ''
     qrVisible.value = true
     startPolling()
   } finally {
     creatingNative.value = false
   }
+}
+
+// ---------- 扫码确认页 URL ----------
+/**
+ * 构造手机可访问的支付确认页地址。
+ *
+ * <p>关键：必须用**局域网 IP**，不能用 127.0.0.1 ——
+ * 后者在手机上指向手机自己，扫出来必然打不开。
+ * 优先取当前浏览器访问后台时用的 host（顾客能打开收银台，说明这个 host 在网络内可达）。
+ */
+function buildConfirmUrl(paymentNo: string): string {
+  if (!paymentNo) return ''
+  const { protocol, hostname, port } = window.location
+  // 若后台是通过 127.0.0.1 打开（本机调试），手机无法访问，给出明确提示
+  const isLoopback = ['127.0.0.1', 'localhost', '::1'].includes(hostname)
+  if (isLoopback) {
+    ElMessage.warning({
+      message: '当前用 127.0.0.1 打开后台，二维码手机上打不开。请改用局域网 IP 访问后台后再扫码。',
+      duration: 8000,
+    })
+  }
+  const origin = protocol + '//' + hostname + (port ? ':' + port : '')
+  return origin + '/pay/confirm?paymentNo=' + encodeURIComponent(paymentNo)
 }
 
 // ---------- Native 轮询 ----------
@@ -675,6 +714,40 @@ const payAmount = ref(0)
 const payStatus = ref('')
 let pollTimer: ReturnType<typeof setInterval> | null = null
 let pollCount = 0
+
+const mockPaying = ref(false)
+
+/** 收银台本机直接确认支付：等价于顾客在手机确认页点心确认，走同一个 Mock 通知接口 */
+async function mockConfirmPay(): Promise<void> {
+  if (!paymentNo.value || mockPaying.value) return
+  mockPaying.value = true
+  try {
+    const res = await fetch('/api/payment/mock/notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        paymentNo: paymentNo.value,
+        amount: payAmount.value,
+        appId: 'mock-appid',
+        mchId: 'mock-mchid',
+      }),
+    })
+    const json = await res.json()
+    if (json.code === 0) {
+      payStatus.value = 'SUCCESS'
+      ElMessage.success('支付成功')
+      stopPolling()
+      qrVisible.value = false
+      afterPaid()
+    } else {
+      ElMessage.error(json.message || '支付失败')
+    }
+  } catch {
+    ElMessage.error('网络异常，支付未完成')
+  } finally {
+    mockPaying.value = false
+  }
+}
 
 function stopPolling(): void {
   if (pollTimer) {
@@ -804,8 +877,39 @@ onMounted(async () => {
   gap: 10px;
 }
 
+/* 面板基础样式：不设 height:100%，避免同列多卡互相挤压、溢出压住下方卡片 */
 .panel {
-  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.panel :deep(.el-card__body) {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* 右列：会员卡 + 购物车卡纵向排列，各自按内容高度展开 */
+.right-col {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.right-col .cart-panel {
+  flex: 1 1 auto;
+}
+
+/* 订单卡片：表格横向溢出时在卡片内滚动，不越过卡片边界 */
+.order-panel {
+  width: 100%;
+}
+
+.order-panel :deep(.el-card__body) {
+  overflow-x: auto;
+}
+
+.order-panel :deep(.el-table) {
+  width: 100%;
 }
 
 .panel-head {
@@ -888,6 +992,18 @@ onMounted(async () => {
   align-items: center;
   gap: 10px;
   margin-top: 12px;
+}
+
+.qr-tip {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: #909399;
+  text-align: center;
+}
+
+.qr-pay-btn {
+  width: 100%;
+  margin: 10px 0 4px;
 }
 
 .qr-box {
