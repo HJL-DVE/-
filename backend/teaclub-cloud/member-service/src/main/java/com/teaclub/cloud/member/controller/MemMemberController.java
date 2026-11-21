@@ -3,6 +3,7 @@ package com.teaclub.cloud.member.controller;
 import com.teaclub.cloud.web.annotation.AuditLog;
 import com.teaclub.cloud.core.api.PageResult;
 import com.teaclub.cloud.core.api.Result;
+import com.teaclub.cloud.member.dto.MemberCreateRequest;
 import com.teaclub.cloud.member.dto.MemberQuery;
 import com.teaclub.cloud.member.dto.MemberUpdateRequest;
 import com.teaclub.cloud.member.service.MemMemberService;
@@ -51,6 +52,14 @@ public class MemMemberController {
     @PreAuthorize("hasAuthority('member:list')")
     public Result<MemberStatsVO> stats() {
         return Result.ok(memberService.stats());
+    }
+
+    @Operation(summary = "后台新增会员（手工建档）")
+    @PostMapping
+    @PreAuthorize("hasAuthority('member:create')")
+    @AuditLog(module = "会员管理", value = "后台新增会员")
+    public Result<Long> create(@Valid @RequestBody MemberCreateRequest request) {
+        return Result.ok(memberService.create(request));
     }
 
     @Operation(summary = "会员详情")

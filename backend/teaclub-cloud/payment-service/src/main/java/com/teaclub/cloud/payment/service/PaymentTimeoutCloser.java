@@ -34,7 +34,7 @@ public class PaymentTimeoutCloser {
     private final PayPaymentOrderMapper paymentMapper;
     private final PaymentProvider provider;
 
-    @Value("${teaclub.payment.timeout-minutes:30}")
+    @Value("${teaclub.payment.timeout-minutes:5}")
     private int timeoutMinutes;
 
     @Value("${teaclub.payment.timeout-close-enabled:true}")

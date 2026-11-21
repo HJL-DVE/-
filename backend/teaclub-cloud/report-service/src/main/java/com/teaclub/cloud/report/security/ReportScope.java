@@ -41,13 +41,28 @@ public class ReportScope {
         return new ReportScope(false, ids);
     }
 
-    /** 解析有效门店过滤：null 表示不过滤（全部），否则必须是授权门店。 */
+    /**
+     * 解析有效门店过滤。
+     * <ul>
+     *   <li>全量账号（SUPER_ADMIN / HQ_ADMIN）：requested 为 null 表示全部门店，否则按指定门店；</li>
+     *   <li>受限账号（STORE_MANAGER）：requested 非空时先校验越权；requested 为空时
+     *       <b>强制收敛到其绑定门店</b>（绑定多店时取最小 ID 作为默认门店，前端可显式传
+     *       storeId 切换），绝不会因为前端未传参而退化成「全部门店」。</li>
+     * </ul>
+     */
     public Long resolveStoreId(Long requested) {
-        if (requested == null) {
-            return null;
+        if (all) {
+            return requested;
         }
-        assertAccessible(requested);
-        return requested;
+        if (requested != null) {
+            assertAccessible(requested);
+            return requested;
+        }
+        if (storeIds == null || storeIds.isEmpty()) {
+            throw new BizException(ResultCode.NO_STORE_PERMISSION,
+                    "当前账号未绑定门店，无法查看经营报表");
+        }
+        return storeIds.stream().min(Long::compareTo).orElseThrow();
     }
 
     public boolean canAccess(Long storeId) {

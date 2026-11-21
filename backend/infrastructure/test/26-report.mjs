@@ -108,6 +108,15 @@ if(mgrRows[0]){
     console.log('  店长 allStoreAccess='+payload.allStoreAccess+' storeIds='+JSON.stringify(allowed));
     r=await req('GET','/api/report/store/overview',{token:mtok});
     chk('店长可看本店',r.json?.code===0,'storeId='+(r.json?.data?.storeId??'-'));
+    // 不传 storeId 时必须自动收敛到绑定门店，不能退化成「全部门店」
+    r=await req('GET','/api/report/dashboard/overview',{token:mtok});
+    const mgrOv=r.json?.data||{};
+    const mgrRank=mgrOv.storeRanking?.list||[];
+    chk('店长驾驶舱门店数收敛到本店',r.json?.code===0
+      &&mgrOv.storeCount===1,'storeCount='+mgrOv.storeCount+'（总部='+ov.storeCount+'）');
+    chk('店长门店排行只含授权门店',mgrRank.length>0
+      &&mgrRank.every(x=>allowed.includes(x.storeId)),
+      '排行storeId='+JSON.stringify(mgrRank.map(x=>x.storeId)));
     // 越权：店长传未授权门店
     // 越权目标：取一个不在授权集合里的门店
     const other=allowed.includes(1)?2:1;

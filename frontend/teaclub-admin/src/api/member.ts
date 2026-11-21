@@ -5,6 +5,19 @@ export function getMemberPage(query: Partial<MemberQuery>): Promise<PageResult<M
   return http.get<PageResult<MemberVO>>('/api/admin/member/members', query)
 }
 
+/** 后台新增会员（手工建档） */
+export function createMember(data: {
+  phone: string
+  nickname?: string
+  gender?: string
+  birthday?: string
+  levelId?: number
+  registerStoreId?: number
+  password?: string
+}): Promise<number> {
+  return http.post<number>('/api/admin/member/members', data)
+}
+
 export function getMemberDetail(id: number): Promise<MemberVO> {
   return http.get<MemberVO>('/api/admin/member/members/' + id)
 }

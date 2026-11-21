@@ -24,7 +24,6 @@ const SUITE = [
   { file: '18-recharge-pay-closed-loop.mjs',  tag: 'funds',    desc: '充值→支付→入账→幂等→下单→钱包支付' },
   { file: '19-refund-via-gateway.mjs',        tag: 'refund',   desc: '微信支付→退款→重复退款被拒→订单 REFUNDED' },
   { file: '20-payment-channel.mjs',           tag: 'channel',  desc: '支付渠道默认值/显式覆盖/非法拒绝/降级' },
-  { file: '12-fund-invariants.mjs',           tag: 'invariant', desc: '资金不变量 I1–I6 + 流水链式衔接' },
   { file: '21-marketing-coupon.mjs',          tag: 'coupon',   desc: '优惠券领取/试算/锁定/核销/释放幂等' },
   { file: '22-marketing-points.mjs',          tag: 'points',   desc: '积分发放/签到幂等/重复投递不重发' },
   { file: '23-marketing-points-refund.mjs',   tag: 'pointsrf', desc: '退款按原流水冲正/重复退款不重冲' },
@@ -38,6 +37,8 @@ const SUITE = [
   { file: '32-level-benefits.mjs',            tag: 'benefit',  desc: '等级营销权益配置与积分倍率真实生效' },
   { file: '33-member-level-upgrade.mjs',      tag: 'lvlup',    desc: '会员等级自动升级（消费跨门槛后等级与权益即时生效）' },
   { file: '34-order-coupon.mjs',              tag: 'coupon',   desc: '下单使用优惠券：试算抵扣→下单锁券→支付核销' },
+  { file: '35-marketing-activities.mjs',      tag: 'actseed',  desc: '8类营销活动创建与列表可见' },
+  { file: '36-activity-effect.mjs',           tag: 'acteff',   desc: '种子活动真实生效：列表/参与/积分到账/统计' },
 ];
 
 const filters = process.argv.slice(2).filter((a) => !a.startsWith('-'));

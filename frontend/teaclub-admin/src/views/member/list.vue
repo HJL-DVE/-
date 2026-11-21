@@ -14,6 +14,7 @@
         </el-select>
         <el-button type="primary" :icon="Search" @click="search">查询</el-button>
         <el-button :icon="Refresh" @click="reset">重置</el-button>
+        <el-button type="success" @click="openCreate">新增会员</el-button>
         <div class="toolbar-spacer" />
         <span class="text-muted">共 {{ total }} 位会员</span>
       </div>
@@ -93,19 +94,115 @@
         <el-button type="primary" :loading="submitting" @click="submit">保存</el-button>
       </template>
     </el-dialog>
+
+    <!-- 新增会员（后台手工建档） -->
+    <el-dialog v-model="createVisible" title="新增会员" width="520px">
+      <el-alert
+        type="info"
+        :closable="false"
+        show-icon
+        style="margin-bottom: 14px"
+        title="后台建档适用于到店办卡 / 纸质会员迁移；手机号在品牌内唯一"
+      />
+      <el-form :model="createForm" label-width="90px">
+        <el-form-item label="手机号" required>
+          <el-input v-model="createForm.phone" placeholder="11 位手机号" maxlength="11" />
+        </el-form-item>
+        <el-form-item label="称呼">
+          <el-input v-model="createForm.nickname" placeholder="留空自动生成" />
+        </el-form-item>
+        <el-form-item label="性别">
+          <el-select v-model="createForm.gender" style="width: 100%">
+            <el-option label="未知" value="UNKNOWN" />
+            <el-option label="男" value="MALE" />
+            <el-option label="女" value="FEMALE" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="生日">
+          <el-date-picker v-model="createForm.birthday" type="date" value-format="YYYY-MM-DD" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="等级">
+          <el-select v-model="createForm.levelId" clearable placeholder="默认等级" style="width: 100%">
+            <el-option v-for="level in levels" :key="level.id" :label="level.levelName" :value="level.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="注册门店">
+          <el-select v-model="createForm.registerStoreId" clearable placeholder="默认门店" style="width: 100%">
+            <el-option v-for="store in appStore.stores" :key="store.id" :label="store.storeName" :value="store.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="初始密码">
+          <el-input v-model="createForm.password" placeholder="留空默认 TeaClub@123" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="createVisible = false">取消</el-button>
+        <el-button type="primary" :loading="createSubmitting" @click="submitCreate">建档</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
+import { useAppStore } from '@/stores/app'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh, Search } from '@element-plus/icons-vue'
-import { getMemberLevels, getMemberPage, updateMember, updateMemberStatus } from '@/api/member'
+import { createMember, getMemberLevels, getMemberPage, updateMember, updateMemberStatus } from '@/api/member'
 import { MEMBER_STATUS_LABEL, fenToYuan, formatDateTime, tagTypeByStatus } from '@/utils/format'
 import type { MemberLevelVO, MemberVO } from '@/api/types'
 
 const loading = ref(false)
+const appStore = useAppStore()
 const submitting = ref(false)
+const createVisible = ref(false)
+const createSubmitting = ref(false)
+const createForm = reactive<{
+  phone: string
+  nickname: string
+  gender: string
+  birthday: string
+  levelId?: number
+  registerStoreId?: number
+  password: string
+}>({
+  phone: '', nickname: '', gender: 'UNKNOWN', birthday: '',
+  levelId: undefined, registerStoreId: undefined, password: '',
+})
+
+function openCreate(): void {
+  Object.assign(createForm, {
+    phone: '', nickname: '', gender: 'UNKNOWN', birthday: '',
+    levelId: undefined, registerStoreId: appStore.currentStoreId || undefined, password: '',
+  })
+  createVisible.value = true
+}
+
+async function submitCreate(): Promise<void> {
+  if (!/^1\d{10}$/.test(createForm.phone)) {
+    ElMessage.warning('请输入 11 位手机号')
+    return
+  }
+  createSubmitting.value = true
+  try {
+    await createMember({
+      phone: createForm.phone,
+      nickname: createForm.nickname || undefined,
+      gender: createForm.gender,
+      birthday: createForm.birthday || undefined,
+      levelId: createForm.levelId,
+      registerStoreId: createForm.registerStoreId,
+      password: createForm.password || undefined,
+    })
+    ElMessage.success('会员建档成功')
+    createVisible.value = false
+    await load()
+  } catch (e: unknown) {
+    ElMessage.error((e as Error)?.message || '建档失败，请检查手机号是否重复')
+  } finally {
+    createSubmitting.value = false
+  }
+}
 const records = ref<MemberVO[]>([])
 const levels = ref<MemberLevelVO[]>([])
 const total = ref(0)

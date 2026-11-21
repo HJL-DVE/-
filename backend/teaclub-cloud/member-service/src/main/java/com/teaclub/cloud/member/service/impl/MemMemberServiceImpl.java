@@ -10,6 +10,7 @@ import com.teaclub.cloud.security.context.LoginUser;
 import com.teaclub.cloud.security.context.StoreScope;
 import com.teaclub.cloud.security.context.UserContext;
 import com.teaclub.cloud.member.client.AuthInternalClient;
+import com.teaclub.cloud.member.dto.MemberCreateRequest;
 import com.teaclub.cloud.member.dto.MemberQuery;
 import com.teaclub.cloud.member.dto.MemberSelfUpdateRequest;
 import com.teaclub.cloud.member.dto.MemberUpdateRequest;
@@ -18,6 +19,16 @@ import com.teaclub.cloud.member.entity.MemMemberLevel;
 import com.teaclub.cloud.member.mapper.MemMemberLevelMapper;
 import com.teaclub.cloud.member.mapper.MemMemberMapper;
 import com.teaclub.cloud.member.service.MemMemberService;
+import com.teaclub.cloud.member.service.support.MemberNoAllocator;
+import com.teaclub.cloud.core.api.ResultCode;
+import com.teaclub.cloud.core.exception.BizException;
+import com.teaclub.cloud.security.context.UserContext;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.DeadlockLoserDataAccessException;
+import org.springframework.util.StringUtils;
+import java.time.LocalDateTime;
 import com.teaclub.cloud.member.service.support.MemberVisibilityResolver;
 import com.teaclub.cloud.member.vo.MemberStatsVO;
 import com.teaclub.cloud.member.vo.MemberVO;
@@ -59,6 +70,8 @@ public class MemMemberServiceImpl implements MemMemberService {
     private final MemMemberLevelMapper levelMapper;
     private final MemberVisibilityResolver visibilityResolver;
     private final AuthInternalClient authClient;
+    private final MemberNoAllocator memberNoAllocator;
+    private final PasswordEncoder passwordEncoder;
 
     @Override
     public PageResult<MemberVO> page(MemberQuery query) {
@@ -223,6 +236,79 @@ public class MemMemberServiceImpl implements MemMemberService {
         Long points = memberMapper.sumPoints(brandId, scopeIds);
         vo.setTotalPoints(points == null ? 0L : points);
         return vo;
+    }
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional(rollbackFor = Exception.class)
+    public Long create(MemberCreateRequest request) {
+        Long brandId = UserContext.require().getBrandId();
+        String phone = request.getPhone() == null ? "" : request.getPhone().trim();
+        if (phone.isBlank()) {
+            throw new BizException(ResultCode.PARAM_INVALID, "手机号不能为空");
+        }
+        // 手机号唯一（品牌内）
+        Long exists = memberMapper.selectCount(Wrappers.<com.teaclub.cloud.member.entity.MemMember>lambdaQuery()
+                .eq(com.teaclub.cloud.member.entity.MemMember::getBrandId, brandId)
+                .eq(com.teaclub.cloud.member.entity.MemMember::getPhone, phone));
+        if (exists != null && exists > 0) {
+            throw new BizException(ResultCode.MEMBER_PHONE_EXISTS);
+        }
+        // 门店数据权限：收银员/店长只能给本店建档，不能跨店
+        StoreScope scope = StoreScope.from(UserContext.require());
+        scope.assertAccessible(request.getRegisterStoreId());
+        Long storeId = request.getRegisterStoreId() != null
+                ? request.getRegisterStoreId()
+                : (scope.isAll() ? null : scope.getStoreIds().iterator().next());
+        if (storeId == null) {
+            throw new BizException(ResultCode.PARAM_INVALID,
+                    "请选择注册门店");
+        }
+
+        com.teaclub.cloud.member.entity.MemMember m = new com.teaclub.cloud.member.entity.MemMember();
+        m.setBrandId(brandId);
+        m.setPhone(phone);
+        m.setPassword(passwordEncoder.encode(
+                StringUtils.hasText(request.getPassword()) ? request.getPassword() : "TeaClub@123"));
+        m.setNickname(StringUtils.hasText(request.getNickname())
+                ? request.getNickname().trim() : "会员" + phone.substring(phone.length() - 4));
+        m.setGender(request.getGender() == null ? "UNKNOWN" : request.getGender());
+        m.setBirthday(request.getBirthday());
+        m.setStatus("NORMAL");
+        m.setLevelId(request.getLevelId() != null ? request.getLevelId() : defaultLevelId(brandId));
+        m.setRegisterStoreId(storeId);
+        m.setRegisterChannel("STAFF");   // 后台手工建档，区别于小程序 MINIAPP
+        m.setPoints(0L);
+        m.setTotalConsumeAmount(0L);
+        m.setTotalRechargeAmount(0L);
+        m.setTotalOrderCount(0);
+
+        // 分配会员号，冲突重试（与小程序注册同一套）
+        for (int attempt = 1; attempt <= 5; attempt++) {
+            m.setId(null);
+            m.setMemberNo(memberNoAllocator.next(brandId));
+            try {
+                memberMapper.insert(m);
+                return m.getId();
+            } catch (DataIntegrityViolationException | DeadlockLoserDataAccessException e) {
+                // 会员号唯一键冲突 或 MySQL 死锁（分配器热点行竞争）都重试
+                if (attempt == 5) {
+                    throw new BizException(ResultCode.SYSTEM_ERROR, "会员建档冲突，请重试");
+                }
+                try { Thread.sleep(20L * attempt); } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
+            }
+        }
+        throw new BizException(ResultCode.SYSTEM_ERROR, "会员建档失败");
+    }
+
+    /** 品牌默认等级（最低折扣档），无配置时返回 1 */
+    private Long defaultLevelId(Long brandId) {
+        com.teaclub.cloud.member.entity.MemMemberLevel level = levelMapper.selectOne(
+                Wrappers.<com.teaclub.cloud.member.entity.MemMemberLevel>lambdaQuery()
+                        .eq(com.teaclub.cloud.member.entity.MemMemberLevel::getBrandId, brandId)
+                        .eq(com.teaclub.cloud.member.entity.MemMemberLevel::getStatus, "ENABLED")
+                        .orderByAsc(com.teaclub.cloud.member.entity.MemMemberLevel::getDiscountRate)
+                        .last("LIMIT 1"));
+        return level == null ? 1L : level.getId();
     }
 
     @Override

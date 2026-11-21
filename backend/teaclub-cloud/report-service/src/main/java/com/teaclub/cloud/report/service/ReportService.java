@@ -51,9 +51,9 @@ public class ReportService {
         Map<String, Object> refund = mapper.refundSummary(brandId, sid, todayStart, null);
 
         Map<String, Object> out = new LinkedHashMap<>();
-        out.put("storeCount", mapper.countStores());
-        out.put("memberCount", mapper.countMembers(null));
-        out.put("todayMemberCount", mapper.countMembers(todayStart));
+        out.put("storeCount", mapper.countStores(brandId, sid));
+        out.put("memberCount", mapper.countMembers(brandId, null, sid));
+        out.put("todayMemberCount", mapper.countMembers(brandId, todayStart, sid));
         out.put("todaySales", money(sales.get("sales")));
         out.put("todayOrders", num(sales.get("orders")));
         // 充值金额=本金；赠送金额单列；到账=本金+赠送（口径见类注释）
@@ -77,7 +77,7 @@ public class ReportService {
         out.put("days", span);
         out.put("salesTrend", fillDays(mapper.salesTrend(brandId, sid, since), span, "sales"));
         out.put("ordersTrend", fillDays(mapper.salesTrend(brandId, sid, since), span, "orders"));
-        out.put("memberGrowth", fillDays(mapper.memberGrowth(since), span, "cnt"));
+        out.put("memberGrowth", fillDays(mapper.memberGrowth(brandId, since, sid), span, "cnt"));
         out.put("rechargeTrend", fillDays(mapper.rechargeTrend(brandId, sid, since), span, "principal"));
         out.put("refundTrend", fillDays(mapper.refundTrend(brandId, sid, since), span, "amount"));
         return out;
@@ -89,7 +89,7 @@ public class ReportService {
                                             LocalDateTime since, LocalDateTime until) {
         List<Map<String, Object>> rows = mapper.salesByStore(brandId, storeId, since, until);
         Map<Long, Map<String, Object>> storeMap = new LinkedHashMap<>();
-        for (Map<String, Object> s : mapper.listStores(storeId)) {
+        for (Map<String, Object> s : mapper.listStores(brandId, storeId)) {
             storeMap.put(num(s.get("id")), s);
         }
         List<Map<String, Object>> out = new ArrayList<>();
@@ -111,12 +111,12 @@ public class ReportService {
     public Map<String, Object> storeOverview(Long storeId) {
         ReportScope scope = ReportScope.current();
         Long sid = scope.resolveStoreId(storeId);
+        Long brandId = UserContext.require().getBrandId();
         if (sid == null) {
-            // 总部账号未指定门店时，取第一个授权门店作为“当前门店”
-            List<Map<String, Object>> stores = mapper.listStores(null);
+            // 仅全量账号且未指定门店时，取品牌下第一个门店作为“当前门店”
+            List<Map<String, Object>> stores = mapper.listStores(brandId, null);
             sid = stores.isEmpty() ? null : num(stores.get(0).get("id"));
         }
-        Long brandId = UserContext.require().getBrandId();
         LocalDateTime todayStart = LocalDate.now().atStartOfDay();
 
         Map<String, Object> sales = mapper.salesSummary(brandId, sid, todayStart, null);
@@ -131,7 +131,7 @@ public class ReportService {
         out.put("rechargeAmount", money(recharge.get("principal")));
         out.put("rechargeGiftAmount", money(recharge.get("gift")));
         out.put("refundAmount", money(refund.get("amount")));
-        out.put("todayNewMembers", mapper.countMembers(todayStart));
+        out.put("todayNewMembers", mapper.countMembers(brandId, todayStart, sid));
         out.put("hotProducts", mapper.productRank(brandId, sid,
                 LocalDate.now().minusDays(29).atStartOfDay(), null, "qty", 10));
         return out;
@@ -154,31 +154,34 @@ public class ReportService {
 
     public Map<String, Object> storeCompare(Integer days) {
         ReportScope scope = ReportScope.current();
+        Long sid = scope.resolveStoreId(null);
         Long brandId = UserContext.require().getBrandId();
         int span = days == null || days <= 0 ? 30 : Math.min(days, 365);
         LocalDateTime since = LocalDate.now().minusDays(span - 1L).atStartOfDay();
         return mapOf("days", span,
-                "list", storeRanking(brandId, null, since, null).get("list"));
+                "list", storeRanking(brandId, sid, since, null).get("list"));
     }
 
     // ==================== 会员分析 ====================
 
     public Map<String, Object> memberOverview() {
         ReportScope scope = ReportScope.current();
-        scope.resolveStoreId(null);
+        Long sid = scope.resolveStoreId(null);
+        Long brandId = UserContext.require().getBrandId();
         return mapOf(
-                "memberCount", mapper.countMembers(null),
-                "levelDistribution", mapper.memberLevelDistribution(),
-                "consumeRank", mapper.memberConsumeRank(10));
+                "memberCount", mapper.countMembers(brandId, null, sid),
+                "levelDistribution", mapper.memberLevelDistribution(brandId, sid),
+                "consumeRank", mapper.memberConsumeRank(brandId, sid, 10));
     }
 
     public Map<String, Object> memberGrowth(Integer days) {
         ReportScope scope = ReportScope.current();
-        scope.resolveStoreId(null);
+        Long sid = scope.resolveStoreId(null);
+        Long brandId = UserContext.require().getBrandId();
         int span = days == null || days <= 0 ? 30 : Math.min(days, 365);
         LocalDateTime since = LocalDate.now().minusDays(span - 1L).atStartOfDay();
         return mapOf("days", span,
-                "growth", fillDays(mapper.memberGrowth(since), span, "cnt"));
+                "growth", fillDays(mapper.memberGrowth(brandId, since, sid), span, "cnt"));
     }
 
     // ==================== 储值 / 支付 / 退款 ====================
@@ -309,13 +312,15 @@ public class ReportService {
 
     public Map<String, Object> marketingOverview(Integer days) {
         ReportScope scope = ReportScope.current();
-        scope.resolveStoreId(null);
+        Long sid = scope.resolveStoreId(null);
         Long brandId = UserContext.require().getBrandId();
         int span = days == null || days <= 0 ? 30 : Math.min(days, 365);
         LocalDateTime since = LocalDate.now().minusDays(span - 1L).atStartOfDay();
 
+        // 券实例表 mkt_coupon 无 store_id 字段，券统计只能按品牌口径；
+        // 积分流水有 store_id，按有效门店范围过滤。
         Map<String, Object> coupon = mapper.couponStats(brandId, since, null);
-        Map<String, Object> points = mapper.pointsStats(brandId, since);
+        Map<String, Object> points = mapper.pointsStats(brandId, since, sid);
         long received = num(coupon.get("received"));
         long used = num(coupon.get("used"));
 
@@ -328,7 +333,7 @@ public class ReportService {
                         : 0,
                 "pointsEarned", num(points.get("earned")),
                 "pointsConsumed", num(points.get("consumed")),
-                "memberLevelDistribution", mapper.memberLevelDistribution());
+                "memberLevelDistribution", mapper.memberLevelDistribution(brandId, sid));
     }
 
     // ==================== 工具 ====================

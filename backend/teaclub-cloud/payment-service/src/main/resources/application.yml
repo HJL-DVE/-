@@ -78,6 +78,11 @@ teaclub:
     issuer: teaclub
   security:
     internal-token: ${INTERNAL_TOKEN:teaclub-internal-default-token}
+  payment:
+    # 未支付支付单超时关闭时长（分钟）；关单只改支付单，订单保持 UNPAID 可重新支付
+    timeout-minutes: ${PAYMENT_TIMEOUT_MINUTES:5}
+    timeout-scan-ms: ${PAYMENT_TIMEOUT_SCAN_MS:60000}
+    timeout-close-enabled: ${PAYMENT_TIMEOUT_CLOSE_ENABLED:true}
 
 feign:
   client:

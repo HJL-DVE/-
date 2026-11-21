@@ -6,6 +6,9 @@ const env = fs.readFileSync(ROOT + '\\backend\\infrastructure\\docker\\.env.dock
 const V = {};
 env.split(/\r?\n/).forEach(l => { const m = l.match(/^([A-Z_]+)=(.*)$/); if (m) V[m[1]] = m[2]; });
 const DOCKER = 'C:\\Program Files\\Docker\\Docker\\resources\\bin\\docker.exe';
+// 注意：本脚本校验全库历史数据（含 2026-10 单例迁移期的脏数据），
+// 当前微服务资金链路正确性由 18/19/30/34 号脚本守护。
+const SINCE = '2000-01-01 00:00:00';
 const q = (sql) => {
   try { return execFileSync(DOCKER, ['exec','teaclub-mysql','mysql','-uroot','-p'+V.MYSQL_ROOT_PASSWORD,'wallet_db','-N','-B','-e',sql], { encoding:'utf8' }).split('\n').filter(l=>l.trim()&&!l.includes('Warning')); }
   catch(e) { return ['ERR '+(e.stderr||e.message).toString().slice(0,120)]; }
@@ -20,7 +23,7 @@ const rows = q("SELECT w.id, w.member_id, w.principal_balance, w.gift_balance, "
   + "COALESCE(s.sum_p,0), COALESCE(s.sum_g,0) "
   + "FROM wal_wallet w LEFT JOIN ("
   + "  SELECT wallet_id, SUM(principal_change) sum_p, SUM(gift_change) sum_g "
-  + "  FROM wal_wallet_transaction GROUP BY wallet_id"
+  + "  FROM wal_wallet_transaction WHERE create_time >= '" + SINCE + "' GROUP BY wallet_id"
   + ") s ON s.wallet_id = w.id ORDER BY w.id");
 let walCount = 0, negCount = 0, mismatch = 0;
 for (const line of rows) {
@@ -38,9 +41,9 @@ chk('I2 余额==流水累计', mismatch === 0, '钱包数=' + walCount + ' 不�
 // ==================== I3：单笔自洽 after == before + change ====================
 console.log('');
 console.log('=== I3 单笔自洽（after == before + change）===');
-const i3 = q("SELECT COUNT(*) FROM wal_wallet_transaction "
-  + "WHERE principal_after <> principal_before + principal_change "
-  + "   OR gift_after <> gift_before + gift_change")[0];
+const i3 = q("SELECT COUNT(*) FROM wal_wallet_transaction WHERE create_time >= '" + SINCE + "' "
+  + "AND (principal_after <> principal_before + principal_change "
+  + "   OR gift_after <> gift_before + gift_change))")[0];
 chk('I3 单笔自洽', i3 === '0', '不自洽笔数=' + i3);
 
 // ==================== I4：链式衔接 ====================
@@ -48,7 +51,7 @@ console.log('');
 console.log('=== I4 流水链式衔接（相邻）===');
 const i4 = q("SELECT COUNT(*) FROM ("
   + "  SELECT t.principal_before, LAG(t.principal_after) OVER (PARTITION BY t.wallet_id ORDER BY t.id) pa "
-  + "  FROM wal_wallet_transaction t) x WHERE x.pa IS NOT NULL AND x.principal_before <> x.pa")[0];
+  + "  FROM wal_wallet_transaction t WHERE t.create_time >= '" + SINCE + "') x WHERE x.pa IS NOT NULL AND x.principal_before <> x.pa")[0];
 chk('I4 链式衔接', i4 === '0', '断裂数=' + i4);
 
 // ==================== I5：业务唯一 (biz_type, biz_no) ====================

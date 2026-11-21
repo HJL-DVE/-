@@ -196,6 +196,8 @@ export interface PaymentInfo {
   invokeParams?: string | null
   codeUrl?: string | null
   tip?: string
+  /** 支付单创建时间，用于计算支付超时倒计时 */
+  createTime?: string
 }
 
 /** GET /api/wallet/account 实测 */

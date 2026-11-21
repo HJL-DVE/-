@@ -24,48 +24,67 @@ public interface ReportMapper {
 
     // ==================== 门店 ====================
 
-    @Select("SELECT COUNT(*) FROM iam_db.sys_store WHERE deleted = 0")
-    long countStores();
+    @Select("""
+            SELECT COUNT(*) FROM iam_db.sys_store
+            WHERE deleted = 0 AND brand_id = #{brandId}
+              AND (#{storeId} IS NULL OR id = #{storeId})
+            """)
+    long countStores(@Param("brandId") Long brandId, @Param("storeId") Long storeId);
 
     @Select("SELECT id, store_code AS storeCode, store_name AS storeName "
-            + "FROM iam_db.sys_store WHERE deleted = 0 "
+            + "FROM iam_db.sys_store WHERE deleted = 0 AND brand_id = #{brandId} "
             + "AND (#{storeId} IS NULL OR id = #{storeId}) "
             + "ORDER BY id")
-    List<Map<String, Object>> listStores(@Param("storeId") Long storeId);
+    List<Map<String, Object>> listStores(@Param("brandId") Long brandId,
+                                         @Param("storeId") Long storeId);
 
     // ==================== 会员 ====================
 
+    /** register_store_id = 注册来源门店；storeId 为 null 表示品牌全部门店。 */
     @Select("""
             SELECT COUNT(*) FROM member_db.mem_member
-            WHERE deleted = 0 AND (#{since} IS NULL OR create_time >= #{since})
+            WHERE deleted = 0 AND brand_id = #{brandId}
+              AND (#{storeId} IS NULL OR register_store_id = #{storeId})
+              AND (#{since} IS NULL OR create_time >= #{since})
             """)
-    long countMembers(@Param("since") LocalDateTime since);
+    long countMembers(@Param("brandId") Long brandId,
+                      @Param("since") LocalDateTime since,
+                      @Param("storeId") Long storeId);
 
     @Select("""
             SELECT DATE(create_time) AS d, COUNT(*) AS cnt
             FROM member_db.mem_member
-            WHERE deleted = 0 AND create_time >= #{since}
+            WHERE deleted = 0 AND brand_id = #{brandId}
+              AND (#{storeId} IS NULL OR register_store_id = #{storeId})
+              AND create_time >= #{since}
             GROUP BY DATE(create_time) ORDER BY d
             """)
-    List<Map<String, Object>> memberGrowth(@Param("since") LocalDateTime since);
+    List<Map<String, Object>> memberGrowth(@Param("brandId") Long brandId,
+                                           @Param("since") LocalDateTime since,
+                                           @Param("storeId") Long storeId);
 
     @Select("""
             SELECT l.level_name AS name, COUNT(m.id) AS value
             FROM member_db.mem_member m
             LEFT JOIN member_db.mem_member_level l ON l.id = m.level_id
-            WHERE m.deleted = 0
+            WHERE m.deleted = 0 AND m.brand_id = #{brandId}
+              AND (#{storeId} IS NULL OR m.register_store_id = #{storeId})
             GROUP BY l.level_name ORDER BY value DESC
             """)
-    List<Map<String, Object>> memberLevelDistribution();
+    List<Map<String, Object>> memberLevelDistribution(@Param("brandId") Long brandId,
+                                                      @Param("storeId") Long storeId);
 
     @Select("""
             SELECT id, member_no AS memberNo, nickname,
                    total_consume_amount AS totalConsume, total_order_count AS orderCount
             FROM member_db.mem_member
-            WHERE deleted = 0 AND total_consume_amount > 0
+            WHERE deleted = 0 AND brand_id = #{brandId} AND total_consume_amount > 0
+              AND (#{storeId} IS NULL OR register_store_id = #{storeId})
             ORDER BY total_consume_amount DESC LIMIT #{limit}
             """)
-    List<Map<String, Object>> memberConsumeRank(@Param("limit") int limit);
+    List<Map<String, Object>> memberConsumeRank(@Param("brandId") Long brandId,
+                                                @Param("storeId") Long storeId,
+                                                @Param("limit") int limit);
 
     // ==================== 订单（销售） ====================
 
@@ -312,12 +331,15 @@ public interface ReportMapper {
               (SELECT COALESCE(SUM(CASE WHEN change_points > 0 THEN change_points ELSE 0 END),0)
                  FROM marketing_db.mkt_points_transaction
                  WHERE brand_id = #{brandId}
+                   AND (#{storeId} IS NULL OR store_id = #{storeId})
                    AND (#{since} IS NULL OR create_time >= #{since})) AS earned,
               (SELECT COALESCE(SUM(-change_points),0)
                  FROM marketing_db.mkt_points_transaction
                  WHERE brand_id = #{brandId} AND biz_type = 'DEDUCT'
+                   AND (#{storeId} IS NULL OR store_id = #{storeId})
                    AND (#{since} IS NULL OR create_time >= #{since})) AS consumed
             """)
     Map<String, Object> pointsStats(@Param("brandId") Long brandId,
-                                    @Param("since") LocalDateTime since);
+                                    @Param("since") LocalDateTime since,
+                                    @Param("storeId") Long storeId);
 }

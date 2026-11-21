@@ -55,6 +55,7 @@ public class ActivityServiceImpl implements ActivityService {
     private final CouponService couponService;
     private final PointsService pointsService;
     private final JdbcTemplate jdbcTemplate;
+    private final org.springframework.transaction.PlatformTransactionManager txManager;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     // ==================== 管理端 ====================
@@ -359,9 +360,17 @@ public class ActivityServiceImpl implements ActivityService {
         if (cfg.getCouponTemplateIds() != null) {
             for (Long tplId : cfg.getCouponTemplateIds()) {
                 try {
-                    couponService.grant(tplId, memberId, "ACTIVITY");
+                    // 券发放在独立事务：发券失败（重复/已发完）只回滚券本身，
+                    // 不把外层「活动记录+积分」事务标记为 rollback-only
+                    org.springframework.transaction.support.TransactionTemplate newTx =
+                            new org.springframework.transaction.support.TransactionTemplate(txManager);
+                    newTx.setPropagationBehavior(
+                            org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+                    newTx.execute(status -> {
+                        couponService.grant(tplId, memberId, "ACTIVITY");
+                        return null;
+                    });
                 } catch (Exception e) {
-                    // 单个券模板发完不影响其它奖励
                     log.warn("[ACTIVITY] 发券失败 activityId={} templateId={} err={}",
                             a.getId(), tplId, e.getMessage());
                 }

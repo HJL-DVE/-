@@ -1,10 +1,18 @@
 <template>
   <div class="page">
     <div class="toolbar">
-      <h2 class="page-title">总部经营驾驶舱</h2>
+      <h2 class="page-title">{{ isStoreScope ? '门店经营驾驶舱' : '总部经营驾驶舱' }}</h2>
       <span class="text-muted">销售=订单实付；充值金额不含赠送；支付金额均为模拟数据</span>
       <div class="toolbar-spacer" />
-      <el-select v-model="storeId" placeholder="全部门店" clearable size="small" style="width: 170px" @change="loadAll">
+      <el-select
+        v-model="storeId"
+        :placeholder="isStoreScope ? '本店' : '全部门店'"
+        :clearable="!isStoreScope"
+        :disabled="isStoreScope"
+        size="small"
+        style="width: 170px"
+        @change="loadAll"
+      >
         <el-option v-for="s in stores" :key="s.id" :label="s.storeName" :value="s.id" />
       </el-select>
       <el-button :icon="Refresh" :loading="loading" @click="loadAll">刷新</el-button>
@@ -94,6 +102,12 @@ import {
   type ReportOverview,
 } from '@/api/report'
 import { getAccessibleStores } from '@/api/store'
+import { useUserStore } from '@/stores/user'
+
+const userStore = useUserStore()
+
+/** 门店级账号（dataScope=STORE）强制只看本店，后端也会兜底校验 */
+const isStoreScope = computed(() => userStore.userInfo?.dataScope === 'STORE')
 
 const ov = ref<ReportOverview | null>(null)
 const stores = ref<{ id: number; storeName: string }[]>([])
@@ -191,6 +205,10 @@ onMounted(async () => {
     stores.value = (Array.isArray(s) ? s : []).map((x) => ({
       id: x.id, storeName: x.storeName || String(x.id),
     }))
+    // 门店级账号默认锁定到授权门店（通常只有一家），避免走「全部门店」口径
+    if (isStoreScope.value && stores.value.length && storeId.value == null) {
+      storeId.value = stores.value[0].id
+    }
   } catch { stores.value = [] }
   await loadAll()
 })

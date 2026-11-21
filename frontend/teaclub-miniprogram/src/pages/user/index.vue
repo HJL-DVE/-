@@ -94,8 +94,16 @@ onShow(() => {
   loadAll()
 })
 
+// tabBar 页面必须用 switchTab，用 navigateTo 会静默失败（点了没反应）
+const TAB_BAR_PAGES = [
+  '/pages/index/index',
+  '/pages/store/list',
+  '/pages/order/list',
+  '/pages/user/index',
+]
+
 function nav(url: string) {
-  if (url === '/pages/order/list' || url === '/pages/index/index') {
+  if (TAB_BAR_PAGES.includes(url)) {
     uni.switchTab({ url })
     return
   }

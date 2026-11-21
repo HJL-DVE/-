@@ -6,6 +6,15 @@
     </view>
 
     <block v-else>
+      <view class="card member-bar">
+        <image v-if="memberAvatar" class="member-avatar" :src="memberAvatar" mode="aspectFill" />
+        <view v-else class="member-avatar fallback" :style="{ background: avatarColor }">{{ avatarInitial }}</view>
+        <view class="member-meta">
+          <view class="member-name">{{ authStore.nickname || 'TeaClub 会员' }}</view>
+          <view class="muted member-no">{{ authStore.memberNo || '' }}</view>
+        </view>
+      </view>
+
       <view class="card">
         <view class="row-between">
           <text class="section-title">门店</text>
@@ -134,6 +143,19 @@ import { toast } from '@/utils/request'
 const authStore = useAuthStore()
 const storeStore = useStoreStore()
 const cartStore = useCartStore()
+
+// ===== 会员头像展示：oss:// 标识小程序 image 不支持，回退到首字头像 =====
+const AVATAR_COLORS = ['#16a34a', '#2563eb', '#7c3aed', '#db2777', '#ea580c']
+const memberAvatar = computed(() => {
+  const url = authStore.avatarUrl || ''
+  // oss:// 是服务端稳定标识，小程序 image 组件无法直接展示，走首字兜底
+  return url && !url.startsWith('oss://') ? url : ''
+})
+const avatarInitial = computed(() => (authStore.nickname || '会员').trim().slice(0, 1))
+const avatarColor = computed(() => {
+  const code = Array.from(authStore.memberNo || '会员').reduce((s, c) => s + c.charCodeAt(0), 0)
+  return AVATAR_COLORS[code % AVATAR_COLORS.length]
+})
 
 const quote = ref<OrderQuote | null>(null)
 const quoteLoading = ref(false)
@@ -414,4 +436,15 @@ function goLogin() {
 .retry {
   margin-top: 20rpx;
 }
+.member-bar { display: flex; align-items: center; gap: 20rpx; }
+.member-avatar {
+  width: 88rpx; height: 88rpx; border-radius: 50%; flex-shrink: 0;
+}
+.member-avatar.fallback {
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 36rpx; font-weight: 700;
+}
+.member-meta { flex: 1; }
+.member-name { font-size: 28rpx; font-weight: 600; }
+.member-no { font-size: 22rpx; margin-top: 6rpx; }
 </style>

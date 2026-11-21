@@ -4,6 +4,7 @@ import com.teaclub.cloud.core.api.PageResult;
 import com.teaclub.cloud.member.dto.MemberQuery;
 import com.teaclub.cloud.member.dto.MemberSelfUpdateRequest;
 import com.teaclub.cloud.member.dto.MemberUpdateRequest;
+import com.teaclub.cloud.member.dto.MemberCreateRequest;
 import com.teaclub.cloud.member.vo.MemberStatsVO;
 import com.teaclub.cloud.member.vo.MemberVO;
 
@@ -21,6 +22,8 @@ public interface MemMemberService {
     MemberStatsVO stats();
 
     MemberVO detail(Long id);
+    /** 后台手工建档：店员录入手机号/称呼，生成会员号、钱包与积分账户 */
+    Long create(MemberCreateRequest request);
 
     void update(Long id, MemberUpdateRequest request);
 

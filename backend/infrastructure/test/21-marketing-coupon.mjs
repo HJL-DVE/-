@@ -35,15 +35,20 @@ chk('模板列表可用',r.json?.code===0,'total='+r.json?.data?.total+' '+(r.js
 
 console.log('');
 console.log('=== 2. 领券（限领 2，连领两次应都成功）===');
-r=await call('POST','/api/marketing/coupons/receive?templateId=1&qty=1',{token:mtok});
+// 动态挑选可用模板，避免历史测试数据被逻辑删除后硬编码 templateId=1 失效
+const tpl=(await call('GET','/api/admin/marketing/coupons/templates?pageNo=1&pageSize=50',{token:adminTok})).json?.data?.records||[];
+const usableTpl=tpl.find(t=>t.status==='ENABLED'&&!t.deleted&&t.thresholdAmount===5000&&t.faceValue===1000)||tpl.find(t=>t.status==='ENABLED'&&!t.deleted)||tpl[0];
+const tplId=usableTpl&&usableTpl.id?usableTpl.id:1;
+chk('存在可用模板',!!usableTpl,'id='+tplId+' name='+(usableTpl?.couponName||''));
+r=await call('POST','/api/marketing/coupons/receive?templateId='+tplId+'&qty=1',{token:mtok});
 const c1=r.json?.data?.[0];
 chk('第 1 次领券',r.json?.code===0,'couponNo='+(c1?.couponNo||'')+' '+(r.json?.message||''));
 await new Promise(x=>setTimeout(x,1000));
-r=await call('POST','/api/marketing/coupons/receive?templateId=1&qty=1',{token:mtok});
+r=await call('POST','/api/marketing/coupons/receive?templateId='+tplId+'&qty=1',{token:mtok});
 const c2=r.json?.data?.[0];
 chk('第 2 次领券（限领2内，应成功）',r.json?.code===0,'couponNo='+(c2?.couponNo||'')+' code='+r.json?.code+' '+(r.json?.message||''));
 await new Promise(x=>setTimeout(x,200));
-r=await call('POST','/api/marketing/coupons/receive?templateId=1&qty=1',{token:mtok});
+r=await call('POST','/api/marketing/coupons/receive?templateId='+tplId+'&qty=1',{token:mtok});
 chk('第 3 次被限领拒绝',r.json?.code!==0,'code='+r.json?.code+' msg='+(r.json?.message||''));
 
 console.log('');

@@ -13,6 +13,13 @@
         <view class="hero-no">订单号 {{ order.orderNo }}</view>
       </view>
 
+      <view v-if="order.status === 'UNPAID' && payDeadline" class="countdown-bar">
+        <text class="countdown-label">{{ remainSeconds > 0 ? '支付剩余时间' : '支付已超时' }}</text>
+        <text class="countdown-value" :class="{ expired: remainSeconds <= 0 }">
+          {{ remainSeconds > 0 ? remainText : '请重新支付' }}
+        </text>
+      </view>
+
       <view v-if="paymentNo" class="card">
         <view class="row-between">
           <text class="section-title">支付单</text>
@@ -59,7 +66,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed, onUnmounted } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import * as orderApi from '@/api/order'
 import * as paymentApi from '@/api/payment'
@@ -67,6 +74,9 @@ import type { OrderInfo } from '@/api/types'
 import { fen2yuan } from '@/utils/money'
 import { formatTime } from '@/utils/normalize'
 import { toast } from '@/utils/request'
+
+/** 与后端 teaclub.payment.timeout-minutes 保持一致（支付单超时关闭时长） */
+const PAY_TIMEOUT_MINUTES = 5
 
 const order = ref<OrderInfo | null>(null)
 const orderNo = ref('')
@@ -79,6 +89,58 @@ const polling = ref(false)
 const paymentStatus = ref('')
 const paymentAmount = ref<number | null>(null)
 
+// ===== 支付超时倒计时 =====
+/** 支付单到期时间戳（毫秒）；未拿到创建时间前为 0，不显示倒计时 */
+const payDeadline = ref(0)
+/** 剩余秒数 */
+const remainSeconds = ref(0)
+let countdownTimer: ReturnType<typeof setInterval> | null = null
+
+const remainText = computed(() => {
+  const s = remainSeconds.value
+  const mm = String(Math.floor(s / 60)).padStart(2, '0')
+  const ss = String(s % 60).padStart(2, '0')
+  return `${mm}:${ss}`
+})
+
+/** 解析后端时间：兼容 ISO（T 分隔 / 毫秒）与 iOS 对 '-' 的解析差异 */
+function parseServerTime(value: string | null | undefined): number {
+  if (!value) return 0
+  const normalized = String(value).replace('T', ' ').replace(/\.\d+$/, '').replace(/-/g, '/')
+  const t = new Date(normalized).getTime()
+  return Number.isFinite(t) ? t : 0
+}
+
+/** 用支付单（或订单）创建时间启动倒计时 */
+function startCountdown(createTime: string | null | undefined) {
+  const created = parseServerTime(createTime)
+  if (!created) return
+  const deadline = created + PAY_TIMEOUT_MINUTES * 60 * 1000
+  payDeadline.value = deadline
+  const tick = () => {
+    const left = Math.max(0, Math.floor((deadline - Date.now()) / 1000))
+    remainSeconds.value = left
+    if (left <= 0 && countdownTimer) {
+      clearInterval(countdownTimer)
+      countdownTimer = null
+    }
+  }
+  if (countdownTimer) clearInterval(countdownTimer)
+  tick()
+  countdownTimer = setInterval(tick, 1000)
+}
+
+function stopCountdown() {
+  if (countdownTimer) {
+    clearInterval(countdownTimer)
+    countdownTimer = null
+  }
+  payDeadline.value = 0
+  remainSeconds.value = 0
+}
+
+onUnmounted(stopCountdown)
+
 async function load() {
   if (!orderNo.value) {
     error.value = '缺少订单号参数 orderNo'
@@ -88,6 +150,14 @@ async function load() {
   error.value = ''
   try {
     order.value = await orderApi.getOrder(orderNo.value)
+    if (order.value && order.value.status === 'UNPAID') {
+      // 优先用支付单创建时间（pollPayment 会设置），这里兜底用订单创建时间
+      if (!payDeadline.value && order.value.createTime) {
+        startCountdown(order.value.createTime)
+      }
+    } else {
+      stopCountdown()
+    }
   } catch (e) {
     error.value = e instanceof Error ? e.message : '订单加载失败'
   } finally {
@@ -109,7 +179,16 @@ async function pollPayment() {
     const data = await paymentApi.getPayment(paymentNo.value)
     paymentStatus.value = data && data.status ? data.status : ''
     paymentAmount.value = data && typeof data.amount === 'number' ? data.amount : null
-    if (paymentStatus.value === 'SUCCESS') load()
+    if (paymentStatus.value === 'SUCCESS') {
+      stopCountdown()
+      load()
+    } else if (paymentStatus.value === 'CLOSED' || paymentStatus.value === 'FAILED') {
+      // 支付单已关闭/失败：提示重新支付，不再走倒计时
+      stopCountdown()
+    } else if (data && data.createTime) {
+      // 支付单创建时间更准确，重置倒计时以它为准
+      startCountdown(data.createTime)
+    }
   } catch (e) {
     console.error('[payment/orders]', e)
   } finally {
@@ -200,6 +279,28 @@ async function cancel() {
   margin-top: 12rpx;
   font-size: 24rpx;
   opacity: 0.9;
+}
+.countdown-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20rpx 32rpx;
+  background: #fff7ed;
+  border-bottom: 1rpx solid #fed7aa;
+}
+.countdown-label {
+  font-size: 26rpx;
+  color: #9a3412;
+}
+.countdown-value {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #ea580c;
+  font-variant-numeric: tabular-nums;
+}
+.countdown-value.expired {
+  color: #dc2626;
+  font-size: 28rpx;
 }
 .section-title {
   font-size: 28rpx;

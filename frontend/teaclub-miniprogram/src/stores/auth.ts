@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import * as authApi from '@/api/auth'
+import * as memberApi from '@/api/member'
 import type { MemberProfile } from '@/api/types'
 import {
   AUTH_EXPIRED_EVENT,
@@ -75,6 +76,21 @@ export const useAuthStore = defineStore('auth', () => {
     return res
   }
 
+  /** 更新本人资料（昵称/头像/性别），同步本地状态与缓存 */
+  async function updateProfile(payload: { nickname?: string; avatarUrl?: string; gender?: string }) {
+    const data = await memberApi.updateProfile(payload)
+    if (payload.nickname !== undefined) nickname.value = payload.nickname || ''
+    if (payload.avatarUrl !== undefined) avatarUrl.value = payload.avatarUrl || ''
+    setStoredMember({
+      memberId: memberId.value,
+      memberNo: memberNo.value,
+      nickname: nickname.value,
+      avatarUrl: avatarUrl.value,
+    })
+    if (data) profile.value = data
+    return data
+  }
+
   async function fetchProfile() {
     if (!isLoggedIn.value) return null
     const data = await authApi.getMemberMe()
@@ -114,6 +130,7 @@ export const useAuthStore = defineStore('auth', () => {
     loginByWechat,
     loginByPassword,
     register,
+    updateProfile,
     fetchProfile,
     logout,
   }
