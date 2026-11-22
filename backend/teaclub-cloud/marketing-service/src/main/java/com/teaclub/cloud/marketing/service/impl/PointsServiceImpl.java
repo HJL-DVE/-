@@ -16,6 +16,7 @@ import com.teaclub.cloud.marketing.mapper.MktPointsTransactionMapper;
 import com.teaclub.cloud.marketing.mapper.MktSignInMapper;
 import com.teaclub.cloud.marketing.service.PointsService;
 import com.teaclub.cloud.marketing.vo.PointsAccountVO;
+import com.teaclub.cloud.marketing.vo.PointsRuleVO;
 import com.teaclub.cloud.marketing.vo.PointsTransactionVO;
 import com.teaclub.cloud.marketing.vo.SignInResultVO;
 import lombok.RequiredArgsConstructor;
@@ -417,6 +418,28 @@ public class PointsServiceImpl implements PointsService {
                     vo.setCreateTime(t.getCreateTime());
                     return vo;
                 }).toList();
+    }
+
+    @Override
+    public List<PointsRuleVO> listRules() {
+        Long brandId = brandId();
+        return ruleMapper.selectByBrand(brandId).stream().map(r -> {
+            PointsRuleVO vo = new PointsRuleVO();
+            vo.setRuleCode(r.getRuleCode());
+            vo.setRuleName(r.getRuleName());
+            vo.setAmountPerPoint(r.getAmountPerPoint());
+            vo.setSignInPoints(r.getSignInPoints());
+            vo.setSignInContinuousMax(r.getSignInContinuousMax());
+            vo.setSignInBonus(r.getSignInBonus());
+            vo.setExpireDays(r.getExpireDays());
+            vo.setStatus(r.getStatus());
+            vo.setUsedBy(switch (r.getRuleCode() == null ? "" : r.getRuleCode()) {
+                case "ORDER_EARN" -> "订单支付成功后，按实付金额换算积分";
+                case "SIGN_IN" -> "每日签到，连续签到按天数加成";
+                default -> r.getRuleName();
+            });
+            return vo;
+        }).toList();
     }
 
     // ==================== 人工调整 ====================

@@ -46,11 +46,15 @@
       </el-col>
       <el-col :span="6">
         <div class="stat-card">
-          <div class="stat-label"><el-icon><Wallet /></el-icon> 储值总余额</div>
-          <div class="stat-value">{{ walletStats ? fenToYuan(walletStats.totalBalance) : placeholder(walletStatsError) }}</div>
+          <div class="stat-label"><el-icon><Wallet /></el-icon> 储值余额（实付 / 赠送）</div>
+          <div class="stat-value">
+            {{ walletStats ? fenToYuan(walletStats.principalTotal) : placeholder(walletStatsError) }}
+            <span class="stat-sep">/</span>
+            {{ walletStats ? fenToYuan(walletStats.giftTotal) : '-' }}
+          </div>
           <div class="stat-extra">
-            钱包 {{ walletStats?.walletCount ?? '-' }} 个 · 累计充值 {{ walletStats ? fenToYuan(walletStats.rechargeTotal) : '-' }} ·
-            赠送 {{ walletStats ? fenToYuan(walletStats.giftGrantTotal) : '-' }}
+            合计 ¥{{ walletStats ? fenToYuan(walletStats.totalBalance) : '-' }} · 钱包 {{ walletStats?.walletCount ?? '-' }} 个 ·
+            累计充值 {{ walletStats ? fenToYuan(walletStats.rechargeTotal) : '-' }}
           </div>
         </div>
       </el-col>
@@ -278,6 +282,13 @@ watch(() => appStore.currentStoreId, loadAll)
   font-size: 26px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+}
+
+.stat-sep {
+  margin: 0 4px;
+  color: #c0c4cc;
+  font-size: 18px;
+  font-weight: 400;
 }
 
 .stat-extra {

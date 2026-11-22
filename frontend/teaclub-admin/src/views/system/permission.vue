@@ -19,7 +19,7 @@
         <el-table-column prop="permCode" label="编码" min-width="180" />
         <el-table-column label="类型" width="90">
           <template #default="{ row }">
-            <el-tag :type="row.permType === 'MENU' ? 'success' : row.permType === 'BUTTON' ? 'warning' : 'info'" size="small">{{ row.permType }}</el-tag>
+            <el-tag :type="row.permType === 'MENU' ? 'success' : row.permType === 'BUTTON' ? 'warning' : 'info'" size="small">{{ PERM_TYPE_LABEL[row.permType] || row.permType }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="routePath" label="路由" min-width="150" />
@@ -74,6 +74,7 @@ import {
   deletePermission,
   type PermissionNode,
 } from '@/api/system'
+import { PERM_TYPE_LABEL } from '@/utils/format'
 
 const tree = ref<PermissionNode[]>([])
 const state = ref<'loading' | 'error' | 'ready'>('loading')

@@ -1,6 +1,7 @@
 package com.teaclub.cloud.marketing.service;
 
 import com.teaclub.cloud.marketing.vo.PointsAccountVO;
+import com.teaclub.cloud.marketing.vo.PointsRuleVO;
 import com.teaclub.cloud.marketing.vo.PointsTransactionVO;
 import com.teaclub.cloud.marketing.vo.SignInResultVO;
 
@@ -54,6 +55,9 @@ public interface PointsService {
 
     /** 我的积分流水。 */
     List<PointsTransactionVO> transactions(Long memberId, String bizType, int limit);
+
+    /** 管理端：读取当前品牌生效的积分规则（真实表数据）。 */
+    List<PointsRuleVO> listRules();
 
     /** 人工调整（管理端）。正数增加，负数扣减。 */
     boolean adjust(Long memberId, long points, String bizNo, String remark);

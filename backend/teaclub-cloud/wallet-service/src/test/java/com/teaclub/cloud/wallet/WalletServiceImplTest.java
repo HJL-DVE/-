@@ -6,6 +6,7 @@ import com.teaclub.cloud.wallet.dto.RechargeInCmd;
 import com.teaclub.cloud.wallet.dto.RefundInCmd;
 import com.teaclub.cloud.wallet.dto.WalletChangeResult;
 import com.teaclub.cloud.wallet.entity.WalWallet;
+import com.teaclub.cloud.wallet.entity.WalWalletTransaction;
 import com.teaclub.cloud.wallet.mapper.WalWalletMapper;
 import com.teaclub.cloud.wallet.mapper.WalWalletTransactionMapper;
 import com.teaclub.cloud.wallet.service.WalletService;
@@ -18,6 +19,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -212,5 +214,42 @@ class WalletServiceImplTest {
                 .brandId(BRAND_ID).memberId(MEMBER_ID).storeId(STORE_ID)
                 .rechargeNo(null).payAmount(1000L).build()))
                 .isInstanceOf(BizException.class);
+    }
+
+    @Test
+    @DisplayName("赠送金到期核销：只扣剩余赠送金且幂等")
+    void giftExpireDeductsRemainingGiftOnly() {
+        String rechargeNo = bizNo("RC");
+        walletService.rechargeIn(RechargeInCmd.builder()
+                .brandId(BRAND_ID).memberId(MEMBER_ID).storeId(STORE_ID)
+                .rechargeNo(rechargeNo).payAmount(10000L).giftAmount(2000L)
+                .giftExpireDays(30).build());
+
+        WalWalletTransaction src = txnMapper.selectByBiz("RECHARGE_IN", rechargeNo);
+        assertThat(src.getGiftExpireTime()).isNotNull();
+
+        // 花掉一半赠送金
+        walletService.consumeOut(ConsumeOutCmd.builder()
+                .brandId(BRAND_ID).memberId(MEMBER_ID).storeId(STORE_ID)
+                .orderNo(bizNo("TC")).payableAmount(1000L)
+                .deductOrder("GIFT_FIRST").build());
+
+        // 人为把到期时间改到过去（测试环境）
+        src.setGiftExpireTime(LocalDateTime.now().minusDays(1));
+        txnMapper.updateById(src);
+
+        WalletChangeResult first = walletService.expireGift(src.getId());
+        assertThat(first.getGiftChange()).isEqualTo(-1000L);
+        assertThat(first.getGiftAfter()).isZero();
+
+        WalletChangeResult second = walletService.expireGift(src.getId());
+        assertThat(second.isIdempotentHit()).isTrue();
+        assertThat(second.getTxnId()).isEqualTo(first.getTxnId());
+
+        WalWallet w = walletService.getWallet(BRAND_ID, MEMBER_ID);
+        assertThat(w.getGiftBalance()).isZero();
+        // GIFT_FIRST 先扣赠送金，本金未动
+        assertThat(w.getPrincipalBalance()).isEqualTo(10000L);
+        assertThat(txnMapper.sumGiftChange(MEMBER_ID)).isZero();
     }
 }

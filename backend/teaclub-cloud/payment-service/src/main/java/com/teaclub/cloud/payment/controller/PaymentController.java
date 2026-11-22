@@ -4,6 +4,7 @@ import com.teaclub.cloud.web.annotation.AuditLog;
 import com.teaclub.cloud.core.api.PageResult;
 import com.teaclub.cloud.core.api.Result;
 import com.teaclub.cloud.payment.dto.PayCreateRequest;
+import com.teaclub.cloud.payment.dto.RechargeRefundRequest;
 import com.teaclub.cloud.payment.dto.RefundApplyRequest;
 import com.teaclub.cloud.payment.service.PaymentService;
 import com.teaclub.cloud.payment.vo.PayCreateVO;
@@ -57,6 +58,14 @@ public class PaymentController {
     @AuditLog(module = "退款", value = "申请退款")
     public Result<RefundVO> applyRefund(@Valid @RequestBody RefundApplyRequest request) {
         return Result.ok(paymentService.applyRefund(request));
+    }
+
+    @Operation(summary = "充值退卡（退实付、扣回赠送，金额全部由服务端计算）")
+    @PostMapping("/recharge-refunds")
+    @PreAuthorize("hasAuthority('wallet:refund')")
+    @AuditLog(module = "退款", value = "充值退卡")
+    public Result<RefundVO> refundRecharge(@Valid @RequestBody RechargeRefundRequest request) {
+        return Result.ok(paymentService.refundRecharge(request));
     }
 
     @Operation(summary = "退款单分页")

@@ -115,5 +115,13 @@
 | --- | --- | --- |
 | TC-T8-01 | [43-经营报表微服务](43-经营报表微服务.md) | report-service 11 接口、跨库只读口径、三角色数据权限、Web 7 页 ECharts |
 
+---
+
+## 第十阶段：课程设计答辩材料
+
+材料集中在 [docs/course-design/](course-design/) 目录（含索引 README）：
+课程设计说明书 / 系统设计图（Mermaid 10 张）/ 数据库设计文档 / API 文档 /
+答辩 PPT（HTML 幻灯片 16 页）/ 答辩问题及参考答案（30 题）/ 截图清单。
+
 > 前端工程在与 `backend/` 平级的 `frontend/`：`teaclub-admin`（Vue 3 + TS + Element Plus）、
 > `teaclub-miniprogram`（uni-app + Vue 3 + TS）。联调脚本 17 / 18 / 19，全部经网关 9000。

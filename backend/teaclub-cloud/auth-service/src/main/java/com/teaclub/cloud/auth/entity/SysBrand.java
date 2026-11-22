@@ -14,9 +14,7 @@ public class SysBrand {
     private String brandName;
     private String logoUrl;
     private String contactPhone;
-    private Integer walletCrossStoreEnabled;
     private String walletDeductOrder;
-    private Integer giftExpireDays;
     private String status;
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;

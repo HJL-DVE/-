@@ -1,4 +1,4 @@
-server:
+﻿server:
   port: ${SERVER_PORT:9005}
 
 spring:
@@ -15,6 +15,8 @@ spring:
         username: ${NACOS_USERNAME:nacos}
         password: ${NACOS_PASSWORD:nacos}
       config:
+        import-check:
+          enabled: false
         server-addr: ${NACOS_ADDR:127.0.0.1:8848}
         namespace: ${NACOS_NAMESPACE:public}
         group: ${NACOS_GROUP:TEACLUB}

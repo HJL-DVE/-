@@ -2,6 +2,7 @@ package com.teaclub.cloud.payment.service;
 
 import com.teaclub.cloud.core.api.PageResult;
 import com.teaclub.cloud.payment.dto.PayCreateRequest;
+import com.teaclub.cloud.payment.dto.RechargeRefundRequest;
 import com.teaclub.cloud.payment.dto.RefundApplyRequest;
 import com.teaclub.cloud.payment.vo.PayCreateVO;
 import com.teaclub.cloud.payment.vo.PaymentVO;
@@ -33,8 +34,16 @@ public interface PaymentService {
     /** 处理支付成功回调（幂等）。由通知/模拟通知/查单共同调用。 */
     void handlePaySuccess(String paymentNo, String transactionId, Long notifyAmount, String provider);
 
-    /** 申请退款 */
+    /** 申请退款（订单） */
     RefundVO applyRefund(RefundApplyRequest request);
+
+    /**
+     * 充值退卡（一键）。
+     *
+     * <p>服务端按充值单计算：原路退回实付本金、扣回全部赠送金（赠送金不折现）。
+     * 金额不接受客户端传入；同一充值单重复调用返回同一退款单。
+     */
+    RefundVO refundRecharge(RechargeRefundRequest request);
 
     /** 处理退款成功回调（幂等） */
     void handleRefundSuccess(String refundNo, String wxRefundId);

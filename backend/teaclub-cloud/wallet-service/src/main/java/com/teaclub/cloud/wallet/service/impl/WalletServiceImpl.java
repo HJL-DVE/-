@@ -409,6 +409,57 @@ public class WalletServiceImpl implements WalletService {
     }
 
 
+    // ==================== 赠送金到期核销 ====================
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public WalletChangeResult expireGift(Long rechargeTxnId) {
+        if (rechargeTxnId == null) {
+            return null;
+        }
+        WalWalletTransaction src = txnMapper.selectById(rechargeTxnId);
+        if (src == null
+                || !WalletBizType.RECHARGE_IN.name().equals(src.getBizType())
+                || src.getGiftAmount() == null || src.getGiftAmount() <= 0
+                || src.getGiftExpireTime() == null
+                || src.getGiftExpireTime().isAfter(LocalDateTime.now())) {
+            return null;
+        }
+
+        String bizNo = "GIFT-EXPIRE-" + rechargeTxnId;
+        WalWalletTransaction existed = findTxn(WalletBizType.GIFT_EXPIRE, bizNo);
+        if (existed != null) {
+            return toResult(existed, true);
+        }
+
+        // 与消费扣款共用钱包行锁，避免并发扣成负数；
+        // 同一充值流水的重复核销也会在锁内被上面的幂等检查拦住。
+        WalWallet wallet = lockWallet(src.getBrandId(), src.getMemberId());
+        long before = wallet.getGiftBalance() == null ? 0L : wallet.getGiftBalance();
+        long deduct = Math.min(src.getGiftAmount(), before);
+        long after = before - deduct;
+        assertNonNegative(wallet.getPrincipalBalance(), after);
+
+        WalWalletTransaction txn = buildTxn(wallet, src.getStoreId(),
+                WalletBizType.GIFT_EXPIRE, bizNo,
+                0L, wallet.getPrincipalBalance(), wallet.getPrincipalBalance(),
+                -deduct, before, after);
+        txn.setRemark("赠送金到期核销（充值流水 " + src.getId() + "）");
+        txn.setOperatorType("SYSTEM");
+
+        insertTxnIdempotent(txn);
+
+        wallet.setGiftBalance(after);
+        wallet.setTotalGiftOut((wallet.getTotalGiftOut() == null ? 0L : wallet.getTotalGiftOut()) + deduct);
+        updateWallet(wallet);
+        evictCache(wallet.getBrandId(), wallet.getMemberId());
+
+        log.info("赠送金到期核销 walletId={} 充值流水={} 核销={}分 赠送余额 {} -> {}",
+                wallet.getId(), src.getId(), deduct, before, after);
+        return toResult(txn, false);
+    }
+
+
     // ==================== 余额冻结 / 确认 / 释放 ====================
 
     /**
@@ -770,6 +821,38 @@ public class WalletServiceImpl implements WalletService {
         log.info("充值单入账完成 rechargeNo={} paymentNo={}", rechargeNo, paymentNo);
         return result;
     }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void markRechargeRefunded(String rechargeNo, String refundNo) {
+        WalRechargeOrder order = rechargeOrderMapper.selectByNoForUpdate(rechargeNo);
+        if (order == null) {
+            throw new BizException(ResultCode.NOT_FOUND, "充值单不存在: " + rechargeNo);
+        }
+        if ("REFUNDED".equals(order.getStatus())) {
+            log.info("充值单已标记退款，忽略重复请求 rechargeNo={} refundNo={}", rechargeNo, refundNo);
+            return;
+        }
+        if (!"PAID".equals(order.getStatus())) {
+            throw new BizException(ResultCode.BAD_REQUEST,
+                    "充值单状态为 " + order.getStatus() + "，不可标记退款");
+        }
+        // 账实校验：没有扣回流水就不允许把充值单改成已退款
+        if (!existsTxn(WalletBizType.RECHARGE_REFUND_OUT.name(), refundNo)) {
+            throw new BizException(ResultCode.BAD_REQUEST,
+                    "退款扣回流水不存在，拒绝标记充值单已退款 refundNo=" + refundNo);
+        }
+
+        WalRechargeOrder patch = new WalRechargeOrder();
+        patch.setId(order.getId());
+        patch.setStatus("REFUNDED");
+        String oldRemark = order.getRemark();
+        patch.setRemark("退卡退款 " + refundNo
+                + (oldRemark == null || oldRemark.isBlank() ? "" : "；" + oldRemark));
+        rechargeOrderMapper.updateById(patch);
+        log.info("充值单已标记退款 rechargeNo={} refundNo={}", rechargeNo, refundNo);
+    }
+
     @Override
     public boolean existsTxn(String bizType, String bizNo) {
         if (bizType == null || bizNo == null) {

@@ -144,6 +144,23 @@ export function adjustPoints(query: {
   return http.post<boolean>('/api/admin/marketing/points/adjust', undefined, { params: query })
 }
 
+/** 积分规则（读真实 mkt_points_rule 表） */
+export interface PointsRuleVO {
+  ruleCode: string
+  ruleName: string
+  amountPerPoint: number
+  signInPoints: number
+  signInContinuousMax: number
+  signInBonus: number
+  expireDays: number
+  status: string
+  usedBy: string
+}
+
+export function getPointsRules() {
+  return http.get<PointsRuleVO[]>('/api/admin/marketing/points/rules')
+}
+
 /** ============ 钀ラ攢锛氭椿鍔?============ */
 
 export interface ActivityVO {

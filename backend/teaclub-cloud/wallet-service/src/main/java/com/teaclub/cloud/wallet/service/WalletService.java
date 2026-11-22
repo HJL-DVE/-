@@ -35,6 +35,14 @@ public interface WalletService {
                                          String remark, Long operatorId);
 
     /**
+     * 充值单退款完成：将状态推进为 REFUNDED。
+     *
+     * <p>前置条件：必须已存在该退款单对应的 RECHARGE_REFUND_OUT 流水，
+     * 避免出现「充值单显示已退款、钱包却没扣回」的账实不符。
+     */
+    void markRechargeRefunded(String rechargeNo, String refundNo);
+
+    /**
      * 创建充值订单（状态 PENDING，等待支付）。
      *
      * @return 充值单号
@@ -102,4 +110,15 @@ public interface WalletService {
     WalletChangeResult adjust(Long brandId, Long memberId, Long storeId, String approvalNo,
                               Long principalChange, Long giftChange,
                               String remark, Long operatorId);
+
+    /**
+     * 赠送金到期核销（幂等键：GIFT-EXPIRE-{充值流水ID}）。
+     *
+     * <p>核销金额 = min(该笔充值赠送额, 当前赠送余额)，保证不把余额扣成负数。
+     * 已花掉的赠送金不追回；赠送金已花完时仍写一条 0 额流水作为"已处理"标记。
+     *
+     * @param rechargeTxnId 充值入账流水 ID
+     * @return 核销结果；流水已过期或不存在时返回 null
+     */
+    WalletChangeResult expireGift(Long rechargeTxnId);
 }

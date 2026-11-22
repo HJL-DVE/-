@@ -6,9 +6,7 @@ export interface BrandVO {
   brandName: string
   logoUrl?: string | null
   contactPhone?: string | null
-  walletCrossStoreEnabled?: number
   walletDeductOrder?: string | null
-  giftExpireDays?: number | null
   status?: string
   createTime?: string | null
   updateTime?: string | null

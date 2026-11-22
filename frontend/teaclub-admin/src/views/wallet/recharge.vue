@@ -45,7 +45,7 @@
         <el-table-column label="赠送额" width="110" align="right">
           <template #default="{ row }">{{ fenToYuan(row.giftAmount) }}</template>
         </el-table-column>
-        <el-table-column label="实收" width="110" align="right">
+        <el-table-column label="实付金额" width="110" align="right">
           <template #default="{ row }">{{ fenToYuan(row.actualAmount) }}</template>
         </el-table-column>
         <el-table-column label="支付渠道" width="120">
@@ -61,10 +61,11 @@
         <el-table-column label="支付时间" width="170">
           <template #default="{ row }">{{ formatDateTime(row.payTime) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="130" fixed="right">
+        <el-table-column label="操作" width="200" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" @click="openDetail(row)">详情</el-button>
             <el-button v-if="row.status === 'PENDING'" link type="danger" @click="onCancel(row)">取消</el-button>
+            <el-button v-if="row.status === 'PAID'" link type="danger" @click="onRefund(row)">退卡</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -117,7 +118,7 @@
         <el-table-column prop="description" label="说明" min-width="160" show-overflow-tooltip />
         <el-table-column label="状态" width="90">
           <template #default="{ row }">
-            <el-tag size="small" :type="row.status === 'ENABLED' ? 'success' : 'info'">{{ row.status }}</el-tag>
+            <el-tag size="small" :type="row.status === 'ENABLED' ? 'success' : 'info'">{{ ENABLED_LABEL[row.status] || row.status }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="生效中" width="90">
@@ -178,7 +179,7 @@
         <el-descriptions-item label="方案">{{ current.planName || '-' }}</el-descriptions-item>
         <el-descriptions-item label="充值金额">{{ fenToYuan(current.rechargeAmount) }}</el-descriptions-item>
         <el-descriptions-item label="赠送金额">{{ fenToYuan(current.giftAmount) }}</el-descriptions-item>
-        <el-descriptions-item label="实收金额">{{ fenToYuan(current.actualAmount) }}</el-descriptions-item>
+        <el-descriptions-item label="实付金额">{{ fenToYuan(current.actualAmount) }}</el-descriptions-item>
         <el-descriptions-item label="支付单号">{{ current.paymentNo || '-' }}</el-descriptions-item>
         <el-descriptions-item label="状态">{{ RECHARGE_STATUS_LABEL[current.status] || current.status }}</el-descriptions-item>
         <el-descriptions-item label="支付时间">{{ formatDateTime(current.payTime) }}</el-descriptions-item>
@@ -193,6 +194,7 @@ import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Refresh, Search } from '@element-plus/icons-vue'
 import { cancelRecharge, createRecharge, getPlans, getRechargePage } from '@/api/wallet'
+import { refundRecharge } from '@/api/payment'
 import { getMemberByPhone } from '@/api/member'
 import { ApiError, isApiError } from '@/api/request'
 import ApiPending from '@/components/ApiPending.vue'
@@ -200,6 +202,7 @@ import { useAppStore } from '@/stores/app'
 import {
   PAY_CHANNEL_LABEL,
   RECHARGE_STATUS_LABEL,
+  ENABLED_LABEL,
   fenToYuan,
   formatDateTime,
   tagTypeByStatus,
@@ -290,6 +293,30 @@ function onCancel(row: RechargeOrderVO): void {
       await cancelRecharge(row.rechargeNo)
       ElMessage.success('已取消')
       await load()
+    })
+    .catch(() => undefined)
+}
+
+/** 一键退卡：金额由服务端按充值单计算，前端只展示口径并二次确认。 */
+function onRefund(row: RechargeOrderVO): void {
+  const cash = fenToYuan(row.rechargeAmount || 0)
+  const gift = fenToYuan(row.giftAmount || 0)
+  ElMessageBox.confirm(
+    '确认对充值单 <b>' + row.rechargeNo + '</b> 退卡？<br/>' +
+    '原路退回实付 <b>' + cash + ' 元</b>，同时扣回赠送 <b>' + gift + ' 元</b>（赠送金不折现）。<br/>' +
+    '若顾客已消费导致赠送余额不足，系统会拒绝并提示人工处理。',
+    '退卡确认',
+    { type: 'warning', dangerouslyUseHTMLString: true, confirmButtonText: '确认退卡', cancelButtonText: '取消' },
+  )
+    .then(async () => {
+      try {
+        const refund = await refundRecharge({ rechargeNo: row.rechargeNo, reason: '管理端退卡' })
+        const tip = refund.status === 'PROCESSING' ? '，退款受理中，待渠道确认后完成' : ''
+        ElMessage.success('退卡已提交：退款单 ' + refund.refundNo + '（' + refund.status + '）' + tip)
+        await load()
+      } catch (error) {
+        ElMessage.error('退卡失败：' + ((error as Error)?.message || '未知错误'))
+      }
     })
     .catch(() => undefined)
 }

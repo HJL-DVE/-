@@ -3,7 +3,9 @@
     <view class="head">
       <view class="head-title">储值充值</view>
       <view class="head-sub">充值本金 + 赠送金额全部由后端入账</view>
-      <view class="head-balance">当前余额 ¥{{ fen2yuan(wallet.totalBalance || 0) }}</view>
+      <view class="head-balance">
+        实付余额 ¥{{ fen2yuan(wallet.principalBalance || 0) }} · 赠送余额 ¥{{ fen2yuan(wallet.giftBalance || 0) }}
+      </view>
     </view>
 
     <view v-if="!authStore.isLoggedIn" class="state">

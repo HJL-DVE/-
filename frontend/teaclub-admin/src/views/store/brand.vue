@@ -2,7 +2,7 @@
   <div class="page">
     <div class="toolbar">
       <h2 class="page-title">品牌信息</h2>
-      <span class="text-muted">品牌为全局唯一，字段变更影响钱包跨店/赠送过期等业务规则</span>
+      <span class="text-muted">品牌为全局唯一，字段变更影响扣款顺序等业务规则</span>
       <div class="toolbar-spacer" />
       <el-button v-if="!editing" type="primary" size="small" :disabled="!canEdit" @click="editing = true">
         编辑
@@ -31,22 +31,12 @@
           <el-input v-if="editing" v-model="form.logoUrl" placeholder="https://..." style="width: 300px" />
           <span v-else class="text-muted">{{ brand?.logoUrl || '未设置' }}</span>
         </el-descriptions-item>
-        <el-descriptions-item label="钱包跨店使用">
-          <el-switch v-if="editing" v-model="form.walletCrossStoreEnabled" :active-value="1" :inactive-value="0" />
-          <el-tag v-else :type="brand?.walletCrossStoreEnabled === 1 ? 'success' : 'info'" size="small">
-            {{ brand?.walletCrossStoreEnabled === 1 ? '允许' : '不允许' }}
-          </el-tag>
-        </el-descriptions-item>
         <el-descriptions-item label="余额抵扣顺序">
           <el-select v-if="editing" v-model="form.walletDeductOrder" style="width: 200px">
-            <el-option label="先赠后本（GIFT_FIRST）" value="GIFT_FIRST" />
-            <el-option label="先本后赠（PRINCIPAL_FIRST）" value="PRINCIPAL_FIRST" />
+            <el-option label="先赠后本（优先使用赠送金）" value="GIFT_FIRST" />
+            <el-option label="先本后赠（优先使用充值本金）" value="PRINCIPAL_FIRST" />
           </el-select>
           <span v-else>{{ deductOrderText }}</span>
-        </el-descriptions-item>
-        <el-descriptions-item label="赠送金额有效期(天)">
-          <el-input-number v-if="editing" v-model="form.giftExpireDays" :min="30" :max="3650" style="width: 200px" />
-          <span v-else>{{ brand?.giftExpireDays ?? '-' }}</span>
         </el-descriptions-item>
         <el-descriptions-item label="状态">
           <el-tag :type="brand?.status === 'ENABLED' ? 'success' : 'danger'" size="small">
@@ -81,8 +71,8 @@ const canEdit = computed(() => {
 
 const deductOrderText = computed(() => {
   const v = brand.value?.walletDeductOrder
-  return v === 'PRINCIPAL_FIRST' ? '先本后赠（PRINCIPAL_FIRST）'
-    : v === 'GIFT_FIRST' ? '先赠后本（GIFT_FIRST）' : (v || '-')
+  return v === 'PRINCIPAL_FIRST' ? '先本后赠（优先使用充值本金）'
+    : v === 'GIFT_FIRST' ? '先赠后本（优先使用赠送金）' : (v || '-')
 })
 
 function formatDateTime(v?: string | null): string {
@@ -118,9 +108,7 @@ async function save() {
       brandName: form.value.brandName?.trim(),
       contactPhone: form.value.contactPhone,
       logoUrl: form.value.logoUrl,
-      walletCrossStoreEnabled: form.value.walletCrossStoreEnabled,
       walletDeductOrder: form.value.walletDeductOrder,
-      giftExpireDays: form.value.giftExpireDays,
     })
     ElMessage.success('品牌信息已更新')
     editing.value = false

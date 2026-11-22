@@ -36,9 +36,7 @@ public class SysBrandServiceImpl implements SysBrandService {
         vo.setBrandName(b.getBrandName());
         vo.setLogoUrl(b.getLogoUrl());
         vo.setContactPhone(b.getContactPhone());
-        vo.setWalletCrossStoreEnabled(b.getWalletCrossStoreEnabled());
         vo.setWalletDeductOrder(b.getWalletDeductOrder());
-        vo.setGiftExpireDays(b.getGiftExpireDays());
         vo.setStatus(b.getStatus());
         vo.setCreateTime(b.getCreateTime());
         vo.setUpdateTime(b.getUpdateTime());
@@ -58,9 +56,7 @@ public class SysBrandServiceImpl implements SysBrandService {
         patch.setBrandName(request.getBrandName());
         patch.setLogoUrl(request.getLogoUrl());
         patch.setContactPhone(request.getContactPhone());
-        patch.setWalletCrossStoreEnabled(request.getWalletCrossStoreEnabled());
         patch.setWalletDeductOrder(request.getWalletDeductOrder());
-        patch.setGiftExpireDays(request.getGiftExpireDays());
         brandMapper.updateById(patch);
     }
 }

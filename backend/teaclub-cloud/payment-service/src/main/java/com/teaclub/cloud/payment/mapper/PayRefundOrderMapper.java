@@ -31,4 +31,15 @@ public interface PayRefundOrderMapper extends BaseMapper<PayRefundOrder> {
             + "WHERE biz_no = #{bizNo} AND biz_type = 'ORDER' "
             + "AND status NOT IN ('FAILED','CANCELLED')")
     Long sumReservedByBizNo(@Param("bizNo") String bizNo);
+
+    /**
+     * 查询同一业务单当前有效的退款单（充值退卡的幂等入口）。
+     *
+     * <p>排除 FAILED/CANCELLED —— 渠道受理失败的退款允许重新发起。
+     * 使用 FOR UPDATE：在 idx_refund_biz 上加间隙锁，防止两个请求同时为同一充值单建退款单。
+     */
+    @Select("SELECT * FROM pay_refund_order WHERE biz_type = #{bizType} AND biz_no = #{bizNo} "
+            + "AND status NOT IN ('FAILED','CANCELLED') ORDER BY id DESC LIMIT 1 FOR UPDATE")
+    PayRefundOrder selectActiveByBizForUpdate(@Param("bizType") String bizType,
+                                              @Param("bizNo") String bizNo);
 }

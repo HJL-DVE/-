@@ -49,6 +49,28 @@ public interface WalWalletTransactionMapper extends BaseMapper<WalWalletTransact
                                                        @Param("storeIds") java.util.Collection<Long> storeIds);
 
     /**
+     * 找出已到期但尚未核销的赠送金充值流水。
+     *
+     * <p>幂等标记：GIFT_EXPIRE 流水的 biz_no = "GIFT-EXPIRE-" + 充值流水 ID，
+     * 与 uk_txn_biz(biz_type, biz_no) 共同保证同一笔赠送金只核销一次。
+     */
+    @Select("""
+            SELECT t.* FROM wal_wallet_transaction t
+            WHERE t.biz_type = 'RECHARGE_IN'
+              AND t.gift_amount > 0
+              AND t.gift_expire_time IS NOT NULL
+              AND t.gift_expire_time <= NOW()
+              AND NOT EXISTS (
+                  SELECT 1 FROM wal_wallet_transaction e
+                  WHERE e.biz_type = 'GIFT_EXPIRE'
+                    AND e.biz_no = CONCAT('GIFT-EXPIRE-', t.id)
+              )
+            ORDER BY t.gift_expire_time ASC
+            LIMIT #{limit}
+            """)
+    List<WalWalletTransaction> findExpiredGiftRecharges(@Param("limit") int limit);
+
+    /**
      * 对账：找出余额与流水累计不一致的钱包。
      *
      * <p>不变量：principal_balance = SUM(principal_change) 且 gift_balance = SUM(gift_change)。

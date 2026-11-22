@@ -1,3 +1,32 @@
+## [第九阶段] 充值退卡（一键）编排（2026-11-22）
+
+### 新增
+
+- **一键退卡接口** `POST /api/admin/payment/recharge-refunds`（权限 `wallet:refund`）：
+  调用方只传充值单号，服务端按充值单计算「退实付本金、扣回全部赠送金」，不接受客户端金额
+- payment-service：`RechargeRefundRequest` / `refundRecharge()` / 退款单按 `RECHARGE` 业务类型编排，
+  新增 `selectActiveByBizForUpdate` 幂等查询；渠道受理失败时用 `/adjust` 回补钱包（UNDO 幂等键）
+- wallet-service：新增 `markRechargeRefunded()` 与内部端点，强制校验扣回流水存在才把充值单置 `REFUNDED`
+- `handleRefundSuccess` 增加 RECHARGE 分支，退款通知到达时推进充值单终态
+- Web 管理后台充值订单页新增「退卡」按钮（二次确认展示退实付/扣赠送口径），`RECHARGE_STATUS_LABEL` 增加 REFUNDED
+- 测试脚本 `27-recharge-refund.mjs`（15 断言）；设计文档 `docs/45`
+
+### 口径
+
+充 100 送 20 退卡 → **退 100 元现金、扣回 20 元赠送**（赠送金不折现，不退 120）；
+「先扣回钱包、后渠道退款」，余额不足时直接拒绝，避免钱退了储值还在。
+
+### 实测
+
+```text
+payment/wallet 两模块 mvn -am compile → EXIT=0
+admin npm run build → EXIT=0
+端到端 27 脚本：待网关与各服务启动后执行（本轮未起服务，未跑）
+```
+
+新增文档：docs/45。
+
+---
 ## [第八阶段] 经营报表微服务 report-service（2026-11-22）
 
 ### 新增

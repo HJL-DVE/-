@@ -63,15 +63,29 @@ async function load() {
     await loadRank()
     const cmp = await getStoreCompare(days.value)
     compareOption.value = {
-      tooltip: {},
-      legend: { data: ['销售额(元)', '订单数'] },
-      xAxis: { type: 'category', data: (cmp.list || []).map((x) => x.storeName) },
-      yAxis: [{ type: 'value', name: '元' }, { type: 'value', name: '单' }],
-      series: [
-        { name: '销售额(元)', type: 'bar', data: (cmp.list || []).map((x) => x.sales / 100) },
-        { name: '订单数', type: 'bar', yAxisIndex: 1, data: (cmp.list || []).map((x) => x.orders) },
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+      // 图例固定顶部并留出足够空间，避免与 x 轴门店名标签重叠
+      legend: { data: ['销售额(元)', '订单数'], top: 4, left: 'center', itemGap: 24 },
+      xAxis: {
+        type: 'category',
+        data: (cmp.list || []).map((x) => x.storeName || '未命名门店'),
+        // 门店名过长时换行/倾斜，避免相邻标签叠在一起
+        axisLabel: {
+          interval: 0,
+          rotate: (cmp.list || []).length > 4 ? 20 : 0,
+          formatter: (name: string) => (name.length > 10 ? name.slice(0, 9) + '…' : name),
+        },
+      },
+      yAxis: [
+        { type: 'value', name: '销售额(元)', nameTextStyle: { padding: [0, 0, 0, 20] } },
+        { type: 'value', name: '订单数(单)' },
       ],
-      grid: { left: 60, right: 60, bottom: 30, top: 40 },
+      series: [
+        { name: '销售额(元)', type: 'bar', barMaxWidth: 60, data: (cmp.list || []).map((x) => x.sales / 100) },
+        { name: '订单数', type: 'bar', yAxisIndex: 1, barMaxWidth: 60, data: (cmp.list || []).map((x) => x.orders) },
+      ],
+      // 底部留足空间给（可能倾斜的）门店名，顶部留足给图例
+      grid: { left: 70, right: 60, bottom: 64, top: 44, containLabel: false },
     }
   } finally {
     loading.value = false
@@ -85,9 +99,18 @@ async function loadRank() {
   rankOption.value = {
     tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
     xAxis: { type: 'value', name: isQty ? '件' : '元' },
-    yAxis: { type: 'category', data: list.map((x) => x.name).reverse() },
-    series: [{ type: 'bar', data: list.map((x) => (isQty ? x.qty : x.amount / 100)).reverse() }],
-    grid: { left: 140, right: 40, top: 20, bottom: 30 },
+    yAxis: {
+      type: 'category',
+      data: list.map((x) => x.name).reverse(),
+      // 商品名过长时截断，避免与柱子和刻度挤在一起
+      axisLabel: {
+        width: 120,
+        overflow: 'truncate',
+        formatter: (name: string) => (name.length > 10 ? name.slice(0, 9) + '…' : name),
+      },
+    },
+    series: [{ type: 'bar', barMaxWidth: 24, data: list.map((x) => (isQty ? x.qty : x.amount / 100)).reverse() }],
+    grid: { left: 130, right: 40, top: 20, bottom: 30 },
   }
 }
 

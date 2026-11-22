@@ -29,7 +29,7 @@
             >
               <div class="level-head">
                 <span class="level-name">{{ item.levelName }}</span>
-                <el-tag size="small" :type="item.status === 'ENABLED' ? 'success' : 'info'">{{ item.status }}</el-tag>
+                <el-tag size="small" :type="item.status === 'ENABLED' ? 'success' : 'info'">{{ ENABLED_LABEL[item.status] || item.status }}</el-tag>
               </div>
               <div class="text-muted mono">{{ item.levelCode }} · Lv.{{ item.levelNo }}</div>
               <div class="text-muted">
@@ -60,7 +60,7 @@
             <el-descriptions-item label="等级">{{ activeLevel.levelName }}（{{ activeLevel.levelCode }}）</el-descriptions-item>
             <el-descriptions-item label="等级序号">Lv.{{ activeLevel.levelNo }}</el-descriptions-item>
             <el-descriptions-item label="升级门槛">{{ fenToYuan(activeLevel.upgradeThreshold) }}</el-descriptions-item>
-            <el-descriptions-item label="升级方式">{{ activeLevel.upgradeType }}</el-descriptions-item>
+            <el-descriptions-item label="升级方式">{{ UPGRADE_TYPE_LABEL[activeLevel.upgradeType] || activeLevel.upgradeType }}</el-descriptions-item>
             <el-descriptions-item label="等级折扣">{{ discountText(activeLevel.discountRate) }}</el-descriptions-item>
             <el-descriptions-item label="积分倍率">{{ pointRateText(activeLevel.pointRate) }}</el-descriptions-item>
           </el-descriptions>
@@ -90,7 +90,7 @@
             </el-table-column>
             <el-table-column label="状态" width="90">
               <template #default="{ row }">
-                <el-tag size="small" :type="row.status === 'ENABLED' ? 'success' : 'info'">{{ row.status }}</el-tag>
+                <el-tag size="small" :type="row.status === 'ENABLED' ? 'success' : 'info'">{{ ENABLED_LABEL[row.status] || row.status }}</el-tag>
               </template>
             </el-table-column>
             <el-table-column label="更新时间" width="170">
@@ -153,9 +153,15 @@ import {
 } from '@/api/marketing'
 import { ApiError, isApiError } from '@/api/request'
 import ApiPending from '@/components/ApiPending.vue'
-import { fenToYuan, formatDateTime } from '@/utils/format'
+import { fenToYuan, formatDateTime, ENABLED_LABEL } from '@/utils/format'
 import type { LevelBenefitVO } from '@/api/marketing'
 import type { MemberLevelVO } from '@/api/types'
+
+const UPGRADE_TYPE_LABEL: Record<string, string> = {
+  CONSUME_AMOUNT: '按累计消费金额',
+  POINTS: '按积分',
+  MANUAL: '手动指定',
+}
 
 /** 与后端 BenefitCode 枚举一致 */
 const BENEFIT_LABEL: Record<string, string> = {

@@ -108,6 +108,7 @@ export const RECHARGE_STATUS_LABEL: Record<string, string> = {
   FAILED: '支付失败',
   CANCELLED: '已取消',
   CLOSED: '已关闭',
+  REFUNDED: '已退卡',
 }
 
 export const PAY_CHANNEL_LABEL: Record<string, string> = {
@@ -115,6 +116,46 @@ export const PAY_CHANNEL_LABEL: Record<string, string> = {
   WECHAT_NATIVE: '微信 Native',
   MOCK: '模拟支付',
   BALANCE: '钱包余额',
+}
+
+/** 通用启用/停用状态（ENABLED/DISABLED）及商品上下架（ON_SALE/OFF_SALE） */
+export const ENABLED_LABEL: Record<string, string> = {
+  ENABLED: '已启用',
+  DISABLED: '已停用',
+  ON_SALE: '在售',
+  OFF_SALE: '已下架',
+}
+
+/** 权限类型 / 注册渠道等零散枚举的兜底映射 */
+export const PERM_TYPE_LABEL: Record<string, string> = {
+  MENU: '菜单',
+  BUTTON: '按钮',
+  API: '接口',
+}
+
+/** 支付通知记录枚举（notify-logs） */
+export const NOTIFY_TYPE_LABEL: Record<string, string> = {
+  PAY: '支付通知',
+  REFUND: '退款通知',
+}
+
+export const EVENT_TYPE_LABEL: Record<string, string> = {
+  'TRANSACTION.SUCCESS': '交易成功',
+  'REFUND.SUCCESS': '退款成功',
+  'TRANSACTION.SUCCESS ': '交易成功',
+}
+
+export const PROCESS_STATUS_LABEL: Record<string, string> = {
+  PROCESSED: '已处理',
+  PROCESSING: '处理中',
+  FAILED: '处理失败',
+  PENDING: '待处理',
+  IGNORED: '已忽略',
+}
+
+export const VERIFY_RESULT_LABEL: Record<string, string> = {
+  '1': '验签通过',
+  '0': '验签失败',
 }
 
 /** 金额正负号展示：钱包流水无 direction 字段，按变动值正负判断 */

@@ -122,12 +122,12 @@ const H = (t) => '\n=== ' + t + ' ===';
 
   r = await req('PUT', '/api/admin/store/brand', {
     brandName: 'TeaClub 茶研社', contactPhone: '400-800-1234',
-    walletCrossStoreEnabled: 1, walletDeductOrder: 'GIFT_FIRST', giftExpireDays: 365
+    walletDeductOrder: 'GIFT_FIRST'
   }, ADMIN);
   check('更新品牌信息', r.code, 0, r.message);
 
   r = await req('PUT', '/api/admin/store/brand', {
-    brandName: '', walletCrossStoreEnabled: 1, walletDeductOrder: 'INVALID', giftExpireDays: 365
+    brandName: '', walletDeductOrder: 'INVALID'
   }, ADMIN);
   check('品牌参数校验 -> 10001', r.code, 10001, r.message);
 

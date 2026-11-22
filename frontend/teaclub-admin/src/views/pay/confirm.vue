@@ -37,7 +37,7 @@
         <el-descriptions :column="1" border size="small" class="meta">
           <el-descriptions-item label="支付单号">{{ detail.paymentNo }}</el-descriptions-item>
           <el-descriptions-item label="业务单号">{{ detail.bizNo || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="支付状态">{{ detail.status }}</el-descriptions-item>
+          <el-descriptions-item label="支付状态">{{ PAY_STATUS_LABEL[detail.status] || detail.status }}</el-descriptions-item>
         </el-descriptions>
 
         <el-button
@@ -63,6 +63,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { PAY_STATUS_LABEL } from '@/utils/format'
 
 interface PayDetail {
   paymentNo: string

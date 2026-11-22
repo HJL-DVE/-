@@ -85,6 +85,18 @@ public class WalletInternalController {
         return Result.ok(data);
     }
 
+    @Operation(summary = "充值单标记退款完成（内部调用）")
+    @PostMapping("/recharge-order/refunded")
+    public Result<Map<String, Object>> markRechargeRefunded(@RequestParam String rechargeNo,
+                                                            @RequestParam String refundNo) {
+        walletService.markRechargeRefunded(rechargeNo, refundNo);
+        Map<String, Object> data = new java.util.LinkedHashMap<>();
+        data.put("rechargeNo", rechargeNo);
+        data.put("refundNo", refundNo);
+        data.put("status", "REFUNDED");
+        return Result.ok(data);
+    }
+
     @Operation(summary = "查询业务单是否已有资金流水（内部对账用）")
     @GetMapping("/txn-exists")
     public Result<Boolean> txnExists(@RequestParam String bizType, @RequestParam String bizNo) {

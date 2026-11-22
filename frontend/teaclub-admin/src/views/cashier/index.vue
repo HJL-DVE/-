@@ -145,7 +145,10 @@
                   钱包接口未就绪 code={{ walletError.code }}
                 </el-tag>
               </template>
-              <span v-else-if="wallet" class="money">{{ fenToYuan(wallet.totalBalance) }} 元</span>
+              <span v-else-if="wallet" class="money">
+                实付 ¥{{ fenToYuan(wallet.principalBalance) }} · 赠送 ¥{{ fenToYuan(wallet.giftBalance) }}
+                <span class="text-muted">（合计 ¥{{ fenToYuan(wallet.totalBalance) }}）</span>
+              </span>
               <span v-else class="text-muted">未开通</span>
             </div>
           </div>

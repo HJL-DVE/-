@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>TeaClub 课程设计答辩</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#111; font-family:"Microsoft YaHei",sans-serif; overflow:hidden; }
+  .slide {
+    width:100vw; height:100vh; display:none;
+    padding:60px 80px; color:#eee;
+    background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);
+  }
+  .slide.active { display:flex; flex-direction:column; justify-content:center; }
+  h1 { font-size:56px; color:#4ade80; margin-bottom:24px; }
+  h2 { font-size:44px; color:#4ade80; border-left:8px solid #4ade80; padding-left:20px; margin-bottom:36px; }
+  h3 { font-size:28px; color:#93c5fd; margin:18px 0 10px; }
+  ul { font-size:24px; line-height:1.9; margin-left:40px; }
+  li { margin:8px 0; }
+  .cover { text-align:center; align-items:center; }
+  .cover h1 { font-size:64px; margin:20px 0; }
+  .cover p { font-size:26px; color:#94a3b8; margin:8px 0; }
+  table { border-collapse:collapse; font-size:20px; margin-top:16px; width:100%; }
+  th,td { border:1px solid #334155; padding:8px 14px; text-align:left; }
+  th { background:#1e40af; color:#fff; }
+  .two-col { display:flex; gap:40px; }
+  .two-col > div { flex:1; }
+  .tag { display:inline-block; background:#1e40af; color:#bfdbfe; padding:4px 14px; border-radius:14px; font-size:18px; margin:4px; }
+  .num { font-size:40px; color:#fbbf24; font-weight:700; }
+  .arch { font-family:Consolas,monospace; font-size:19px; line-height:1.6; background:#020617; padding:20px; border-radius:10px; white-space:pre; color:#a5f3fc; }
+  .nav { position:fixed; bottom:20px; right:30px; color:#64748b; font-size:16px; }
+  .foot { position:fixed; bottom:20px; left:30px; color:#475569; font-size:14px; }
+  .green { color:#4ade80; } .red { color:#f87171; } .amber { color:#fbbf24; }
+</style>
+</head>
+<body>
+<div class="slide"><div class="cover">
+  <h1>TeaClub 奶茶店会员与储值营销管理系统</h1>
+  <p>—— 基于 Spring Cloud 微服务架构的课程设计 ——</p>
+  <p style="margin-top:40px">答辩人：XXX　　指导教师：XXX</p>
+  <p>专业：XXX　　班级：XXX</p>
+  <p style="margin-top:30px;color:#4ade80">Java 17 · Spring Cloud · Nacos · RabbitMQ · Vue 3 · uni-app</p>
+</div></div>
+<div class="slide"><h2>1. 项目背景</h2>
+<ul>
+  <li><b>行业痛点</b>：连锁奶茶店会员分散、储值资金管理不规范、营销活动效果难度量</li>
+  <li><b>解决思路</b>：统一的会员储值营销平台，总部集中运营、门店按权限使用</li>
+  <li><b>课程目标</b>：实践微服务拆分、分布式事务（Outbox/Saga）、消息可靠投递、资金一致性设计</li>
+</ul>
+<h3>系统规模</h3>
+<div class="two-col">
+  <div>
+    <p><span class="num">9</span> 个微服务　<span class="num">9</span> 个数据库　<span class="num">63</span> 张表</p>
+    <p><span class="num">28</span> 个管理后台页面　<span class="num">26</span> 个小程序页面</p>
+  </div>
+  <div>
+    <p><span class="num">36</span> 个测试脚本　<span class="num">246</span> 项自动化断言</p>
+    <p><span class="num">7</span> 大业务域全链路真实可用</p>
+  </div>
+</div></div>
+<div class="slide"><h2>2. 系统需求</h2>
+<h3>四类角色</h3>
+<table>
+<tr><th>角色</th><th>数据范围</th><th>核心需求</th></tr>
+<tr><td>总部管理员</td><td>全部门店</td><td>门店/商品/会员/订单/营销/报表/系统管理</td></tr>
+<tr><td>店长</td><td>仅绑定门店</td><td>本店会员/订单/经营报表</td></tr>
+<tr><td>收银员</td><td>本门店</td><td>收银工作台（无财务报表）</td></tr>
+<tr><td>会员</td><td>仅本人</td><td>点单/充值/领券/积分/商城</td></tr>
+</table>
+<h3>非功能需求</h3>
+<ul>
+  <li>资金安全：余额不为负、防重复入账、金额服务端计算</li>
+  <li>消息可靠：业务与消息原子性（Outbox）、失败不丢（DLQ+重放）</li>
+  <li>数据权限：后端逐接口校验，越权拒绝</li>
+</ul></div>
+<div class="slide"><h2>3. 系统功能总览</h2>
+<div class="two-col">
+<div>
+<h3>管理后台</h3>
+<ul>
+  <li>工作台 / 门店 / 品牌管理</li>
+  <li>商品列表 / 分类管理</li>
+  <li>会员列表 / 会员等级</li>
+  <li>营销：券 / 积分 / 活动 / 统计 / 等级权益</li>
+  <li>钱包：套餐 / 充值 / 账户 / 流水</li>
+  <li>订单 / 支付 / 退款管理</li>
+  <li>经营报表（9 页可视化）</li>
+  <li>系统：用户 / 角色 / 权限 / 日志</li>
+</ul>
+</div>
+<div>
+<h3>微信小程序</h3>
+<ul>
+  <li>首页：门店选择 / 热门商品</li>
+  <li>点单：列表 / 详情 / 规格 / 立即下单</li>
+  <li>购物车 / 订单确认 / 支付</li>
+  <li>钱包：充值套餐 / 结果 / 余额 / 流水</li>
+  <li>营销：券中心 / 我的券 / 积分商城</li>
+  <li>签到 / 会员等级 / 生日福利</li>
+  <li>会员中心 / 兑换记录</li>
+</ul>
+</div>
+</div></div>
+<div class="slide"><h2>4. 技术选型</h2>
+<h3>后端</h3>
+<p>
+<span class="tag">Java 17</span><span class="tag">Spring Boot 3</span><span class="tag">Spring Cloud</span>
+<span class="tag">Nacos 注册配置</span><span class="tag">Gateway 网关</span><span class="tag">OpenFeign 服务调用</span>
+<span class="tag">RabbitMQ 事件</span><span class="tag">Redis 缓存幂等</span><span class="tag">MySQL 8</span>
+<span class="tag">MyBatis-Plus</span><span class="tag">Flyway 迁移</span>
+</p>
+<h3>前端</h3>
+<p>
+<span class="tag">Vue 3</span><span class="tag">TypeScript</span><span class="tag">Element Plus</span>
+<span class="tag">ECharts</span><span class="tag">Pinia</span><span class="tag">uni-app 小程序</span>
+</p>
+<h3>工程</h3>
+<p>
+<span class="tag">Docker Compose</span><span class="tag">Nginx 同源反代</span><span class="tag">JUnit/自动化脚本</span>
+</p>
+<h3>关键选型理由</h3>
+<ul>
+  <li><b>Mock 支付</b>：课程设计不接真实商户，但保留验签/幂等/状态机的真实逻辑</li>
+  <li><b>Flyway</b>：63 张表的版本化管理，环境一致</li>
+  <li><b>整数分</b>：金额全链路整数运算，避免浮点误差</li>
+</ul></div>
+<div class="slide"><h2>5. 微服务架构</h2>
+<div class="arch">客户端                    Gateway :9000 (JWT/路由/白名单)
+  ├─ Vue3 管理后台 :8080        │
+  └─ 微信小程序                 │ lb:// 按服务名路由
+                    ┌─────────┼─────────┐
+                    ▼    ▼    ▼    ▼    ▼
+  auth  member  product  wallet  order  payment  marketing  report
+  :9001  :9002   :9003   :9004  :9005  :9006    :9007     :9008
+  iam_db member_db product_db wallet_db order_db payment_db marketing_db report_db
+                    │         (独立库 + 独立账号 tc_xxx)
+        Nacos 注册/配置    RabbitMQ 事件    Redis 缓存</div>
+<h3>服务间通信</h3>
+<ul>
+  <li><b>同步 OpenFeign</b>：订单→商品（价格）、订单→钱包（扣款）、订单→营销（券试算）</li>
+  <li><b>异步 RabbitMQ</b>：ORDER_PAID → 会员档案+积分+活动；REFUND_SUCCEEDED → 积分冲正</li>
+  <li><b>报表跨库只读</b>：SELECT-only 账号聚合，不侵入业务服务</li>
+</ul></div>
+<div class="slide"><h2>6. 数据库设计</h2>
+<h3>8 库 63 表，每服务独立库独立账号</h3>
+<table>
+<tr><th>库</th><th>表数</th><th>核心表</th></tr>
+<tr><td>iam_db</td><td>13</td><td>用户 角色 权限 门店 品牌 操作日志</td></tr>
+<tr><td>wallet_db</td><td>8</td><td>钱包 流水 冻结 充值订单 套餐</td></tr>
+<tr><td>order_db</td><td>6</td><td>订单 明细 状态日志 Saga</td></tr>
+<tr><td>payment_db</td><td>5</td><td>支付单 退款单 回调日志</td></tr>
+<tr><td>marketing_db</td><td>21</td><td>券 积分 活动 等级权益 签到 商城</td></tr>
+<tr><td>member/product</td><td>15</td><td>会员 等级 商品 SKU 分类 库存</td></tr>
+</table>
+<h3>关键设计</h3>
+<ul>
+  <li>资金流水链式记录（before/change/after），可逐笔审计</li>
+  <li>唯一索引防重：uk_txn_biz、uk_coupon_no、uk_points_biz、uk_activity_member_biz</li>
+  <li>Outbox/Inbox 表每库标配，支撑可靠消息</li>
+</ul></div>
+<div class="slide"><h2>7. 会员储值与钱包</h2>
+<div class="two-col">
+<div>
+<h3>双账本设计</h3>
+<ul>
+  <li><b>本金</b> principal_balance：真实收款</li>
+  <li><b>赠送</b> gift_balance：营销赠送</li>
+  <li>充 100 送 20 → 到账 120，收款只认 100</li>
+  <li>赠送可设有效期，批次过期任务扣减</li>
+</ul>
+<h3>资金安全四道防线</h3>
+<ul>
+  <li><span class="green">① 条件 UPDATE</span> 防超扣</li>
+  <li><span class="green">② 唯一索引</span> 防重复入账</li>
+  <li><span class="green">③ 链式流水</span> 逐笔审计</li>
+  <li><span class="green">④ 冻结模型</span> 下单预占</li>
+</ul>
+</div>
+<div>
+<h3>充值流程</h3>
+<p class="arch">创建充值单 → 创建支付单(PAYING)
+→ Mock 回调（验签/金额校验）
+→ 支付单 SUCCESS
+→ 充值单 PAID
+→ 钱包本金+赠送入账
+→ 链式流水记录</p>
+<p style="margin-top:12px"><span class="green">✓ 实测</span>重复回调余额不变（幂等）</p>
+</div>
+</div></div>
+<div class="slide"><h2>8. 订单与 Mock 支付</h2>
+<h3>订单金额：全部服务端计算</h3>
+<p class="arch">商品总额 → 活动折扣 → 等级折扣(9.5折) → 券抵扣(满50减10) → 应付金额</p>
+<ul>
+  <li>前端只传商品和数量，<b>金额不可篡改</b></li>
+  <li>优惠券抵扣由 marketing-service 试算判定</li>
+  <li>下单锁券(UNUSED→LOCKED) → 支付核销(→USED) → 取消释放</li>
+</ul>
+<h3>Mock 支付</h3>
+<ul>
+  <li>provider=mock 条件装配，保留<span class="amber">验签、幂等、状态机</span>真实逻辑</li>
+  <li>notify 校验签名+金额，不符拒绝；已 SUCCESS 拒绝二次变更</li>
+  <li><span class="amber">重复回调实测不重复入账</span></li>
+  <li>前端明确标注「模拟支付数据，非真实收款」</li>
+</ul></div>
+<div class="slide"><h2>9. 会员营销体系</h2>
+<div class="two-col">
+<div>
+<h3>优惠券</h3>
+<ul>
+  <li>模板 8 类 / 范围(门店商品等级)</li>
+  <li>领取：Redis 锁 + 限领</li>
+  <li>状态机：UNUSED→LOCKED→USED</li>
+  <li>抵扣由营销服务试算判定</li>
+</ul>
+<h3>积分</h3>
+<ul>
+  <li>消费得分（等级倍率实算）</li>
+  <li>签到 / 活动奖励 / 商城兑换</li>
+  <li>退款按原流水冲正</li>
+  <li>批次有效期管理</li>
+</ul>
+</div>
+<div>
+<h3>会员等级（自动升级）</h3>
+<ul>
+  <li>5 级：普通→银卡→金卡→黑金→钻石</li>
+  <li>门槛：0/500/1500/5000/12000 元</li>
+  <li>消费后自动重算（只升不降）</li>
+  <li>权益：倍率/折扣/生日礼</li>
+</ul>
+<h3>营销活动（8 类）</h3>
+<ul>
+  <li>满赠/门店活动：<span class="green">事件自动触发</span></li>
+  <li>参与记录唯一键防重</li>
+  <li>发奖 REQUIRES_NEW 独立事务</li>
+</ul>
+</div>
+</div></div>
+<div class="slide"><h2>10. 多门店管理与数据权限</h2>
+<h3>三层权限体系</h3>
+<p class="arch">① Gateway 解析 JWT → 转发身份头(userId/roles/storeIds)
+② 服务端 @PreAuthorize 校验权限点
+③ StoreScope 数据范围过滤（WHERE store_id IN ...）</p>
+<table>
+<tr><th>角色</th><th>数据范围</th><th>实测</th></tr>
+<tr><td>admin/hqadmin</td><td>全部门店</td><td>✅ 报表 5 店</td></tr>
+<tr><td>mgr_xihu（店长）</td><td>仅门店 1</td><td>✅ 越权门店2 → 10202</td></tr>
+<tr><td>cashier01（收银员）</td><td>无报表权限</td><td>✅ 10201</td></tr>
+</table>
+<p style="margin-top:16px"><span class="green">✓ 报表接口实测</span>：店长驾驶舱门店数收敛为 1、排行只含授权门店</p></div>
+<div class="slide"><h2>11. 经营报表</h2>
+<h3>9 页可视化（ECharts）</h3>
+<p>
+<span class="tag">总部驾驶舱</span><span class="tag">门店驾驶舱</span><span class="tag">销售分析</span>
+<span class="tag">商品分析</span><span class="tag">会员分析</span><span class="tag">充值统计</span>
+<span class="tag">支付统计</span><span class="tag">退款统计</span><span class="tag">营销分析</span>
+</p>
+<h3>严格口径</h3>
+<ul>
+  <li>销售 = 订单实付（PAID/COMPLETED/REFUNDING/REFUNDED）</li>
+  <li>充值 = 本金；赠送单列，<b>不计入收款</b></li>
+  <li>模拟支付：明确标注「模拟支付数据，非真实收款」</li>
+  <li>钱包消费：单列展示，不混入支付收款</li>
+</ul>
+<h3>实现</h3>
+<ul>
+  <li>report-service 跨库 SELECT-only 聚合（独立账号 tc_report）</li>
+  <li>11 个 GET 接口，支持日期 + 门店筛选，趋势补零</li>
+  <li>权限：总部全量 / 店长本店（越权 10202）/ 收银员拒绝（10201）</li>
+</ul></div>
+<div class="slide"><h2>12. 系统界面</h2>
+<div class="two-col">
+<div>
+<h3>管理后台（截图见 docs/screenshots）</h3>
+<ul>
+  <li>总部驾驶舱（6 指标卡 + 5 图表）</li>
+  <li>商品管理 / 会员管理 / 订单管理</li>
+  <li>营销活动 / 优惠券 / 积分流水</li>
+  <li>经营报表 9 页（ECharts）</li>
+  <li>收银工作台</li>
+</ul>
+</div>
+<div>
+<h3>微信小程序</h3>
+<ul>
+  <li>首页（门店 / 热门商品 / 分类）</li>
+  <li>商品详情（规格 / 立即下单）</li>
+  <li>订单确认（试算 / 选券 / 支付）</li>
+  <li>钱包充值 / 积分商城 / 签到</li>
+  <li>会员中心（等级权益）</li>
+</ul>
+</div>
+</div></div>
+<div class="slide"><h2>13. 系统测试</h2>
+<h3>自动化回归门禁：19 脚本 / 246 断言 全绿</h3>
+<table>
+<tr><th>脚本</th><th>断言</th><th>覆盖</th></tr>
+<tr><td>17 冒烟 / 18 充值闭环 / 19 退款</td><td>59</td><td>登录·权限·充值·支付·退款</td></tr>
+<tr><td>21 券 / 22 积分 / 23 冲正</td><td>42</td><td>领券限领·锁核释放·冲正幂等</td></tr>
+<tr><td>24 DLQ 重放 / 25 活动商城</td><td>33</td><td>失败→DLQ→重放→消费成功</td></tr>
+<tr><td>26 报表 / 27 报表扩展 / 28 等级</td><td>41</td><td>口径·筛选·越权·CRUD</td></tr>
+<tr><td>30 完整流程 / 31 占位页 / 32-34</td><td>55</td><td>五方一致·权限·倍率·升级·用券</td></tr>
+<tr><td>35/36 活动创建与生效</td><td>17</td><td>8 类活动·参与发奖</td></tr>
+</table>
+<p style="margin-top:16px"><span class="green">✓ 完整流程实测</span>：注册→充100送20→余额120→消费17.5→流水→积分→报表五方一致</p>
+<p><span class="green">✓ 安全实测</span>：越权 10202 / 无权限 10201 / 重复入账防护 / 重复退款防护</p></div>
+<div class="slide"><h2>14. 项目总结</h2>
+<h3>技术收获</h3>
+<ul>
+  <li>微服务拆分实战：业务域边界、独立库、服务通信选型</li>
+  <li>分布式事务：Outbox 原子事件、Saga 补偿、REQUIRES_NEW 隔离</li>
+  <li>消息可靠性：DLQ + 定时补偿重放，失败不丢消息</li>
+  <li>资金一致性：双账本、条件 UPDATE、链式流水、幂等三层</li>
+  <li>真实问题排查：缓存污染、幂等键隔离、事务传播等 8+ 缺陷定位修复</li>
+</ul>
+<h3>工程规范</h3>
+<ul>
+  <li>19 个自动化脚本纳入回归门禁，246 断言守护</li>
+  <li>20+ 篇文档与代码同步演进</li>
+  <li>Git 提交 40+ 次，每次提交对应可验证的功能</li>
+</ul></div>
+<div class="slide"><h2>15. 不足与展望</h2>
+<div class="two-col">
+<div>
+<h3>不足（如实）</h3>
+<ul>
+  <li>微信支付为 Mock 模拟</li>
+  <li>报表实时聚合，大数据量受限</li>
+  <li>4 类活动未接自动触发入口</li>
+  <li>操作日志覆盖不完整</li>
+  <li>无监控告警体系</li>
+</ul>
+</div>
+<div>
+<h3>展望</h3>
+<ul>
+  <li>接入真实微信支付商户</li>
+  <li>引入数仓 / 物化视图</li>
+  <li>活动全事件化 + 定时任务</li>
+  <li>Prometheus + Grafana 监控</li>
+  <li>库存管理模块扩展</li>
+  <li>多品牌 SaaS 化演进</li>
+</ul>
+</div>
+</div>
+<h3 style="margin-top:40px;text-align:center;color:#4ade80">谢谢观看 · 恳请各位老师批评指正</h3></div><div class="nav" id="pageNo">1 / 16</div><div class="foot">← → 方向键翻页 · F 全屏</div>
+<script>
+const slides=document.querySelectorAll('.slide');let cur=0;
+function show(n){slides[cur].classList.remove('active');cur=(n+slides.length)%slides.length;slides[cur].classList.add('active');document.getElementById('pageNo').textContent=(cur+1)+' / '+slides.length;}
+document.addEventListener('keydown',e=>{
+  if(e.key==='ArrowRight'||e.key==='PageDown'||e.key===' ')show(cur+1);
+  if(e.key==='ArrowLeft'||e.key==='PageUp')show(cur-1);
+  if(e.key==='f'||e.key==='F')document.documentElement.requestFullscreen();
+});
+show(0);
+</script>
+</body>
+</html>

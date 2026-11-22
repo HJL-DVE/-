@@ -1,5 +1,5 @@
 import { http } from './request'
-import type { PageResult, PayCreateRequest, PayCreateVO, PaymentVO, RefundApplyRequest, RefundVO } from './types'
+import type { PageResult, PayCreateRequest, PayCreateVO, PaymentVO, RechargeRefundRequest, RefundApplyRequest, RefundVO } from './types'
 
 export function createPayment(data: PayCreateRequest): Promise<PayCreateVO> {
   return http.post<PayCreateVO>('/api/admin/payment/create', data)
@@ -20,6 +20,11 @@ export function getPaymentPage(query: {
 
 export function applyRefund(data: RefundApplyRequest): Promise<RefundVO> {
   return http.post<RefundVO>('/api/admin/payment/refunds', data)
+}
+
+/** 充值退卡：原路退实付、扣回赠送，金额全部由服务端计算 */
+export function refundRecharge(data: RechargeRefundRequest): Promise<RefundVO> {
+  return http.post<RefundVO>('/api/admin/payment/recharge-refunds', data)
 }
 
 export function getRefundPage(query: {

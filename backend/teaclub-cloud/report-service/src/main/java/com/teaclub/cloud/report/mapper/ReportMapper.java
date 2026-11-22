@@ -188,9 +188,15 @@ public interface ReportMapper {
     List<Map<String, Object>> productTrend(@Param("brandId") Long brandId,
                                            @Param("storeId") Long storeId,
                                            @Param("since") LocalDateTime since);
-    /** 商品排行：metric 只允许 qty 或 amount（服务层白名单传入，用 ${} 拼 ORDER BY）。 */
+    /**
+     * 商品排行：metric 只允许 qty 或 amount（服务层白名单传入，用 ${} 拼 ORDER BY）。
+     *
+     * <p>按 sku_id 聚合（而非 sku_name 快照）—— 历史订单里同一 SKU 存在"完整名"和"纯规格名"
+     * 两种 sku_name，按 sku_name 分组会把同一商品拆成多行、且出现孤立的"大杯/中杯"。
+     * 展示名统一用 spu_name，保证重复的是"同一商品"而不是无意义的规格词。
+     */
     @Select("""
-            SELECT i.sku_id AS skuId, i.sku_name AS name,
+            SELECT i.sku_id AS skuId, MAX(i.spu_name) AS name,
                    SUM(i.quantity) AS qty,
                    COALESCE(SUM(i.actual_amount),0) AS amount
             FROM order_db.oms_order_item i
@@ -200,7 +206,7 @@ public interface ReportMapper {
               AND (#{storeId} IS NULL OR i.store_id = #{storeId})
               AND (#{since} IS NULL OR o.pay_time >= #{since})
               AND (#{until} IS NULL OR o.pay_time < #{until})
-            GROUP BY i.sku_id, i.sku_name
+            GROUP BY i.sku_id
             ORDER BY ${metric} DESC LIMIT #{limit}
             """)
     List<Map<String, Object>> productRank(@Param("brandId") Long brandId,

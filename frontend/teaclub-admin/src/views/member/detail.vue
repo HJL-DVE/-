@@ -22,7 +22,7 @@
         </el-descriptions-item>
         <el-descriptions-item label="订单数">{{ member.totalOrderCount ?? 0 }}</el-descriptions-item>
         <el-descriptions-item label="注册门店">{{ member.registerStoreName || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="注册渠道">{{ member.registerChannel || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="注册渠道">{{ REGISTER_CHANNEL_LABEL[member.registerChannel || ''] || member.registerChannel || '-' }}</el-descriptions-item>
         <el-descriptions-item label="注册时间">{{ formatDateTime(member.createTime) }}</el-descriptions-item>
       </el-descriptions>
       <el-empty v-else description="未取到会员信息" />
@@ -49,7 +49,7 @@
             <el-descriptions-item label="合计余额">
               <span class="money">{{ fenToYuan(wallet.totalBalance) }}</span>
             </el-descriptions-item>
-            <el-descriptions-item label="钱包状态">{{ wallet.status }}</el-descriptions-item>
+            <el-descriptions-item label="钱包状态">{{ MEMBER_STATUS_LABEL[wallet.status] || wallet.status }}</el-descriptions-item>
             <el-descriptions-item label="开通时间">{{ formatDateTime(wallet.createTime) }}</el-descriptions-item>
             <el-descriptions-item label="钱包 ID">{{ wallet.id }}</el-descriptions-item>
           </el-descriptions>
@@ -131,6 +131,14 @@ import {
   tagTypeByStatus,
 } from '@/utils/format'
 import type { MemberVO, OrderVO, WalletTransactionVO, WalletVO } from '@/api/types'
+
+const REGISTER_CHANNEL_LABEL: Record<string, string> = {
+  MINIAPP: '微信小程序',
+  WECHAT: '微信',
+  POS: '门店收银',
+  CASHIER: '收银台',
+  ADMIN: '后台建档',
+}
 
 const route = useRoute()
 const memberId = Number(route.params.id)

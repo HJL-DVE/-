@@ -408,6 +408,12 @@ export interface RefundApplyRequest {
   reason?: string
 }
 
+/** 充值退卡：金额全部由服务端按充值单计算，调用方只传单号与原因 */
+export interface RechargeRefundRequest {
+  rechargeNo: string
+  reason?: string
+}
+
 export interface NotifyLogVO {
   id: number
   paymentNo?: string | null

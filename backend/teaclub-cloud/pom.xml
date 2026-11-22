@@ -48,7 +48,6 @@
     <module>payment-service</module>
     <!-- 预留服务（仅骨架） -->
     <module>marketing-service</module>
-    <module>inventory-service</module>
     <module>report-service</module>
   </modules>
 

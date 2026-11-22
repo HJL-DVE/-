@@ -14,14 +14,8 @@ public class BrandVO {
     private String logoUrl;
     private String contactPhone;
 
-    @Schema(description = "储值是否允许跨店消费")
-    private Integer walletCrossStoreEnabled;
-
     @Schema(description = "扣款顺序 GIFT_FIRST / PRINCIPAL_FIRST")
     private String walletDeductOrder;
-
-    @Schema(description = "赠送金有效天数")
-    private Integer giftExpireDays;
 
     private String status;
     private LocalDateTime createTime;

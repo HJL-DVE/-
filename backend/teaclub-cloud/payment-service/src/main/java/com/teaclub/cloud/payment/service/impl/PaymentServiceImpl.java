@@ -15,6 +15,7 @@ import com.teaclub.cloud.security.context.UserContext;
 import com.teaclub.cloud.core.exception.BizException;
 import com.teaclub.cloud.core.util.BizNoGenerator;
 import com.teaclub.cloud.payment.dto.PayCreateRequest;
+import com.teaclub.cloud.payment.dto.RechargeRefundRequest;
 import com.teaclub.cloud.payment.dto.RefundApplyRequest;
 import com.teaclub.cloud.payment.entity.PayNotifyLog;
 import com.teaclub.cloud.payment.entity.PayPaymentOrder;
@@ -421,6 +422,170 @@ public class PaymentServiceImpl implements PaymentService {
         return new long[]{principalPart, giftPart};
     }
 
+    // ==================== 充值退卡（一键） ====================
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public RefundVO refundRecharge(RechargeRefundRequest request) {
+        LoginUser current = UserContext.require();
+        String rechargeNo = request.getRechargeNo() == null ? null : request.getRechargeNo().trim();
+        if (!StringUtils.hasText(rechargeNo)) {
+            throw new BizException(ResultCode.PARAM_INVALID, "充值单号不能为空");
+        }
+
+        // 幂等：同一充值单已有进行中/成功的退款单 → 直接返回，不重复扣回、不重复退款。
+        // FOR UPDATE + 间隙锁同时挡住「双击退卡」的并发建单。
+        PayRefundOrder active = refundMapper.selectActiveByBizForUpdate("RECHARGE", rechargeNo);
+        if (active != null) {
+            log.info("充值退卡幂等命中 rechargeNo={} refundNo={} status={}",
+                    rechargeNo, active.getRefundNo(), active.getStatus());
+            return toRefundVO(active);
+        }
+
+        // 充值单权威数据在 wallet_db，只经内部 Feign 读取，金额一律服务端取
+        Map<String, Object> recharge = fetchRechargeOrder(rechargeNo);
+        if (recharge == null) {
+            throw new BizException(ResultCode.NOT_FOUND, "充值单不存在: " + rechargeNo);
+        }
+        Long brandId = toLong(ord(recharge, "brand_id"));
+        if (brandId != null && !brandId.equals(current.getBrandId())) {
+            throw new BizException(ResultCode.FORBIDDEN, "充值单不属于当前品牌");
+        }
+        Long storeId = toLong(ord(recharge, "store_id"));
+        StoreScope.from(current).assertAccessible(storeId);
+        Long memberId = toLong(ord(recharge, "member_id"));
+
+        if (!"PAID".equals(str(ord(recharge, "status")))) {
+            throw new BizException(ResultCode.BAD_REQUEST,
+                    "充值单状态为 " + str(ord(recharge, "status")) + "，仅已支付的充值单可退卡");
+        }
+        Long principalVal = toLong(ord(recharge, "recharge_amount"));
+        Long giftVal = toLong(ord(recharge, "gift_amount"));
+        long principal = principalVal == null ? 0 : principalVal;
+        long gift = giftVal == null ? 0 : giftVal;
+        if (principal <= 0) {
+            throw new BizException(ResultCode.BAD_REQUEST, "充值本金异常，无法退卡");
+        }
+
+        // 原支付单必须成功，现金按原路退回
+        PayPaymentOrder payment = paymentMapper.selectByBizForUpdate("RECHARGE", rechargeNo);
+        if (payment == null || !"SUCCESS".equals(payment.getStatus())) {
+            throw new BizException(ResultCode.BAD_REQUEST, "充值单没有成功的支付单，无法原路退款");
+        }
+        Long reserved = refundMapper.sumRefundedByPayment(payment.getPaymentNo());
+        if (reserved != null && reserved > 0) {
+            throw new BizException(ResultCode.BAD_REQUEST,
+                    "该充值支付单已发起过退款 " + reserved + " 分，不允许重复退卡");
+        }
+
+        String refundNo = BizNoGenerator.refundNo();
+        String reason = StringUtils.hasText(request.getReason()) ? request.getReason().trim() : "顾客退卡";
+
+        PayRefundOrder refund = new PayRefundOrder();
+        refund.setBrandId(current.getBrandId());
+        refund.setRefundNo(refundNo);
+        refund.setPaymentNo(payment.getPaymentNo());
+        refund.setBizType("RECHARGE");
+        refund.setBizNo(rechargeNo);
+        refund.setStoreId(storeId);
+        refund.setMemberId(memberId);
+        refund.setChannel("WECHAT");
+        // 退卡只把【实付本金】原路退回；赠送金不折现，只在钱包侧扣回。
+        refund.setRefundAmount(principal);
+        refund.setRefundCashAmount(principal);
+        refund.setRefundPrincipalAmount(0L);
+        refund.setRefundGiftAmount(0L);
+        refund.setReason(reason + "；扣回实付 " + principal + " 分、赠送 " + gift + " 分");
+        refund.setStatus("CREATED");
+        refund.setApplyUserId(current.getUserId());
+        refundMapper.insert(refund);
+
+        // ① 先扣回钱包（独立事务，幂等键 refundNo）。
+        //    顾客若已消费导致赠送余额不足，wallet 会拒绝 → 本地退款单回滚，
+        //    绝不会出现「现金已退、储值还在」的品牌资金损失。
+        try {
+            var clawback = walletClient.rechargeRefundOut(brandId, memberId, storeId, refundNo,
+                    principal, gift, reason, current.getUserId());
+            if (clawback == null || clawback.getCode() != 0) {
+                throw new BizException(ResultCode.DOWNSTREAM_UNAVAILABLE,
+                        "钱包扣回失败：" + (clawback == null ? "无响应" : clawback.getMessage()));
+            }
+        } catch (BizException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("充值退卡扣回钱包失败 refundNo={} rechargeNo={}", refundNo, rechargeNo, e);
+            throw new BizException(ResultCode.DOWNSTREAM_UNAVAILABLE, "钱包服务不可用，退卡未完成");
+        }
+
+        // ② 现金原路退回
+        RefundResult result;
+        try {
+            result = provider.createRefund(RefundCreateCmd.builder()
+                    .refundNo(refundNo)
+                    .paymentNo(payment.getPaymentNo())
+                    .totalAmount(payment.getAmount())
+                    .refundAmount(principal)
+                    .reason(reason)
+                    .build());
+        } catch (Exception e) {
+            rollbackClawback(refund, principal, gift, storeId, current);
+            markRefundFailed(refund, e.getMessage());
+            throw new BizException(ResultCode.SYSTEM_ERROR, "退款渠道调用失败：" + e.getMessage());
+        }
+        if (result == null || !result.isSuccess()) {
+            String failReason = result == null ? "渠道无响应" : result.getFailReason();
+            rollbackClawback(refund, principal, gift, storeId, current);
+            markRefundFailed(refund, failReason);
+            throw new BizException(ResultCode.BAD_REQUEST, "退款渠道受理失败：" + failReason);
+        }
+
+        if ("SUCCESS".equals(result.getStatus())) {
+            markRefundSuccess(refund, result.getRefundId());
+            // 充值单状态推进失败则整体回滚，退款单不会停在 SUCCESS 而账没改
+            settleRechargeRefund(rechargeNo, refundNo);
+        } else {
+            // PROCESSING：钱包已扣回，等退款成功通知由 handleRefundSuccess 收尾
+            PayRefundOrder patch = new PayRefundOrder();
+            patch.setId(refund.getId());
+            patch.setStatus("PROCESSING");
+            patch.setWxRefundId(result.getRefundId());
+            refundMapper.updateById(patch);
+            log.info("充值退卡退款受理中 refundNo={} rechargeNo={}", refundNo, rechargeNo);
+        }
+        return toRefundVO(refundMapper.selectByNoForUpdate(refundNo));
+    }
+
+    /** 渠道退款失败时，把已从钱包扣回的金额原样加回（幂等键：UNDO-退款单号）。 */
+    private void rollbackClawback(PayRefundOrder refund, long principal, long gift,
+                                  Long storeId, LoginUser current) {
+        try {
+            var resp = walletClient.adjust(refund.getBrandId(), refund.getMemberId(), storeId,
+                    "UNDO-" + refund.getRefundNo(), principal, gift,
+                    "退卡渠道受理失败，回补被扣回的钱包", current.getUserId());
+            if (resp == null || resp.getCode() != 0) {
+                log.error("退卡失败回补钱包失败 refundNo={} resp={}", refund.getRefundNo(), resp);
+            }
+        } catch (Exception e) {
+            log.error("退卡失败回补钱包异常 refundNo={}", refund.getRefundNo(), e);
+        }
+    }
+
+    /** 渠道即时成功 / 退款通知到达时，把充值单推进为 REFUNDED。 */
+    private void settleRechargeRefund(String rechargeNo, String refundNo) {
+        try {
+            var resp = walletClient.markRechargeRefunded(rechargeNo, refundNo);
+            if (resp == null || resp.getCode() != 0) {
+                throw new BizException(ResultCode.DOWNSTREAM_UNAVAILABLE,
+                        "充值单状态推进失败：" + (resp == null ? "无响应" : resp.getMessage()));
+            }
+        } catch (BizException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("充值单标记已退款异常 rechargeNo={} refundNo={}", rechargeNo, refundNo, e);
+            throw new BizException(ResultCode.DOWNSTREAM_UNAVAILABLE, "钱包服务不可用，充值单状态未更新");
+        }
+    }
+
     private void executeRefund(PayRefundOrder refund, Map<String, Object> order) {
         boolean fullyRefunded = (toLong(ord(order, "refunded_amount")) == null ? 0 : toLong(ord(order, "refunded_amount")))
                 + refund.getRefundAmount() >= toLong(ord(order, "paid_amount"));
@@ -542,6 +707,9 @@ public class PaymentServiceImpl implements PaymentService {
                 refundApply.put("fullyRefunded", fully);
                 orderClient.applyRefund(str(ord(order, "order_no")), refundApply);
             }
+        } else if ("RECHARGE".equals(refund.getBizType())) {
+            // 钱包的扣回在申请退卡时已完成（幂等），这里只推进充值单状态
+            settleRechargeRefund(refund.getBizNo(), refund.getRefundNo());
         }
         log.info("退款成功处理完成 refundNo={}", refundNo);
     }

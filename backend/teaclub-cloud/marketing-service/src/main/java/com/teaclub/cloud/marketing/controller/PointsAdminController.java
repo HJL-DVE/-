@@ -3,6 +3,7 @@ package com.teaclub.cloud.marketing.controller;
 import com.teaclub.cloud.core.api.Result;
 import com.teaclub.cloud.marketing.service.PointsService;
 import com.teaclub.cloud.marketing.vo.PointsAccountVO;
+import com.teaclub.cloud.marketing.vo.PointsRuleVO;
 import com.teaclub.cloud.marketing.vo.PointsTransactionVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -35,6 +36,13 @@ public class PointsAdminController {
                                                           @RequestParam(required = false) String bizType,
                                                           @RequestParam(required = false) Integer limit) {
         return Result.ok(pointsService.transactions(memberId, bizType, limit == null ? 50 : limit));
+    }
+
+    @Operation(summary = "积分规则列表（读取真实规则表）")
+    @GetMapping("/rules")
+    @PreAuthorize("hasAuthority('marketing:points:list')")
+    public Result<List<PointsRuleVO>> rules() {
+        return Result.ok(pointsService.listRules());
     }
 
     @Operation(summary = "人工调整积分（正加负减）")

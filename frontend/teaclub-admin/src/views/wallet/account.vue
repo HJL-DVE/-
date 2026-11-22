@@ -53,7 +53,7 @@
         </el-table-column>
         <el-table-column label="状态" width="90">
           <template #default="{ row }">
-            <el-tag size="small" :type="row.status === 'NORMAL' ? 'success' : 'danger'">{{ row.status }}</el-tag>
+            <el-tag size="small" :type="row.status === 'NORMAL' ? 'success' : 'danger'">{{ MEMBER_STATUS_LABEL[row.status] || row.status }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="开通时间" width="170">
@@ -104,7 +104,7 @@ import { CircleCheck, Refresh, Search } from '@element-plus/icons-vue'
 import { getReconcile, getWalletPage } from '@/api/wallet'
 import { ApiError, isApiError } from '@/api/request'
 import ApiPending from '@/components/ApiPending.vue'
-import { fenToYuan, formatDateTime } from '@/utils/format'
+import { fenToYuan, formatDateTime, MEMBER_STATUS_LABEL } from '@/utils/format'
 import type { WalletVO } from '@/api/types'
 
 const loading = ref(false)

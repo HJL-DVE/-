@@ -89,7 +89,7 @@
       <template v-if="detail">
         <el-descriptions :column="2" border size="small">
           <el-descriptions-item label="门店">{{ detail.storeName }}</el-descriptions-item>
-          <el-descriptions-item label="来源">{{ detail.orderSource }}</el-descriptions-item>
+          <el-descriptions-item label="来源">{{ ORDER_SOURCE_LABEL[detail.orderSource || ''] || detail.orderSource || '-' }}</el-descriptions-item>
           <el-descriptions-item label="会员">{{ detail.memberName || detail.memberPhone || '散客' }}</el-descriptions-item>
           <el-descriptions-item label="状态">
             <el-tag size="small" :type="ORDER_STATUS_TAG[detail.status] || 'info'">
@@ -161,6 +161,14 @@ import {
   yuanToFen,
 } from '@/utils/format'
 import type { OrderVO } from '@/api/types'
+
+const ORDER_SOURCE_LABEL: Record<string, string> = {
+  MINIAPP: '微信小程序',
+  WECHAT: '微信小程序',
+  POS: '门店收银',
+  CASHIER: '收银台',
+  ADMIN: '后台代下单',
+}
 
 const appStore = useAppStore()
 

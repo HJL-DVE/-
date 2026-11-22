@@ -85,7 +85,7 @@
         <el-descriptions-item label="商品编码">{{ detail.spuCode }}</el-descriptions-item>
         <el-descriptions-item label="分类">{{ detail.categoryName || '-' }}</el-descriptions-item>
         <el-descriptions-item label="基础价">{{ fenToYuan(detail.basePrice) }} 元</el-descriptions-item>
-        <el-descriptions-item label="状态">{{ detail.status }}</el-descriptions-item>
+        <el-descriptions-item label="状态">{{ ENABLED_LABEL[detail.status] || detail.status }}</el-descriptions-item>
         <el-descriptions-item label="副标题" :span="2">{{ detail.subtitle || '-' }}</el-descriptions-item>
         <el-descriptions-item label="描述" :span="2">{{ detail.description || '-' }}</el-descriptions-item>
       </el-descriptions>
@@ -100,7 +100,11 @@
         <el-table-column label="成本" width="100" align="right">
           <template #default="{ row }">{{ fenToYuan(row.costPrice) }}</template>
         </el-table-column>
-        <el-table-column prop="status" label="状态" width="90" />
+        <el-table-column label="状态" width="90">
+          <template #default="{ row }">
+            <el-tag size="small" :type="tagTypeByStatus(row.status)">{{ ENABLED_LABEL[row.status] || row.status }}</el-tag>
+          </template>
+        </el-table-column>
       </el-table>
     </el-drawer>
   </div>
@@ -111,7 +115,7 @@ import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh, Search } from '@element-plus/icons-vue'
 import { getCategoryTree, getSpuDetail, getSpuPage, updateSpuStatus, deleteSpu } from '@/api/product'
-import { fenToYuan, tagTypeByStatus } from '@/utils/format'
+import { fenToYuan, tagTypeByStatus, ENABLED_LABEL } from '@/utils/format'
 import type { CategoryVO, SpuVO } from '@/api/types'
 
 const loading = ref(false)
