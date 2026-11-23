@@ -80,6 +80,11 @@ teaclub:
     issuer: teaclub
   security:
     internal-token: ${INTERNAL_TOKEN:teaclub-internal-default-token}
+  # 跨服务本地直连地址（留空=走 Nacos 服务发现）。
+  # 混合部署（被调服务在容器、本服务在宿主机）时使用。
+  client:
+    order-url: ${ORDER_SERVICE_URL:}
+    wallet-url: ${WALLET_SERVICE_URL:}
   payment:
     # 未支付支付单超时关闭时长（分钟）；关单只改支付单，订单保持 UNPAID 可重新支付
     timeout-minutes: ${PAYMENT_TIMEOUT_MINUTES:5}
@@ -125,7 +130,3 @@ logging:
 
 # 跨服务本地直连地址（留空=走 Nacos 服务发现）。
 # 混合部署（被调服务在容器、本服务在宿主机）时设为 http://127.0.0.1:9005 等。
-teaclub:
-  client:
-    order-url: ${ORDER_SERVICE_URL:}
-    wallet-url: ${WALLET_SERVICE_URL:}
