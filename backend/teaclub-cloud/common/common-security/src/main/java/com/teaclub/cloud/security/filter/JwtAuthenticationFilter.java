@@ -23,10 +23,13 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+
+import static java.util.stream.Collectors.toSet;
 
 /**
  * 管理端 JWT 认证过滤器（Servlet 环境专用）。
@@ -105,8 +108,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 // 不再优先使用 Gateway 透传的 X-Roles / X-Permissions 头——
                 // 历史上这个头在跨服务转发时可能丢失或被覆盖，导致下游解析出空权限
                 // （表现：登录时有权限，刷新后 /me 返回的 permissions 为空）。
-                Set<String> roles = toSet(claims.get("roles"));
-                Set<String> permissions = toSet(claims.get("permissions"));
+                Set<String> roles = toStringSet(claims.get("roles"));
+                Set<String> permissions = toStringSet(claims.get("permissions"));
 
                 LoginUser user = LoginUser.builder()
                         .userId(userId)
@@ -173,6 +176,33 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         return b == null ? null : String.valueOf(b);
     }
 
+    /**
+     * 把令牌声明转成字符串集合。
+     *
+     * <p>兼容两种形态：JWT 里通常是 List&lt;String&gt;，也可能是逗号分隔的字符串。
+     */
+    private static Set<String> toStringSet(Object value) {
+        if (value == null) {
+            return Set.of();
+        }
+        if (value instanceof Collection<?> collection) {
+            return collection.stream()
+                    .filter(java.util.Objects::nonNull)
+                    .map(String::valueOf)
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .collect(Collectors.toSet());
+        }
+        String text = String.valueOf(value).trim();
+        if (text.isEmpty()) {
+            return Set.of();
+        }
+        return Arrays.stream(text.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(Collectors.toSet());
+    }
+
     private static Set<String> splitToSet(String value) {
         if (value == null || value.isBlank()) {
             return Set.of();
@@ -180,7 +210,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         return Arrays.stream(value.split(","))
                 .map(String::trim)
                 .filter(s -> !s.isEmpty())
-                .collect(Collectors.toSet());
+                .collect(toSet());
     }
 
     private static Set<Long> splitToLongSet(String value) {
@@ -191,7 +221,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 .map(String::trim)
                 .filter(s -> !s.isEmpty())
                 .map(Long::valueOf)
-                .collect(Collectors.toSet());
+                .collect(toSet());
     }
 
     private static Long parseLong(String value) {
