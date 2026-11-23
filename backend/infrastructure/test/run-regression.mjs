@@ -40,6 +40,8 @@ const SUITE = [
   { file: '35-marketing-activities.mjs',      tag: 'actseed',  desc: '8类营销活动创建与列表可见' },
   { file: '36-activity-effect.mjs',           tag: 'acteff',   desc: '种子活动真实生效：列表/参与/积分到账/统计' },
   { file: '37-new-features.mjs',              tag: 'newfeat',  desc: '操作日志AOP/积分规则编辑/8类活动触发' },
+  { file: '38-profile-birthday.mjs',            tag: 'bday',     desc: '会员自助填写生日（首次可设/防薅/扫描识别）' },
+  { file: '39-auth-permission.mjs',             tag: 'authperm', desc: 'JWT权限解析修复：/me权限完整/三角色差异/越权防护' },
 ];
 
 const filters = process.argv.slice(2).filter((a) => !a.startsWith('-'));

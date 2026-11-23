@@ -75,6 +75,9 @@ public class JwtAuthGlobalFilter implements GlobalFilter, Ordered {
             "/doc.html"
     );
 
+    /** 原始 Authorization 头名：转发时必须保留，下游服务要自己解析令牌取权限。 */
+    private static final String AUTHORIZATION_HEADER = "Authorization";
+
     private final JwtProvider jwtProvider;
     private final ObjectMapper objectMapper;
 
@@ -94,6 +97,9 @@ public class JwtAuthGlobalFilter implements GlobalFilter, Ordered {
         try {
             Claims claims = jwtProvider.parseAdminToken(token);
             ServerHttpRequest mutated = exchange.getRequest().mutate()
+                    // 保留原始 Authorization：下游服务从令牌里取权限/角色（令牌经签名，是权威来源），
+                    // X-Roles / X-Permissions 头仅作为兜底
+                    .header("Authorization", auth)
                     .header(InternalHeaders.USER_ID, String.valueOf(claims.getSubject()))
                     .header(InternalHeaders.USERNAME, str(claims.get("username")))
                     .header(InternalHeaders.BRAND_ID, str(claims.get("brandId")))

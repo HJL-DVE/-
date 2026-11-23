@@ -108,8 +108,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 // 不再优先使用 Gateway 透传的 X-Roles / X-Permissions 头——
                 // 历史上这个头在跨服务转发时可能丢失或被覆盖，导致下游解析出空权限
                 // （表现：登录时有权限，刷新后 /me 返回的 permissions 为空）。
-                Set<String> roles = toStringSet(claims.get("roles"));
-                Set<String> permissions = toStringSet(claims.get("permissions"));
+                // 权限/角色双来源：
+                // 1) 优先用 Gateway 透传的请求头（网关已解析过令牌，避免重复解析开销）；
+                // 2) 请求头缺失时回退到令牌声明（令牌经签名，是权威来源）。
+                // 这样既修复了「网关未转发原 Authorization 导致下游拿不到令牌」的问题，
+                // 也兼容直连服务（无网关头）的场景。
+                Set<String> roles = mergePermissionSource(
+                        request.getHeader(InternalHeaders.ROLES), claims.get("roles"));
+                Set<String> permissions = mergePermissionSource(
+                        request.getHeader(InternalHeaders.PERMISSIONS), claims.get("permissions"));
 
                 LoginUser user = LoginUser.builder()
                         .userId(userId)
@@ -181,10 +188,25 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
      *
      * <p>兼容两种形态：JWT 里通常是 List&lt;String&gt;，也可能是逗号分隔的字符串。
      */
+    /**
+     * 合并权限来源：请求头优先，缺失时用令牌声明。
+     *
+     * @param headerValue Gateway 透传的 X-Roles / X-Permissions 头（逗号分隔）
+     * @param claimValue  令牌中的 roles / permissions 声明
+     */
+    private static Set<String> mergePermissionSource(String headerValue, Object claimValue) {
+        Set<String> fromHeader = toStringSet(headerValue);
+        if (!fromHeader.isEmpty()) {
+            return fromHeader;
+        }
+        return toStringSet(claimValue);
+    }
+
     private static Set<String> toStringSet(Object value) {
         if (value == null) {
             return Set.of();
         }
+        // 集合：逐元素取值（jjwt 反序列化出的是 ArrayList，但不应依赖具体实现类）
         if (value instanceof Collection<?> collection) {
             return collection.stream()
                     .filter(java.util.Objects::nonNull)
@@ -193,9 +215,23 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     .filter(s -> !s.isEmpty())
                     .collect(Collectors.toSet());
         }
+        // 数组：可能是 Object[] 或原始类型数组
+        if (value instanceof Object[] array) {
+            return Arrays.stream(array)
+                    .filter(java.util.Objects::nonNull)
+                    .map(String::valueOf)
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .collect(Collectors.toSet());
+        }
+        // 逗号分隔字符串
         String text = String.valueOf(value).trim();
         if (text.isEmpty()) {
             return Set.of();
+        }
+        if (text.startsWith("[") && text.endsWith("]")) {
+            // 形如 [a, b, c] 的字符串表示
+            text = text.substring(1, text.length() - 1);
         }
         return Arrays.stream(text.split(","))
                 .map(String::trim)
