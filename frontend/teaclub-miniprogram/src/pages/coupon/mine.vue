@@ -13,7 +13,7 @@
     <view v-else-if="list.length === 0" class="state">暂无优惠券</view>
 
     <view v-else class="list">
-      <view v-for="c in list" :key="c.id" :class="['card', c.status.toLowerCase()]">
+      <view v-for="c in list" :key="c.id" :class="['card', (c.status || '').toLowerCase()]">
         <view class="left">
           <text class="amount" v-if="c.couponType === 'DISCOUNT'">{{ discountLabel(c) }}</text>
           <text class="amount" v-else>{{ fen2yuan(c.faceValue || 0) }}<text class="unit">元</text></text>

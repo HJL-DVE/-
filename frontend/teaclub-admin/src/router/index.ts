@@ -91,6 +91,15 @@ export function resetDynamicRoutes(): void {
   removeDynamicRoutes(router)
 }
 
+/** 收银员专属落地页：纯收银角色不展示总部/店长仪表盘，直接进收银工作台。 */
+function isCashierOnly(userStore: ReturnType<typeof useUserStore>): boolean {
+  const roles = userStore.userInfo?.roles || []
+  return roles.includes('CASHIER')
+    && !roles.includes('SUPER_ADMIN')
+    && !roles.includes('HQ_ADMIN')
+    && !roles.includes('STORE_MANAGER')
+}
+
 router.beforeEach(async (to) => {
   const userStore = useUserStore()
 
@@ -125,11 +134,20 @@ router.beforeEach(async (to) => {
       registerDynamicRoutes(router, userStore.menus)
       const appStore = useAppStore()
       await appStore.loadStores()
+      // 收银员访问首页/仪表盘 → 直接进收银工作台
+      if (isCashierOnly(userStore) && (to.path === '/' || to.path === '/dashboard')) {
+        return { path: '/cashier', replace: true }
+      }
       return { path: to.path, query: to.query, hash: to.hash, replace: true }
     } catch (error) {
       userStore.reset()
       return { path: '/login', query: { redirect: to.fullPath } }
     }
+  }
+
+  // 收银员在已加载状态下访问首页/仪表盘 → 拦截到收银工作台
+  if (isCashierOnly(userStore) && (to.path === '/' || to.path === '/dashboard')) {
+    return { path: '/cashier', replace: true }
   }
 
   return true

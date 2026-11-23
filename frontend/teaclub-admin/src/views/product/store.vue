@@ -14,7 +14,7 @@
         <el-input v-model="keyword" placeholder="商品名称/编码" clearable style="width: 200px" @keyup.enter="search" />
         <el-button type="primary" :icon="Search" @click="search">查询</el-button>
         <el-button :icon="Refresh" @click="load">刷新</el-button>
-        <el-button type="success" :icon="Plus" @click="openAdd">添加商品</el-button>
+        <el-button v-if="canEditStoreProduct()" type="success" :icon="Plus" @click="openAdd">添加商品</el-button>
         <div class="toolbar-spacer" />
         <span class="text-muted">
           GET /api/admin/product/store-products?storeId={{ appStore.currentStoreId }} · 共 {{ total }} 条
@@ -43,7 +43,7 @@
                     </el-tag>
                   </template>
                 </el-table-column>
-                <el-table-column label="操作" width="120">
+                <el-table-column v-if="canEditStoreProduct()" label="操作" width="120">
                   <template #default="scope">
                     <el-button link type="primary" @click="openPrice(row, scope.row)">改价</el-button>
                   </template>
@@ -67,7 +67,7 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="220" fixed="right">
+        <el-table-column v-if="canEditStoreProduct()" label="操作" width="220" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" @click="toggleShelf(row)">
               {{ row.isOnSale === 1 ? '下架' : '上架' }}
@@ -279,10 +279,14 @@ import {
   uploadProductImage,
 } from '@/api/product'
 import { useAppStore } from '@/stores/app'
+import { useUserStore } from '@/stores/user'
 import { fenToYuan, yuanToFen } from '@/utils/format'
 import type { CategoryVO, SpuVO, StoreSkuVO, StoreSpuVO } from '@/api/types'
 
 const appStore = useAppStore()
+const userStore = useUserStore()
+/** 是否有门店商品写权限（收银员只有 list，全部写按钮隐藏） */
+const canEditStoreProduct = () => userStore.hasPerm('product:store:update')
 
 const loading = ref(false)
 const records = ref<StoreSpuVO[]>([])

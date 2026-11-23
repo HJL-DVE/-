@@ -106,8 +106,9 @@ public class ReportController {
     @GetMapping("/member/growth")
     @PreAuthorize("hasAuthority('report:view')")
     public Result<Map<String, Object>> memberGrowth(
-            @RequestParam(required = false, defaultValue = "30") Integer days) {
-        return Result.ok(reportService.memberGrowth(days));
+            @RequestParam(required = false, defaultValue = "30") Integer days,
+            @RequestParam(required = false) Long storeId) {
+        return Result.ok(reportService.memberGrowth(days, storeId));
     }
 
     // ==================== 储值 / 支付 / 退款 ====================

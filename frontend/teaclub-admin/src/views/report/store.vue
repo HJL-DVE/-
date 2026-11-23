@@ -16,18 +16,18 @@
     </el-alert>
 
     <el-row :gutter="14">
-      <el-col :span="4"><div class="stat-card"><div class="stat-label">本店销售额(元)</div>
+      <el-col :span="4"><div class="stat-card"><div class="stat-label">今日销售额(元)</div>
         <div class="stat-value">{{ ov ? yuan(ov.sales) : '-' }}</div></div></el-col>
-      <el-col :span="4"><div class="stat-card"><div class="stat-label">本店订单量</div>
+      <el-col :span="4"><div class="stat-card"><div class="stat-label">今日订单量</div>
         <div class="stat-value">{{ ov?.orders ?? '-' }}</div></div></el-col>
-      <el-col :span="4"><div class="stat-card"><div class="stat-label">本店客单价(元)</div>
+      <el-col :span="4"><div class="stat-card"><div class="stat-label">今日客单价(元)</div>
         <div class="stat-value">{{ ov?.avgOrder ?? '-' }}</div></div></el-col>
-      <el-col :span="4"><div class="stat-card"><div class="stat-label">本店充值(元)</div>
+      <el-col :span="4"><div class="stat-card"><div class="stat-label">今日充值(元)</div>
         <div class="stat-value">{{ ov ? yuan(ov.rechargeAmount) : '-' }}</div>
         <div class="stat-extra">赠送 {{ ov ? yuan(ov.rechargeGiftAmount) : '-' }} 另计</div></div></el-col>
-      <el-col :span="4"><div class="stat-card"><div class="stat-label">本店退款(元)</div>
+      <el-col :span="4"><div class="stat-card"><div class="stat-label">今日退款(元)</div>
         <div class="stat-value">{{ ov ? yuan(ov.refundAmount) : '-' }}</div></div></el-col>
-      <el-col :span="4"><div class="stat-card"><div class="stat-label">本店新增会员</div>
+      <el-col :span="4"><div class="stat-card"><div class="stat-label">今日新增会员</div>
         <div class="stat-value">{{ ov?.todayNewMembers ?? '-' }}</div></div></el-col>
     </el-row>
 
@@ -119,17 +119,20 @@ const optHourly = computed(() => ({
 const optHot = computed(() => ({
   tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
   xAxis: { type: 'value', name: '件' },
-  yAxis: { type: 'category', data: hot.value.map((x) => x.name).reverse() },
-  series: [{ name: '销量', type: 'bar', data: hot.value.map((x) => x.qty).reverse() }],
+  yAxis: {
+    type: 'category', data: hot.value.map((x) => x.name).reverse(),
+    axisLabel: { width: 120, overflow: 'truncate', formatter: (n: string) => (n.length > 10 ? n.slice(0, 9) + '…' : n) },
+  },
+  series: [{ name: '销量', type: 'bar', barMaxWidth: 24, data: hot.value.map((x) => x.qty).reverse() }],
   legend: { data: ['销量'] },
   grid: { left: 130, right: 30, top: 30, bottom: 28 },
 }))
 const optPay = computed(() => ({
   tooltip: { trigger: 'item', formatter: '{b}: {c}元 ({d}%)' },
-  legend: { orient: 'vertical', left: 'left' },
+  legend: { orient: 'vertical', left: 'left', top: 'middle', itemGap: 10 },
   series: [{
     name: '模拟支付',
-    type: 'pie', radius: ['40%', '70%'],
+    type: 'pie', radius: ['40%', '68%'], center: ['62%', '55%'],
     label: { formatter: '{b}: {d}%' },
     data: channels.value.map((x) => ({ name: x.channel, value: x.amount / 100 })),
   }],

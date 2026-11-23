@@ -24,6 +24,13 @@ function resolveImage(raw: string | null | undefined): string {
   if (!v) return ''
   // 已经是完整 URL 或包内绝对路径，直接返回
   if (v.startsWith('http://') || v.startsWith('https://') || v.startsWith('/')) return v
+  // OSS 伪地址（如 oss://teaclub-a/products/migrated/spu/1.jpg）：
+  // 库里存的是迁移前的 OSS 路径，但本项目把图片打进了包内 static/images，
+  // 取末尾的 "spu/1.jpg" 或 "category/1.jpg" 映射到本地文件。
+  if (v.startsWith('oss://')) {
+    const m = v.match(/(spu|category)\/([^/]+)$/i)
+    if (m) return '/static/images/' + m[1].toLowerCase() + '/' + m[2]
+  }
   // 裸文件名兜底
   return '/static/images/' + v
 }

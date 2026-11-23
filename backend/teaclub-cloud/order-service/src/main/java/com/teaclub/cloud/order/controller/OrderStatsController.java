@@ -68,10 +68,23 @@ public class OrderStatsController {
         data.put("storeId", effectiveStoreId);
         data.put("orderCount", orderCount);
         data.put("paidOrderCount", paidOrderCount);
+        // 钱包支付资金构成：本金抵扣 + 赠送抵扣
+        java.util.Map<String, Object> composition =
+                orderMapper.sumBalanceCompositionSince(brandId, effectiveStoreId, since);
+        long giftPay = composition == null || composition.get("gift") == null
+                ? 0L : ((Number) composition.get("gift")).longValue();
+        long principalPay = composition == null || composition.get("principal") == null
+                ? 0L : ((Number) composition.get("principal")).longValue();
+        // 实付口径 = 营业额 - 赠送金抵扣（现金支付 + 钱包本金）；赠送金是营销成本，不计真实收入
+        long actualPay = gmvValue - giftPay;
+
         data.put("gmv", gmvValue);
         data.put("avgOrderAmount", paidOrderCount == 0 ? 0 : gmvValue / paidOrderCount);
         data.put("balancePayAmount", balancePay == null ? 0L : balancePay);
         data.put("wechatPayAmount", wechatPay == null ? 0L : wechatPay);
+        data.put("balancePrincipalAmount", principalPay);
+        data.put("balanceGiftAmount", giftPay);
+        data.put("actualPayAmount", actualPay);
         data.put("dailyTrend", trend);
         return Result.ok(data);
     }

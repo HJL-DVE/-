@@ -102,29 +102,38 @@ const optTrend = computed(() => ({
 const optQty = computed(() => ({
   tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
   xAxis: { type: 'value', name: '件' },
-  yAxis: { type: 'category', data: qtyRank.value.map((x) => x.name).reverse() },
-  series: [{ name: '销量', type: 'bar', data: qtyRank.value.map((x) => x.qty).reverse() }],
+  yAxis: {
+    type: 'category', data: qtyRank.value.map((x) => x.name).reverse(),
+    axisLabel: { width: 120, overflow: 'truncate', formatter: (n: string) => (n.length > 10 ? n.slice(0, 9) + '…' : n) },
+  },
+  series: [{ name: '销量', type: 'bar', barMaxWidth: 24, data: qtyRank.value.map((x) => x.qty).reverse() }],
   legend: { data: ['销量'] },
   grid: { left: 130, right: 30, top: 30, bottom: 28 },
 }))
 const optAmt = computed(() => ({
   tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
   xAxis: { type: 'value', name: '元' },
-  yAxis: { type: 'category', data: amtRank.value.map((x) => x.name).reverse() },
-  series: [{ name: '销售额', type: 'bar', data: amtRank.value.map((x) => x.amount / 100).reverse() }],
+  yAxis: {
+    type: 'category', data: amtRank.value.map((x) => x.name).reverse(),
+    axisLabel: { width: 120, overflow: 'truncate', formatter: (n: string) => (n.length > 10 ? n.slice(0, 9) + '…' : n) },
+  },
+  series: [{ name: '销售额', type: 'bar', barMaxWidth: 24, data: amtRank.value.map((x) => x.amount / 100).reverse() }],
   legend: { data: ['销售额'] },
   grid: { left: 130, right: 30, top: 30, bottom: 28 },
 }))
 const optCat = computed(() => ({
   tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
   legend: { data: ['销量(件)', '销售额(元)'] },
-  xAxis: { type: 'category', data: cat.value.map((x) => x.name || '未分类') },
+  xAxis: {
+    type: 'category', data: cat.value.map((x) => x.name || '未分类'),
+    axisLabel: { interval: 0, rotate: cat.value.length > 5 ? 20 : 0, width: 80, overflow: 'truncate' },
+  },
   yAxis: [{ type: 'value', name: '件' }, { type: 'value', name: '元' }],
   series: [
-    { name: '销量(件)', type: 'bar', data: cat.value.map((x) => x.qty) },
-    { name: '销售额(元)', type: 'bar', yAxisIndex: 1, data: cat.value.map((x) => x.amount / 100) },
+    { name: '销量(件)', type: 'bar', barMaxWidth: 40, data: cat.value.map((x) => x.qty) },
+    { name: '销售额(元)', type: 'bar', yAxisIndex: 1, barMaxWidth: 40, data: cat.value.map((x) => x.amount / 100) },
   ],
-  grid: { left: 54, right: 60, bottom: 28, top: 40 },
+  grid: { left: 54, right: 60, bottom: 48, top: 40 },
 }))
 
 async function load() {

@@ -93,4 +93,30 @@ public class WalletAdminController {
     public Result<WalletStatsVO> stats() {
         return Result.ok(walletQueryService.stats());
     }
+
+    /**
+     * 余额人工调整（高敏感操作）。
+     *
+     * <p>必须填写审批单号（幂等键）、调整原因；实付/赠送分列，可只调其一；
+     * 负数扣减不得使余额为负。资金变动由 {@link WalletService#adjust} 统一落流水。
+     */
+    @Operation(summary = "余额人工调整（审批单号幂等，写流水+操作日志）")
+    @PostMapping("/adjust")
+    @PreAuthorize("hasAuthority('wallet:adjust')")
+    public Result<Map<String, Object>> adjust(@RequestParam Long memberId,
+                                              @RequestParam(required = false) Long storeId,
+                                              @RequestParam String approvalNo,
+                                              @RequestParam(required = false) Long principalChange,
+                                              @RequestParam(required = false) Long giftChange,
+                                              @RequestParam(required = false) String remark) {
+        var result = walletService.adjust(
+                UserContext.currentBrandId(), memberId, storeId, approvalNo,
+                principalChange, giftChange, remark, UserContext.currentUserId());
+        return Result.ok(Map.of(
+                "txnId", result.getTxnId() == null ? 0 : result.getTxnId(),
+                "idempotentHit", result.isIdempotentHit(),
+                "principalAfter", result.getPrincipalAfter() == null ? 0 : result.getPrincipalAfter(),
+                "giftAfter", result.getGiftAfter() == null ? 0 : result.getGiftAfter()
+        ));
+    }
 }

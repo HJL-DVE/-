@@ -72,6 +72,7 @@ public class MemberAuthController {
 
     private final WxOpenIdResolver wxOpenIdResolver;
     private final MemberWxInternalClient memberClient;
+    private final com.teaclub.cloud.auth.client.MarketingInternalClient marketingClient;
     private final MemberBrandProperties memberBrandProperties;
     private final JwtProvider jwtProvider;
     private final PasswordEncoder passwordEncoder;
@@ -111,6 +112,18 @@ public class MemberAuthController {
 
         MemberBindDTO bind = unwrap(callRegister(registerRequest), "会员注册失败");
         log.info("会员注册成功: brandId={} memberId={} memberNo={}", brandId, bind.getMemberId(), bind.getMemberNo());
+
+        // 新人礼包：注册成功后立即发放（营销服务不可用不影响注册成功）
+        try {
+            var granted = marketingClient.triggerNewMember(brandId, bind.getMemberId());
+            if (granted != null && granted.getCode() == 0 && granted.getData() != null && granted.getData() > 0) {
+                log.info("[NEW-MEMBER-GIFT] 新人礼包已发放 memberId={} 活动数={}",
+                        bind.getMemberId(), granted.getData());
+            }
+        } catch (Exception e) {
+            log.warn("[NEW-MEMBER-GIFT] 新人礼包发放失败（不影响注册） memberId={} err={}",
+                    bind.getMemberId(), e.getMessage());
+        }
         return Result.ok(buildToken(bind, brandId));
     }
 

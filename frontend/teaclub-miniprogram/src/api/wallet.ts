@@ -33,3 +33,32 @@ export function getRechargeOrder(rechargeNo: string) {
 export function getRechargeOrders(params: { pageNo?: number; pageSize?: number }) {
   return http.get<PageResult<RechargeOrder>>('/api/wallet/recharges', params)
 }
+
+// ==================== 自助退卡 ====================
+
+export interface CardRefund {
+  id?: number
+  refundNo?: string
+  principalAmount?: number
+  giftVoidAmount?: number
+  status?: string
+  applyReason?: string
+  auditRemark?: string
+  refundTxnNo?: string
+  createTime?: string
+}
+
+/**
+ * POST /api/wallet/card-refund —— 会员自助退卡（提交即退款）。
+ *
+ * 实付本金全额退回，赠送金额作废不折现；
+ * 同一会员每日限退一次，金额由服务端计算。
+ */
+export function applyCardRefund(payload: { reason: string }) {
+  return http.post<CardRefund>('/api/wallet/card-refund', payload)
+}
+
+/** GET /api/wallet/card-refund/mine —— 我的退卡记录 */
+export function getMyCardRefunds() {
+  return http.get<CardRefund[]>('/api/wallet/card-refund/mine')
+}

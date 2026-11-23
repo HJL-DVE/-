@@ -56,11 +56,67 @@ public class PointsServiceImpl implements PointsService {
 
     private final MktPointsAccountMapper accountMapper;
     private final com.teaclub.cloud.marketing.service.LevelBenefitService levelBenefitService;
+    private final com.teaclub.cloud.marketing.service.ActivityService activityService;
     private final MktPointsTransactionMapper txnMapper;
     private final MktPointsBatchMapper batchMapper;
     private final MktPointsRuleMapper ruleMapper;
     private final MktSignInMapper signInMapper;
     private final com.teaclub.cloud.marketing.client.MemberSnapshotClient memberSnapshotClient;
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional(rollbackFor = Exception.class)
+    public PointsRuleVO updateRule(Long id, com.teaclub.cloud.marketing.dto.PointsRuleUpdateRequest request) {
+        MktPointsRule rule = ruleMapper.selectById(id);
+        if (rule == null || Integer.valueOf(1).equals(rule.getDeleted())) {
+            throw new BizException(ResultCode.NOT_FOUND, "积分规则不存在");
+        }
+        if (!rule.getBrandId().equals(brandId())) {
+            throw new BizException(ResultCode.FORBIDDEN, "无权修改其它品牌的积分规则");
+        }
+        // 数值合法性：避免除零与负值
+        if (request.getAmountPerPoint() != null) {
+            if (request.getAmountPerPoint() <= 0) {
+                throw new BizException(ResultCode.PARAM_INVALID, "多少金额得1积分必须大于0");
+            }
+            rule.setAmountPerPoint(request.getAmountPerPoint());
+        }
+        if (request.getSignInPoints() != null) {
+            if (request.getSignInPoints() < 0) {
+                throw new BizException(ResultCode.PARAM_INVALID, "签到积分不能为负");
+            }
+            rule.setSignInPoints(request.getSignInPoints());
+        }
+        if (request.getSignInContinuousMax() != null) {
+            if (request.getSignInContinuousMax() < 0) {
+                throw new BizException(ResultCode.PARAM_INVALID, "连续签到上限不能为负");
+            }
+            rule.setSignInContinuousMax(request.getSignInContinuousMax());
+        }
+        if (request.getSignInBonus() != null) {
+            if (request.getSignInBonus() < 0) {
+                throw new BizException(ResultCode.PARAM_INVALID, "连续签到加成不能为负");
+            }
+            rule.setSignInBonus(request.getSignInBonus());
+        }
+        if (request.getExpireDays() != null) {
+            if (request.getExpireDays() < 0) {
+                throw new BizException(ResultCode.PARAM_INVALID, "有效期天数不能为负");
+            }
+            rule.setExpireDays(request.getExpireDays());
+        }
+        if (request.getStatus() != null) {
+            if (!"ENABLED".equals(request.getStatus()) && !"DISABLED".equals(request.getStatus())) {
+                throw new BizException(ResultCode.PARAM_INVALID, "状态只能是 ENABLED 或 DISABLED");
+            }
+            rule.setStatus(request.getStatus());
+        }
+        rule.setUpdateTime(java.time.LocalDateTime.now());
+        ruleMapper.updateById(rule);
+        log.info("[POINTS-RULE] 更新规则 id={} code={} amountPerPoint={} signInPoints={}",
+                id, rule.getRuleCode(), rule.getAmountPerPoint(), rule.getSignInPoints());
+        return listRules().stream().filter(v -> id.equals(v.getId())).findFirst()
+                .orElseThrow(() -> new BizException(ResultCode.NOT_FOUND, "规则不存在"));
+    }
 
     // ==================== 账户 ====================
 
@@ -392,6 +448,17 @@ public class PointsServiceImpl implements PointsService {
         vo.setFirstTime(true);
         vo.setTotalPoints(newTotal);
         vo.setBonusRemark(bonusDays > 1 ? "连续 " + continuous + " 天，额外加成 " + (bonusDays - 1) + " 天" : null);
+
+        // 连续签到活动：达到活动配置的 continuousDays 即发奖（唯一键保证同一业务只发一次）
+        try {
+            int granted = activityService.triggerContinuousSign(brandId, memberId, continuous);
+            if (granted > 0) {
+                log.info("[SIGN-IN] 触发连续签到活动发奖 memberId={} continuous={} count={}",
+                        memberId, continuous, granted);
+            }
+        } catch (Exception e) {
+            log.warn("[SIGN-IN] 触发连续签到活动失败 memberId={} err={}", memberId, e.getMessage());
+        }
         return vo;
     }
 
@@ -425,6 +492,7 @@ public class PointsServiceImpl implements PointsService {
         Long brandId = brandId();
         return ruleMapper.selectByBrand(brandId).stream().map(r -> {
             PointsRuleVO vo = new PointsRuleVO();
+            vo.setId(r.getId());
             vo.setRuleCode(r.getRuleCode());
             vo.setRuleName(r.getRuleName());
             vo.setAmountPerPoint(r.getAmountPerPoint());

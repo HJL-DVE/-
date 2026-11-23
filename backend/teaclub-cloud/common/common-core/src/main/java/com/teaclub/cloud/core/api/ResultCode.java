@@ -119,7 +119,23 @@ public enum ResultCode {
     /** 门店定价低于最低保护价 */
     PRICE_BELOW_MIN(50008, "门店定价低于最低保护价"),
     /** 价格必须大于 0 */
-    PRICE_INVALID(50009, "价格必须大于 0");
+    PRICE_INVALID(50009, "价格必须大于 0"),
+
+    // ==================== 钱包 / 资金（6xxxx） ====================
+    /** 余额不足 */
+    WALLET_INSUFFICIENT(60001, "余额不足"),
+    /** 钱包不存在 */
+    WALLET_NOT_FOUND(60002, "钱包不存在"),
+    /** 赠送金已被使用，自助退卡不可用，需转人工处理 */
+    CARD_REFUND_GIFT_USED(60003, "赠送金额已被使用，需门店店长人工处理退卡"),
+    /** 无实付余额可退 */
+    CARD_REFUND_NO_PRINCIPAL(60004, "当前无实付本金可退"),
+    /** 今日已办理过退卡 */
+    CARD_REFUND_DAILY_LIMIT(60005, "今日已办理过退卡，请明日再试"),
+    /** 退卡申请不存在 */
+    CARD_REFUND_NOT_FOUND(60006, "退卡申请不存在"),
+    /** 退卡申请已处理 */
+    CARD_REFUND_ALREADY_HANDLED(60007, "该退卡申请已处理，请勿重复审核");
 
     private final int code;
     private final String message;

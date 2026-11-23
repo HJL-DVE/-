@@ -153,16 +153,22 @@ const optGrowth = computed(() => ({
 const optRank = computed(() => ({
   tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
   xAxis: { type: 'value', name: '元' },
-  yAxis: { type: 'category', data: rank.value.map((x) => x.storeName).reverse() },
-  series: [{ name: '销售额', type: 'bar', data: rank.value.map((x) => x.sales / 100).reverse() }],
+  yAxis: {
+    type: 'category', data: rank.value.map((x) => x.storeName).reverse(),
+    axisLabel: { width: 100, overflow: 'truncate', formatter: (n: string) => (n.length > 8 ? n.slice(0, 7) + '…' : n) },
+  },
+  series: [{ name: '销售额', type: 'bar', barMaxWidth: 24, data: rank.value.map((x) => x.sales / 100).reverse() }],
   legend: { data: ['销售额'] },
   grid: { left: 110, right: 30, top: 30, bottom: 28 },
 }))
 const optHot = computed(() => ({
   tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
   xAxis: { type: 'value', name: '件' },
-  yAxis: { type: 'category', data: hot.value.map((x) => x.name).reverse() },
-  series: [{ name: '销量', type: 'bar', data: hot.value.map((x) => x.qty).reverse() }],
+  yAxis: {
+    type: 'category', data: hot.value.map((x) => x.name).reverse(),
+    axisLabel: { width: 120, overflow: 'truncate', formatter: (n: string) => (n.length > 10 ? n.slice(0, 9) + '…' : n) },
+  },
+  series: [{ name: '销量', type: 'bar', barMaxWidth: 24, data: hot.value.map((x) => x.qty).reverse() }],
   legend: { data: ['销量'] },
   grid: { left: 130, right: 30, top: 30, bottom: 28 },
 }))
@@ -176,7 +182,7 @@ async function loadAll() {
     const [t7, t30, g] = await Promise.all([
       getDashboardTrend(7, storeId.value),
       getDashboardTrend(30, storeId.value),
-      getMemberGrowth(30),
+      getMemberGrowth(30, storeId.value),
     ])
     trend7.value = t7.salesTrend || []
     trend30.value = t30.salesTrend || []

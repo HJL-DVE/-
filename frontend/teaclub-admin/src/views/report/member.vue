@@ -34,6 +34,7 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import EChart from './components/EChart.vue'
 import { getMemberOverview, getMemberGrowth } from '@/api/report'
 
@@ -54,18 +55,22 @@ async function loadGrowth() {
 }
 
 async function load() {
-  const o = await getMemberOverview()
-  rank.value = o.consumeRank || []
-  levelOption.value = {
-    tooltip: { trigger: 'item', formatter: '{b}: {c} 人 ({d}%)' },
-    legend: { orient: 'vertical', left: 'left' },
-    series: [{
-      type: 'pie', radius: ['40%', '70%'],
-      label: { formatter: '{b}: {c}' },
-      data: (o.levelDistribution || []).map((x) => ({ name: x.name || '未知', value: x.value })),
-    }],
+  try {
+    const o = await getMemberOverview()
+    rank.value = o.consumeRank || []
+    levelOption.value = {
+      tooltip: { trigger: 'item', formatter: '{b}: {c} 人 ({d}%)' },
+      legend: { type: 'scroll', bottom: 0, left: 'center', itemGap: 8 },
+      series: [{
+        type: 'pie', radius: ['38%', '65%'], center: ['50%', '46%'],
+        label: { formatter: '{d}%' },
+        data: (o.levelDistribution || []).map((x) => ({ name: x.name || '未知', value: x.value })),
+      }],
+    }
+    await loadGrowth()
+  } catch (e) {
+    ElMessage.error('会员报表加载失败：' + (e instanceof Error ? e.message : '未知错误'))
   }
-  await loadGrowth()
 }
 
 onMounted(load)

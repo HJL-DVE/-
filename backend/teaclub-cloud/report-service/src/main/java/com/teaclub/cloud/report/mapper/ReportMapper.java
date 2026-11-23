@@ -64,12 +64,12 @@ public interface ReportMapper {
                                            @Param("storeId") Long storeId);
 
     @Select("""
-            SELECT l.level_name AS name, COUNT(m.id) AS value
+            SELECT COALESCE(l.level_name,'未知等级') AS name, COUNT(m.id) AS value
             FROM member_db.mem_member m
             LEFT JOIN member_db.mem_member_level l ON l.id = m.level_id
             WHERE m.deleted = 0 AND m.brand_id = #{brandId}
               AND (#{storeId} IS NULL OR m.register_store_id = #{storeId})
-            GROUP BY l.level_name ORDER BY value DESC
+            GROUP BY l.id, l.level_name ORDER BY value DESC
             """)
     List<Map<String, Object>> memberLevelDistribution(@Param("brandId") Long brandId,
                                                       @Param("storeId") Long storeId);
@@ -89,11 +89,11 @@ public interface ReportMapper {
     // ==================== 订单（销售） ====================
 
     @Select("""
-            SELECT COALESCE(SUM(payable_amount),0) AS sales,
+            SELECT COALESCE(SUM(paid_amount - refunded_amount),0) AS sales,
                    COUNT(*) AS orders
             FROM order_db.oms_order
             WHERE brand_id = #{brandId} AND deleted = 0
-              AND status IN ('PAID','COMPLETED','REFUNDING','REFUNDED')
+              AND status IN ('PAID','COMPLETED','REFUNDING')
               AND (#{storeId} IS NULL OR store_id = #{storeId})
               AND (#{since} IS NULL OR pay_time >= #{since})
               AND (#{until} IS NULL OR pay_time < #{until})
@@ -105,26 +105,28 @@ public interface ReportMapper {
 
     @Select("""
             SELECT DATE(pay_time) AS d,
-                   COALESCE(SUM(payable_amount),0) AS sales,
+                   COALESCE(SUM(paid_amount - refunded_amount),0) AS sales,
                    COUNT(*) AS orders
             FROM order_db.oms_order
             WHERE brand_id = #{brandId} AND deleted = 0
-              AND status IN ('PAID','COMPLETED','REFUNDING','REFUNDED')
+              AND status IN ('PAID','COMPLETED','REFUNDING')
               AND (#{storeId} IS NULL OR store_id = #{storeId})
               AND pay_time >= #{since}
+              AND (#{until} IS NULL OR pay_time < #{until})
             GROUP BY DATE(pay_time) ORDER BY d
             """)
     List<Map<String, Object>> salesTrend(@Param("brandId") Long brandId,
                                          @Param("storeId") Long storeId,
-                                         @Param("since") LocalDateTime since);
+                                         @Param("since") LocalDateTime since,
+                                         @Param("until") LocalDateTime until);
 
     @Select("""
             SELECT store_id AS storeId,
-                   COALESCE(SUM(payable_amount),0) AS sales,
+                   COALESCE(SUM(paid_amount - refunded_amount),0) AS sales,
                    COUNT(*) AS orders
             FROM order_db.oms_order
             WHERE brand_id = #{brandId} AND deleted = 0
-              AND status IN ('PAID','COMPLETED','REFUNDING','REFUNDED')
+              AND status IN ('PAID','COMPLETED','REFUNDING')
               AND (#{storeId} IS NULL OR store_id = #{storeId})
               AND (#{since} IS NULL OR pay_time >= #{since})
               AND (#{until} IS NULL OR pay_time < #{until})
@@ -139,21 +141,23 @@ public interface ReportMapper {
     /** 今日每小时订单趋势（0-23 点；无单的小时由服务层补零）。 */
     @Select("""
             SELECT HOUR(pay_time) AS h, COUNT(*) AS orders,
-                   COALESCE(SUM(payable_amount),0) AS sales
+                   COALESCE(SUM(paid_amount - refunded_amount),0) AS sales
             FROM order_db.oms_order
             WHERE brand_id = #{brandId} AND deleted = 0
-              AND status IN ('PAID','COMPLETED','REFUNDING','REFUNDED')
+              AND status IN ('PAID','COMPLETED','REFUNDING')
               AND (#{storeId} IS NULL OR store_id = #{storeId})
               AND pay_time >= #{since}
+              AND pay_time < #{until}
             GROUP BY HOUR(pay_time) ORDER BY h
             """)
     List<Map<String, Object>> hourlyOrders(@Param("brandId") Long brandId,
                                            @Param("storeId") Long storeId,
-                                           @Param("since") LocalDateTime since);
+                                           @Param("since") LocalDateTime since,
+                                           @Param("until") LocalDateTime until);
 
     /** 商品分类销售排行（经 product_db.prd_spu 关联分类；metric 白名单由服务层传入）。 */
     @Select("""
-            SELECT c.category_name AS name,
+            SELECT COALESCE(c.category_name,'未分类') AS name,
                    SUM(i.quantity) AS qty,
                    COALESCE(SUM(i.actual_amount),0) AS amount
             FROM order_db.oms_order_item i
@@ -161,15 +165,17 @@ public interface ReportMapper {
             JOIN product_db.prd_spu s ON s.id = i.spu_id
             LEFT JOIN product_db.prd_category c ON c.id = s.category_id
             WHERE i.brand_id = #{brandId} AND o.deleted = 0
-              AND o.status IN ('PAID','COMPLETED','REFUNDING','REFUNDED')
+              AND o.status IN ('PAID','COMPLETED','REFUNDING')
               AND (#{storeId} IS NULL OR i.store_id = #{storeId})
               AND (#{since} IS NULL OR o.pay_time >= #{since})
-            GROUP BY c.category_name
+              AND (#{until} IS NULL OR o.pay_time < #{until})
+            GROUP BY c.id, c.category_name
             ORDER BY ${metric} DESC LIMIT #{limit}
             """)
     List<Map<String, Object>> categoryRank(@Param("brandId") Long brandId,
                                            @Param("storeId") Long storeId,
                                            @Param("since") LocalDateTime since,
+                                           @Param("until") LocalDateTime until,
                                            @Param("metric") String metric,
                                            @Param("limit") int limit);
 
@@ -189,24 +195,24 @@ public interface ReportMapper {
                                            @Param("storeId") Long storeId,
                                            @Param("since") LocalDateTime since);
     /**
-     * 商品排行：metric 只允许 qty 或 amount（服务层白名单传入，用 ${} 拼 ORDER BY）。
+     * 商品排行（商品级）：按 spu_id 聚合，每个商品一行。
      *
-     * <p>按 sku_id 聚合（而非 sku_name 快照）—— 历史订单里同一 SKU 存在"完整名"和"纯规格名"
-     * 两种 sku_name，按 sku_name 分组会把同一商品拆成多行、且出现孤立的"大杯/中杯"。
-     * 展示名统一用 spu_name，保证重复的是"同一商品"而不是无意义的规格词。
+     * <p>不能按 sku_id —— 同一商品的大杯/中杯是不同 sku，会产出多条同名行；
+     * 也不能按 sku_name 快照 —— 历史数据存在"完整名/纯规格名"混用，会出现孤立的"大杯/中杯"。
+     * 按 spu_id 聚合后展示名取 MAX(spu_name) 即商品名，保证"一种商品一行"。
      */
     @Select("""
-            SELECT i.sku_id AS skuId, MAX(i.spu_name) AS name,
+            SELECT i.spu_id AS spuId, MAX(i.spu_name) AS name,
                    SUM(i.quantity) AS qty,
                    COALESCE(SUM(i.actual_amount),0) AS amount
             FROM order_db.oms_order_item i
             JOIN order_db.oms_order o ON o.id = i.order_id
             WHERE i.brand_id = #{brandId} AND o.deleted = 0
-              AND o.status IN ('PAID','COMPLETED','REFUNDING','REFUNDED')
+              AND o.status IN ('PAID','COMPLETED','REFUNDING')
               AND (#{storeId} IS NULL OR i.store_id = #{storeId})
               AND (#{since} IS NULL OR o.pay_time >= #{since})
               AND (#{until} IS NULL OR o.pay_time < #{until})
-            GROUP BY i.sku_id
+            GROUP BY i.spu_id
             ORDER BY ${metric} DESC LIMIT #{limit}
             """)
     List<Map<String, Object>> productRank(@Param("brandId") Long brandId,

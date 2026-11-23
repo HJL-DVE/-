@@ -45,6 +45,14 @@ public class PointsAdminController {
         return Result.ok(pointsService.listRules());
     }
 
+    @Operation(summary = "更新积分规则")
+    @PutMapping("/rules/{id}")
+    @PreAuthorize("hasAuthority('marketing:points:rule')")
+    public Result<PointsRuleVO> updateRule(@PathVariable Long id,
+                                           @RequestBody com.teaclub.cloud.marketing.dto.PointsRuleUpdateRequest request) {
+        return Result.ok(pointsService.updateRule(id, request));
+    }
+
     @Operation(summary = "人工调整积分（正加负减）")
     @PostMapping("/adjust")
     @PreAuthorize("hasAuthority('marketing:points:adjust')")

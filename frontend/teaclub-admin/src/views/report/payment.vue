@@ -33,6 +33,7 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import EChart from './components/EChart.vue'
 import { getPaymentOverview, yuan } from '@/api/report'
 
@@ -41,15 +42,19 @@ const ov = ref<Awaited<ReturnType<typeof getPaymentOverview>> | null>(null)
 const pieOption = ref<Record<string, unknown>>({})
 
 async function load() {
-  ov.value = await getPaymentOverview(days.value)
-  const ch = ov.value?.byChannel || []
-  pieOption.value = {
-    tooltip: { trigger: 'item', formatter: '{b}: {c}元 ({d}%)' },
-    legend: { orient: 'vertical', left: 'left' },
-    series: [{
-      type: 'pie', radius: ['40%', '70%'],
-      data: ch.map((x) => ({ name: x.channel, value: x.amount / 100 })),
-    }],
+  try {
+    ov.value = await getPaymentOverview(days.value)
+    const ch = ov.value?.byChannel || []
+    pieOption.value = {
+      tooltip: { trigger: 'item', formatter: '{b}: {c}元 ({d}%)' },
+      legend: { orient: 'vertical', left: 'left', top: 'middle', itemGap: 10 },
+      series: [{
+        type: 'pie', radius: ['40%', '68%'], center: ['62%', '55%'],
+        data: ch.map((x) => ({ name: x.channel, value: x.amount / 100 })),
+      }],
+    }
+  } catch (e) {
+    ElMessage.error('支付报表加载失败：' + (e instanceof Error ? e.message : '未知错误'))
   }
 }
 

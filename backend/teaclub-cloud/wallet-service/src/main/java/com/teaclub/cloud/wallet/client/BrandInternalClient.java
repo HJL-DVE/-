@@ -28,6 +28,15 @@ public interface BrandInternalClient {
     Result<String> getDeductOrder(@PathVariable("brandId") Long brandId);
 
     /**
+     * 查询品牌退款规则（退卡时判断是否需审核、每日上限、赠送金处置策略）。
+     *
+     * @param brandId 品牌 ID
+     * @return deductOrder / needAudit / dailyLimit / giftConsumedAction
+     */
+    @GetMapping("/brand/{brandId}/refund-rule")
+    Result<Map<String, Object>> getRefundRule(@PathVariable("brandId") Long brandId);
+
+    /**
      * 批量查询门店名称（流水/充值单展示用）。
      *
      * @param brandId  品牌 ID

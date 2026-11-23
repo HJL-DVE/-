@@ -46,6 +46,16 @@
             <el-table-column label="创建时间" width="170">
               <template #default="{ row }">{{ formatDateTime(row.createTime) }}</template>
             </el-table-column>
+            <el-table-column label="操作" width="90" fixed="right">
+              <template #default="{ row }">
+                <el-button
+                  v-if="userStore.hasPerm('payment:query')"
+                  link type="primary"
+                  :loading="queryingNo === row.paymentNo"
+                  @click="doQuery(row.paymentNo)"
+                >查单</el-button>
+              </template>
+            </el-table-column>
           </el-table>
 
           <div class="pager">
@@ -66,13 +76,33 @@
         </el-tab-pane>
       </el-tabs>
     </div>
+
+    <el-dialog v-model="queryVisible" title="主动查单结果" width="460px">
+      <el-descriptions v-if="queryResult" :column="1" border size="small">
+        <el-descriptions-item label="支付单号">{{ queryResult.paymentNo }}</el-descriptions-item>
+        <el-descriptions-item label="渠道状态">
+          <el-tag size="small" :type="tagTypeByStatus(queryResult.status)">
+            {{ PAY_STATUS_LABEL[queryResult.status] || queryResult.status }}
+          </el-tag>
+        </el-descriptions-item>
+        <el-descriptions-item label="渠道">{{ PAY_CHANNEL_LABEL[queryResult.channel] || queryResult.channel }}</el-descriptions-item>
+        <el-descriptions-item label="金额">{{ fenToYuan(queryResult.amount) }} 元</el-descriptions-item>
+        <el-descriptions-item label="业务单号">{{ queryResult.bizNo }}</el-descriptions-item>
+        <el-descriptions-item label="成功时间">{{ formatDateTime(queryResult.successTime) || '—' }}</el-descriptions-item>
+      </el-descriptions>
+      <template #footer>
+        <el-button @click="queryVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import { Refresh, Search } from '@element-plus/icons-vue'
-import { getPaymentPage } from '@/api/payment'
+import { getPaymentPage, queryPayment } from '@/api/payment'
+import { useUserStore } from '@/stores/user'
 import NotifyTable from './notify.vue'
 import {
   BIZ_TYPE_LABEL,
@@ -115,6 +145,25 @@ async function loadOrders(): Promise<void> {
 function searchOrders(): void {
   orderQuery.pageNo = 1
   loadOrders()
+}
+
+const userStore = useUserStore()
+const queryingNo = ref('')
+const queryVisible = ref(false)
+const queryResult = ref<PaymentVO | null>(null)
+
+async function doQuery(paymentNo: string): Promise<void> {
+  queryingNo.value = paymentNo
+  try {
+    // 主动向支付渠道核实该支付单的真实状态
+    const result = await queryPayment(paymentNo, true)
+    queryResult.value = result
+    queryVisible.value = true
+  } catch (error) {
+    ElMessage.error((error as Error)?.message || '查单失败')
+  } finally {
+    queryingNo.value = ''
+  }
 }
 
 onMounted(loadOrders)

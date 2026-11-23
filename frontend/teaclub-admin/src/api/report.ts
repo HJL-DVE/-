@@ -72,8 +72,8 @@ export function getMemberOverview() {
   }>('/api/report/member/overview')
 }
 
-export function getMemberGrowth(days = 30) {
-  return http.get<{ days: number; growth: TrendPoint[] }>('/api/report/member/growth', { days })
+export function getMemberGrowth(days = 30, storeId?: number) {
+  return http.get<{ days: number; growth: TrendPoint[] }>('/api/report/member/growth', { days, storeId })
 }
 
 export function getRechargeOverview(days = 30, storeId?: number) {

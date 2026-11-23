@@ -70,6 +70,28 @@ public interface OmsOrderMapper extends BaseMapper<OmsOrder> {
                               @Param("since") java.time.LocalDateTime since,
                               @Param("payChannel") String payChannel);
 
+    /**
+     * 区间内钱包支付的资金构成汇总：实付本金与赠送金。
+     *
+     * <p>营业额 GMV = 现金支付 + 钱包本金抵扣 + 钱包赠送抵扣。
+     * 本方法拆出后两项，供「营业额（实付/赠送）」展示与口径核对。
+     */
+    @Select("""
+            <script>
+            SELECT
+              COALESCE(SUM(balance_principal_amount), 0) AS principal,
+              COALESCE(SUM(balance_gift_amount), 0) AS gift
+            FROM oms_order
+            WHERE brand_id = #{brandId} AND deleted = 0 AND create_time &gt;= #{since}
+              AND status IN ('PAID','COMPLETED','REFUNDING','REFUNDED')
+            <if test="storeId != null"> AND store_id = #{storeId} </if>
+            </script>
+            """)
+    java.util.Map<String, Object> sumBalanceCompositionSince(
+            @Param("brandId") Long brandId,
+            @Param("storeId") Long storeId,
+            @Param("since") java.time.LocalDateTime since);
+
     /** 按日趋势（订单数 + 成交额）。 */
     @Select("""
             <script>

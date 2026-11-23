@@ -69,7 +69,12 @@ async function submit(): Promise<void> {
     userStore.loaded = true
     registerDynamicRoutes(router, userStore.menus)
     await appStore.loadStores().catch(() => undefined)
-    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/dashboard'
+    const roles = userStore.userInfo?.roles || []
+    const cashierOnly = roles.includes('CASHIER')
+      && !roles.includes('SUPER_ADMIN') && !roles.includes('HQ_ADMIN') && !roles.includes('STORE_MANAGER')
+    const redirect = typeof route.query.redirect === 'string'
+      ? route.query.redirect
+      : (cashierOnly ? '/cashier' : '/dashboard')
     await router.replace(redirect)
     ElMessage.success('欢迎回来，' + userStore.displayName)
   } finally {

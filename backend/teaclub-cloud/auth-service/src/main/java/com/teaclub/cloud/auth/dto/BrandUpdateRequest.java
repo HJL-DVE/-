@@ -22,4 +22,13 @@ public class BrandUpdateRequest {
     @Pattern(regexp = "^(GIFT_FIRST|PRINCIPAL_FIRST)$", message = "扣款顺序只能是 GIFT_FIRST 或 PRINCIPAL_FIRST")
     private String walletDeductOrder;
 
+    /** 退款是否需要人工审核：1 需要 0 自助秒退 */
+    private Integer refundNeedAudit;
+
+    /** 同一会员每日退卡次数上限，0 表示不限 */
+    private Integer refundDailyLimit;
+
+    /** 赠送金已被消费时的处置：REJECT / ALLOW */
+    private String refundGiftConsumedAction;
+
 }

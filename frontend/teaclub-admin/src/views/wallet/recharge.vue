@@ -65,7 +65,7 @@
           <template #default="{ row }">
             <el-button link type="primary" @click="openDetail(row)">详情</el-button>
             <el-button v-if="row.status === 'PENDING'" link type="danger" @click="onCancel(row)">取消</el-button>
-            <el-button v-if="row.status === 'PAID'" link type="danger" @click="onRefund(row)">退卡</el-button>
+            <el-button v-if="row.status === 'PAID' && userStore.hasPerm('wallet:refund')" link type="danger" @click="onRefund(row)">退卡</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -83,7 +83,7 @@
       </div>
     </div>
 
-    <div class="page-card" style="margin-top: 14px">
+    <div v-if="userStore.hasPerm('wallet:plan:list')" class="page-card" style="margin-top: 14px">
       <div class="toolbar">
         <strong>充值方案（GET /api/admin/wallet/plans）</strong>
         <div class="toolbar-spacer" />
@@ -193,12 +193,13 @@
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Refresh, Search } from '@element-plus/icons-vue'
-import { cancelRecharge, createRecharge, getPlans, getRechargePage } from '@/api/wallet'
+import { cancelRecharge, createRecharge, getPlans, getAvailablePlans, getRechargePage } from '@/api/wallet'
 import { refundRecharge } from '@/api/payment'
 import { getMemberByPhone } from '@/api/member'
 import { ApiError, isApiError } from '@/api/request'
 import ApiPending from '@/components/ApiPending.vue'
 import { useAppStore } from '@/stores/app'
+import { useUserStore } from '@/stores/user'
 import {
   PAY_CHANNEL_LABEL,
   RECHARGE_STATUS_LABEL,
@@ -211,6 +212,7 @@ import {
 import type { MemberVO, RechargeOrderVO, RechargePlanVO } from '@/api/types'
 
 const appStore = useAppStore()
+const userStore = useUserStore()
 
 const loading = ref(false)
 const records = ref<RechargeOrderVO[]>([])
@@ -264,7 +266,10 @@ function search(): void {
 async function loadPlans(): Promise<void> {
   plansLoading.value = true
   try {
-    plans.value = await getPlans()
+    // 收银员无 wallet:plan:list：改用免权限的 /plans/available，保证新建充值下拉有数据
+    plans.value = userStore.hasPerm('wallet:plan:list')
+      ? await getPlans()
+      : await getAvailablePlans({})
     plansError.value = null
   } catch (error) {
     plans.value = []

@@ -59,10 +59,10 @@
         <el-table-column label="操作" width="220" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" @click="openDetail(row)">SKU 明细</el-button>
-            <el-button link type="primary" @click="toggleStatus(row)">
+            <el-button v-if="userStore.hasPerm('product:spu:update')" link type="primary" @click="toggleStatus(row)">
               {{ row.status === 'ON_SALE' ? '下架' : '上架' }}
             </el-button>
-            <el-button link type="danger" @click="onDelete(row)">删除</el-button>
+            <el-button v-if="userStore.hasPerm('product:spu:delete')" link type="danger" @click="onDelete(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -97,7 +97,7 @@
         <el-table-column label="售价" width="100" align="right">
           <template #default="{ row }"><span class="money">{{ fenToYuan(row.price) }}</span></template>
         </el-table-column>
-        <el-table-column label="成本" width="100" align="right">
+        <el-table-column v-if="userStore.hasPerm('product:spu:update')" label="成本" width="100" align="right">
           <template #default="{ row }">{{ fenToYuan(row.costPrice) }}</template>
         </el-table-column>
         <el-table-column label="状态" width="90">
@@ -115,9 +115,11 @@ import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh, Search } from '@element-plus/icons-vue'
 import { getCategoryTree, getSpuDetail, getSpuPage, updateSpuStatus, deleteSpu } from '@/api/product'
+import { useUserStore } from '@/stores/user'
 import { fenToYuan, tagTypeByStatus, ENABLED_LABEL } from '@/utils/format'
 import type { CategoryVO, SpuVO } from '@/api/types'
 
+const userStore = useUserStore()
 const loading = ref(false)
 const records = ref<SpuVO[]>([])
 const total = ref(0)

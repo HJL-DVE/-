@@ -22,6 +22,7 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import EChart from './components/EChart.vue'
 import { getRefundOverview, yuan } from '@/api/report'
 
@@ -30,14 +31,18 @@ const ov = ref<Awaited<ReturnType<typeof getRefundOverview>> | null>(null)
 const trendOption = ref<Record<string, unknown>>({})
 
 async function load() {
-  ov.value = await getRefundOverview(days.value)
-  const t = ov.value?.trend || []
-  trendOption.value = {
-    tooltip: { trigger: 'axis' },
-    xAxis: { type: 'category', data: t.map((p) => p.date.slice(5)) },
-    yAxis: { type: 'value', name: '元' },
-    series: [{ name: '退款金额', type: 'line', smooth: true, areaStyle: {}, data: t.map((p) => p.value / 100) }],
-    grid: { left: 60, right: 30, bottom: 30, top: 30 },
+  try {
+    ov.value = await getRefundOverview(days.value)
+    const t = ov.value?.trend || []
+    trendOption.value = {
+      tooltip: { trigger: 'axis' },
+      xAxis: { type: 'category', data: t.map((p) => p.date.slice(5)) },
+      yAxis: { type: 'value', name: '元' },
+      series: [{ name: '退款金额', type: 'line', smooth: true, areaStyle: {}, data: t.map((p) => p.value / 100) }],
+      grid: { left: 60, right: 30, bottom: 30, top: 30 },
+    }
+  } catch (e) {
+    ElMessage.error('退款报表加载失败：' + (e instanceof Error ? e.message : '未知错误'))
   }
 }
 

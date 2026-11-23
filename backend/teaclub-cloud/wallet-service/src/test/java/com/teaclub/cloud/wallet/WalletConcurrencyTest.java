@@ -42,14 +42,18 @@ class WalletConcurrencyTest {
     private WalWalletTransactionMapper txnMapper;
 
     private static final Long BRAND_ID = 1L;
-    private static final Long MEMBER_ID = 900002L;
     private static final Long STORE_ID = 1L;
+
+    /** 每次运行用独立会员 ID，避免上次运行残留余额导致断言不稳定 */
+    private long freshMemberId() {
+        return 900_000_000L + (Math.abs(System.nanoTime()) % 1_000_000L);
+    }
 
     @Test
     @DisplayName("并发扣款：不超扣、不出现负余额")
     void concurrentConsumeNeverOverdraws() throws Exception {
         String tag = UUID.randomUUID().toString().substring(0, 8);
-        long memberId = MEMBER_ID;
+        long memberId = freshMemberId();
 
         // 充值 100 元
         walletService.rechargeIn(RechargeInCmd.builder()
@@ -120,7 +124,7 @@ class WalletConcurrencyTest {
     @DisplayName("并发重复同一订单号：只扣一次")
     void concurrentSameOrderOnlyDeductsOnce() throws Exception {
         String tag = UUID.randomUUID().toString().substring(0, 8);
-        long memberId = 900003L;
+        long memberId = freshMemberId();
         String orderNo = "TC-SAME-" + tag;
 
         walletService.rechargeIn(RechargeInCmd.builder()

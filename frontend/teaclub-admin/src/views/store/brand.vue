@@ -27,10 +27,6 @@
           <el-input v-if="editing" v-model="form.contactPhone" maxlength="30" style="width: 300px" />
           <span v-else>{{ brand?.contactPhone || '-' }}</span>
         </el-descriptions-item>
-        <el-descriptions-item label="Logo 地址">
-          <el-input v-if="editing" v-model="form.logoUrl" placeholder="https://..." style="width: 300px" />
-          <span v-else class="text-muted">{{ brand?.logoUrl || '未设置' }}</span>
-        </el-descriptions-item>
         <el-descriptions-item label="余额抵扣顺序">
           <el-select v-if="editing" v-model="form.walletDeductOrder" style="width: 200px">
             <el-option label="先赠后本（优先使用赠送金）" value="GIFT_FIRST" />
@@ -107,7 +103,6 @@ async function save() {
     await updateBrand({
       brandName: form.value.brandName?.trim(),
       contactPhone: form.value.contactPhone,
-      logoUrl: form.value.logoUrl,
       walletDeductOrder: form.value.walletDeductOrder,
     })
     ElMessage.success('品牌信息已更新')

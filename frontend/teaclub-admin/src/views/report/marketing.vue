@@ -81,11 +81,11 @@ const optCoupon = computed(() => ({
 }))
 const optLevel = computed(() => ({
   tooltip: { trigger: 'item', formatter: '{b}: {c} 人 ({d}%)' },
-  legend: { orient: 'vertical', left: 'left' },
+  legend: { orient: 'vertical', left: 'left', top: 'middle', itemGap: 10 },
   series: [{
     name: '会员等级',
-    type: 'pie', radius: ['40%', '70%'],
-    label: { formatter: '{b}: {c}' },
+    type: 'pie', radius: ['40%', '68%'], center: ['62%', '55%'],
+    label: { formatter: '{d}%' },
     data: levels.value.map((x) => ({ name: x.name || '未知', value: x.value })),
   }],
 }))

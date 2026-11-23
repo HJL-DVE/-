@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.Map;
 
@@ -26,4 +27,14 @@ public interface MemberSnapshotClient {
     @PostMapping("/user/{userId}/points-snapshot")
     Result<Void> syncPoints(@PathVariable("userId") Long userId,
                             @RequestBody Map<String, Object> body);
+
+    /** 当月生日会员 ID（生日活动定时发奖用）。 */
+    @GetMapping("/birthday-members")
+    Result<java.util.List<Long>> birthdayMembers(@RequestParam("brandId") Long brandId,
+                                                  @RequestParam("month") Integer month);
+
+    /** 沉睡会员 ID（沉睡召回应活动定时发奖用）。 */
+    @GetMapping("/sleeping-members")
+    Result<java.util.List<Long>> sleepingMembers(@RequestParam("brandId") Long brandId,
+                                                  @RequestParam("sleepingDays") Integer sleepingDays);
 }

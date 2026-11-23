@@ -8,6 +8,9 @@ import lombok.Data;
 @Schema(description = "积分规则")
 public class PointsRuleVO {
 
+    @Schema(description = "规则ID")
+    private Long id;
+
     @Schema(description = "规则编码，如 ORDER_EARN / SIGN_IN")
     private String ruleCode;
 

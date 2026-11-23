@@ -52,6 +52,39 @@ public class BrandInternalController {
         return Result.ok(value);
     }
 
+    /**
+     * 查询品牌退款规则（供 wallet-service 退卡时判断是否需审核等）。
+     *
+     * <p>返回字段：
+     * <ul>
+     *   <li>{@code deductOrder}：消费扣款顺序 GIFT_FIRST / PRINCIPAL_FIRST</li>
+     *   <li>{@code needAudit}：退卡是否需要人工审核 1/0</li>
+     *   <li>{@code dailyLimit}：每日退卡次数上限，0 表示不限</li>
+     *   <li>{@code giftConsumedAction}：赠送金已被消费时 REJECT / ALLOW</li>
+     * </ul>
+     */
+    @Operation(summary = "查询品牌退款规则")
+    @GetMapping("/brand/{brandId}/refund-rule")
+    public Result<Map<String, Object>> getRefundRule(@PathVariable("brandId") Long brandId) {
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT wallet_deduct_order, refund_need_audit, refund_daily_limit, refund_gift_consumed_action "
+                        + "FROM sys_brand WHERE id = ?", brandId);
+        if (rows.isEmpty()) {
+            throw new BizException(ResultCode.NOT_FOUND, "品牌不存在");
+        }
+        Map<String, Object> row = rows.get(0);
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("deductOrder", row.get("wallet_deduct_order") == null
+                ? "GIFT_FIRST" : String.valueOf(row.get("wallet_deduct_order")));
+        data.put("needAudit", row.get("refund_need_audit") == null
+                ? 1 : ((Number) row.get("refund_need_audit")).intValue());
+        data.put("dailyLimit", row.get("refund_daily_limit") == null
+                ? 1 : ((Number) row.get("refund_daily_limit")).intValue());
+        data.put("giftConsumedAction", row.get("refund_gift_consumed_action") == null
+                ? "REJECT" : String.valueOf(row.get("refund_gift_consumed_action")));
+        log.info("查询品牌退款规则: brandId={} data={}", brandId, data);
+        return Result.ok(data);
+    }
     @Operation(summary = "查询单个门店信息")
     @GetMapping("/store/{storeId}")
     public Result<Map<String, Object>> store(@PathVariable("storeId") Long storeId) {

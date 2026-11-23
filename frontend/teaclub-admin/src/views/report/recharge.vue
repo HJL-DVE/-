@@ -109,10 +109,10 @@ const optRc = computed(() => ({
 }))
 const optPay = computed(() => ({
   tooltip: { trigger: 'item', formatter: '{b}: {c}元 ({d}%)' },
-  legend: { orient: 'vertical', left: 'left' },
+  legend: { orient: 'vertical', left: 'left', top: 'middle', itemGap: 10 },
   series: [{
     name: '模拟支付',
-    type: 'pie', radius: ['40%', '70%'],
+    type: 'pie', radius: ['40%', '68%'], center: ['62%', '55%'],
     label: { formatter: '{b}: {d}%' },
     data: channels.value.map((x) => ({ name: x.channel, value: x.amount / 100 })),
   }],

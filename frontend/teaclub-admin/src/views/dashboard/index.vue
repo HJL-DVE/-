@@ -27,10 +27,14 @@
     <el-row :gutter="14">
       <el-col :span="6">
         <div class="stat-card">
-          <div class="stat-label"><el-icon><TrendCharts /></el-icon> 营业额（GMV）</div>
-          <div class="stat-value">{{ orderStats ? fenToYuan(orderStats.gmv) : placeholder(orderStatsError) }}</div>
+          <div class="stat-label"><el-icon><TrendCharts /></el-icon> 营业额（实付 / 赠送）</div>
+          <div class="stat-value">
+            {{ orderStats ? fenToYuan(orderStats.actualPayAmount ?? orderStats.gmv) : placeholder(orderStatsError) }}
+            <span class="stat-sep">/</span>
+            {{ orderStats ? fenToYuan(orderStats.balanceGiftAmount ?? 0) : '-' }}
+          </div>
           <div class="stat-extra">
-            订单 {{ orderStats?.orderCount ?? '-' }} 笔 · 已支付 {{ orderStats?.paidOrderCount ?? '-' }} 笔 ·
+            合计 GMV ¥{{ orderStats ? fenToYuan(orderStats.gmv) : '-' }} · 订单 {{ orderStats?.paidOrderCount ?? '-' }} 笔 ·
             客单价 {{ orderStats ? fenToYuan(orderStats.avgOrderAmount) : '-' }}
           </div>
         </div>

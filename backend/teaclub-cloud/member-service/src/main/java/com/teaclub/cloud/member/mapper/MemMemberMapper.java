@@ -165,4 +165,38 @@ public interface MemMemberMapper extends BaseMapper<MemMember> {
             </script>
             """)
     Long sumPoints(@Param("brandId") Long brandId, @Param("memberIds") Collection<Long> memberIds);
+
+    /**
+     * 当月生日的会员 ID（营销活动定时发奖用）。
+     *
+     * @param brandId 品牌
+     * @param month   月份 1-12
+     */
+    @Select("""
+            SELECT m.id
+            FROM mem_member m
+            WHERE m.brand_id = #{brandId}
+              AND m.deleted = 0
+              AND m.status = 'ACTIVE'
+              AND m.birthday IS NOT NULL
+              AND MONTH(m.birthday) = #{month}
+            """)
+    List<Long> selectBirthdayIds(@Param("brandId") Long brandId, @Param("month") Integer month);
+
+    /**
+     * 沉睡会员 ID：最后消费时间早于截止时间；从未消费的注册满 N 天也算。
+     *
+     * @param brandId   品牌
+     * @param cutoff    截止时间（now - sleepingDays）
+     */
+    @Select("""
+            SELECT m.id
+            FROM mem_member m
+            WHERE m.brand_id = #{brandId}
+              AND m.deleted = 0
+              AND m.status = 'ACTIVE'
+              AND (m.last_consume_time IS NULL OR m.last_consume_time < #{cutoff})
+            """)
+    List<Long> selectSleepingIds(@Param("brandId") Long brandId,
+                                 @Param("cutoff") LocalDateTime cutoff);
 }

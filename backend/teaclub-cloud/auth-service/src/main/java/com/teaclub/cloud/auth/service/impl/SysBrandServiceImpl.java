@@ -37,6 +37,9 @@ public class SysBrandServiceImpl implements SysBrandService {
         vo.setLogoUrl(b.getLogoUrl());
         vo.setContactPhone(b.getContactPhone());
         vo.setWalletDeductOrder(b.getWalletDeductOrder());
+        vo.setRefundNeedAudit(b.getRefundNeedAudit());
+        vo.setRefundDailyLimit(b.getRefundDailyLimit());
+        vo.setRefundGiftConsumedAction(b.getRefundGiftConsumedAction());
         vo.setStatus(b.getStatus());
         vo.setCreateTime(b.getCreateTime());
         vo.setUpdateTime(b.getUpdateTime());
@@ -57,6 +60,36 @@ public class SysBrandServiceImpl implements SysBrandService {
         patch.setLogoUrl(request.getLogoUrl());
         patch.setContactPhone(request.getContactPhone());
         patch.setWalletDeductOrder(request.getWalletDeductOrder());
+        patch.setRefundNeedAudit(request.getRefundNeedAudit());
+        patch.setRefundDailyLimit(request.getRefundDailyLimit());
+        patch.setRefundGiftConsumedAction(request.getRefundGiftConsumedAction());
         brandMapper.updateById(patch);
     }
-}
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateRefundRule(BrandUpdateRequest request) {
+        LoginUser current = UserContext.require();
+        SysBrand brand = brandMapper.selectById(current.getBrandId());
+        if (brand == null) {
+            throw new BizException(ResultCode.BRAND_NOT_FOUND);
+        }
+        if (request.getRefundDailyLimit() != null && request.getRefundDailyLimit() < 0) {
+            throw new BizException(ResultCode.PARAM_INVALID, "每日退卡次数不能为负");
+        }
+        if (request.getRefundNeedAudit() != null
+                && request.getRefundNeedAudit() != 0 && request.getRefundNeedAudit() != 1) {
+            throw new BizException(ResultCode.PARAM_INVALID, "审核开关只能是 0 或 1");
+        }
+        String action = request.getRefundGiftConsumedAction();
+        if (action != null && !"REJECT".equals(action) && !"ALLOW".equals(action)) {
+            throw new BizException(ResultCode.PARAM_INVALID, "赠送金处置只能是 REJECT 或 ALLOW");
+        }
+
+        SysBrand patch = new SysBrand();
+        patch.setId(brand.getId());
+        patch.setRefundNeedAudit(request.getRefundNeedAudit());
+        patch.setRefundDailyLimit(request.getRefundDailyLimit());
+        patch.setRefundGiftConsumedAction(action);
+        brandMapper.updateById(patch);
+    }}

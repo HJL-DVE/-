@@ -30,6 +30,23 @@ export function openWallet(memberId: number) {
   )
 }
 
+/** 余额人工调整（审批单号幂等；实付/赠送分列，负数扣减） */
+export function adjustWallet(data: {
+  memberId: number
+  storeId?: number
+  approvalNo: string
+  principalChange?: number
+  giftChange?: number
+  remark?: string
+}) {
+  return http.post<{
+    txnId: number
+    idempotentHit: boolean
+    principalAfter: number
+    giftAfter: number
+  }>('/api/admin/wallet/adjust', data)
+}
+
 export function getTransactionPage(query: Partial<TransactionQuery>) {
   return http.get<PageResult<WalletTransactionVO>>('/api/admin/wallet/transactions', query, SILENT)
 }
@@ -87,4 +104,31 @@ export function deletePlan(id: number) {
 
 export function getWalletStats(silent = false) {
   return http.get<WalletStatsVO>('/api/admin/wallet/stats', undefined, { silent })
+}
+
+// ==================== 退卡记录 ====================
+
+export interface CardRefundVO {
+  id: number
+  refundNo: string
+  memberId: number
+  memberNo?: string | null
+  memberNickname?: string | null
+  principalAmount: number
+  giftVoidAmount: number
+  status: string
+  applyReason?: string | null
+  auditRemark?: string | null
+  refundTxnNo?: string | null
+  createTime?: string | null
+}
+
+/** GET /api/admin/wallet/card-refunds —— 退卡记录分页 */
+export function getCardRefundPage(query: {
+  pageNo?: number
+  pageSize?: number
+  status?: string
+  memberId?: number
+}) {
+  return http.get<PageResult<CardRefundVO>>('/api/admin/wallet/card-refunds', query, SILENT)
 }

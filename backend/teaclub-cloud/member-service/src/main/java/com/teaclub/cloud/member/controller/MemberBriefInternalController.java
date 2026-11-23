@@ -78,4 +78,19 @@ public class MemberBriefInternalController {
                                         @RequestParam(value = "keyword", required = false) String keyword) {
         return Result.ok(memberMapper.selectIdsByPhoneOrKeyword(brandId, phone, keyword));
     }
+
+    @Operation(summary = "当月生日的会员ID列表（营销活动定时发奖用）")
+    @GetMapping("/birthday-members")
+    public Result<java.util.List<Long>> birthdayMembers(@RequestParam("brandId") Long brandId,
+                                                        @RequestParam("month") Integer month) {
+        return Result.ok(memberMapper.selectBirthdayIds(brandId, month));
+    }
+
+    @Operation(summary = "沉睡会员ID列表（last_consume_time 早于指定时间）")
+    @GetMapping("/sleeping-members")
+    public Result<java.util.List<Long>> sleepingMembers(@RequestParam("brandId") Long brandId,
+                                                         @RequestParam("sleepingDays") Integer sleepingDays) {
+        java.time.LocalDateTime cutoff = java.time.LocalDateTime.now().minusDays(sleepingDays);
+        return Result.ok(memberMapper.selectSleepingIds(brandId, cutoff));
+    }
 }

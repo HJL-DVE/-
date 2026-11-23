@@ -14,7 +14,7 @@
         </el-select>
         <el-button type="primary" :icon="Search" @click="search">查询</el-button>
         <el-button :icon="Refresh" @click="reset">重置</el-button>
-        <el-button type="success" @click="openCreate">新增会员</el-button>
+        <el-button v-if="userStore.hasPerm('member:create')" type="success" @click="openCreate">新增会员</el-button>
         <div class="toolbar-spacer" />
         <span class="text-muted">共 {{ total }} 位会员</span>
       </div>
@@ -48,8 +48,8 @@
         <el-table-column label="操作" width="200" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" @click="$router.push('/member/detail/' + row.id)">详情</el-button>
-            <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
-            <el-button link :type="row.status === 'NORMAL' ? 'warning' : 'success'" @click="toggleStatus(row)">
+            <el-button v-if="userStore.hasPerm('member:update')" link type="primary" @click="openEdit(row)">编辑</el-button>
+            <el-button v-if="userStore.hasPerm('member:status')" link :type="row.status === 'NORMAL' ? 'warning' : 'success'" @click="toggleStatus(row)">
               {{ row.status === 'NORMAL' ? '冻结' : '解冻' }}
             </el-button>
           </template>
@@ -146,6 +146,7 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { useAppStore } from '@/stores/app'
+import { useUserStore } from '@/stores/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh, Search } from '@element-plus/icons-vue'
 import { createMember, getMemberLevels, getMemberPage, updateMember, updateMemberStatus } from '@/api/member'
@@ -154,6 +155,7 @@ import type { MemberLevelVO, MemberVO } from '@/api/types'
 
 const loading = ref(false)
 const appStore = useAppStore()
+const userStore = useUserStore()
 const submitting = ref(false)
 const createVisible = ref(false)
 const createSubmitting = ref(false)

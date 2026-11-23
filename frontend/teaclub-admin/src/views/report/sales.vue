@@ -11,6 +11,11 @@
       <el-button :icon="Refresh" :loading="loading" @click="load">刷新</el-button>
     </div>
 
+    <el-alert v-if="loadError" type="error" :closable="false" show-icon style="margin-bottom: 12px"
+              :title="'报表加载失败：' + loadError">
+      <el-button size="small" @click="load">重试</el-button>
+    </el-alert>
+
     <el-row :gutter="14">
       <el-col :span="24">
         <el-card shadow="never"><template #header>销售趋势</template><EChart :option="trendOption" /></el-card>
@@ -48,9 +53,11 @@ const loading = ref(false)
 const trendOption = ref<Record<string, unknown>>({})
 const rankOption = ref<Record<string, unknown>>({})
 const compareOption = ref<Record<string, unknown>>({})
+const loadError = ref('')
 
 async function load() {
   loading.value = true
+  loadError.value = ''
   try {
     const t = await getDashboardTrend(days.value)
     trendOption.value = {
@@ -87,6 +94,8 @@ async function load() {
       // 底部留足空间给（可能倾斜的）门店名，顶部留足给图例
       grid: { left: 70, right: 60, bottom: 64, top: 44, containLabel: false },
     }
+  } catch (e) {
+    loadError.value = e instanceof Error ? e.message : '加载失败'
   } finally {
     loading.value = false
   }

@@ -146,6 +146,8 @@ export function adjustPoints(query: {
 
 /** 积分规则（读真实 mkt_points_rule 表） */
 export interface PointsRuleVO {
+  /** 规则 ID（编辑时使用） */
+  id?: number
   ruleCode: string
   ruleName: string
   amountPerPoint: number
@@ -159,6 +161,18 @@ export interface PointsRuleVO {
 
 export function getPointsRules() {
   return http.get<PointsRuleVO[]>('/api/admin/marketing/points/rules')
+}
+
+/** PUT /api/admin/marketing/points/rules/{id} —— 更新积分规则（ruleCode 不可改） */
+export function updatePointsRule(id: number, payload: {
+  amountPerPoint?: number
+  signInPoints?: number
+  signInContinuousMax?: number
+  signInBonus?: number
+  expireDays?: number
+  status?: string
+}) {
+  return http.put<PointsRuleVO>(`/api/admin/marketing/points/rules/${id}`, payload)
 }
 
 /** ============ 钀ラ攢锛氭椿鍔?============ */

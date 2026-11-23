@@ -549,6 +549,12 @@ export interface OrderStatsVO {
   avgOrderAmount: number
   balancePayAmount: number
   wechatPayAmount: number
+  /** 钱包支付中的实付本金抵扣（分） */
+  balancePrincipalAmount?: number
+  /** 钱包支付中的赠送金抵扣（分），营销成本不计真实收入 */
+  balanceGiftAmount?: number
+  /** 实付营业额 = GMV - 赠送金抵扣（现金 + 钱包本金，分） */
+  actualPayAmount?: number
   dailyTrend?: { statDate: string; gmv: number; orderCount: number }[]
 }
 

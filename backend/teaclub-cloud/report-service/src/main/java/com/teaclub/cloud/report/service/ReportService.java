@@ -72,11 +72,14 @@ public class ReportService {
         Long brandId = UserContext.require().getBrandId();
         int span = days == null || days <= 0 ? 7 : Math.min(days, 90);
         LocalDateTime since = LocalDate.now().minusDays(span - 1L).atStartOfDay();
+        LocalDateTime until = LocalDate.now().plusDays(1L).atStartOfDay();
 
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("days", span);
-        out.put("salesTrend", fillDays(mapper.salesTrend(brandId, sid, since), span, "sales"));
-        out.put("ordersTrend", fillDays(mapper.salesTrend(brandId, sid, since), span, "orders"));
+        // 一次查询分别取销售额与订单数，避免重复执行同一条 SQL
+        List<Map<String, Object>> trend = mapper.salesTrend(brandId, sid, since, until);
+        out.put("salesTrend", fillDays(trend, span, "sales"));
+        out.put("ordersTrend", fillDays(trend, span, "orders"));
         out.put("memberGrowth", fillDays(mapper.memberGrowth(brandId, since, sid), span, "cnt"));
         out.put("rechargeTrend", fillDays(mapper.rechargeTrend(brandId, sid, since), span, "principal"));
         out.put("refundTrend", fillDays(mapper.refundTrend(brandId, sid, since), span, "amount"));
@@ -132,8 +135,6 @@ public class ReportService {
         out.put("rechargeGiftAmount", money(recharge.get("gift")));
         out.put("refundAmount", money(refund.get("amount")));
         out.put("todayNewMembers", mapper.countMembers(brandId, todayStart, sid));
-        out.put("hotProducts", mapper.productRank(brandId, sid,
-                LocalDate.now().minusDays(29).atStartOfDay(), null, "qty", 10));
         return out;
     }
 
@@ -174,9 +175,9 @@ public class ReportService {
                 "consumeRank", mapper.memberConsumeRank(brandId, sid, 10));
     }
 
-    public Map<String, Object> memberGrowth(Integer days) {
+    public Map<String, Object> memberGrowth(Integer days, Long storeId) {
         ReportScope scope = ReportScope.current();
-        Long sid = scope.resolveStoreId(null);
+        Long sid = scope.resolveStoreId(storeId);
         Long brandId = UserContext.require().getBrandId();
         int span = days == null || days <= 0 ? 30 : Math.min(days, 365);
         LocalDateTime since = LocalDate.now().minusDays(span - 1L).atStartOfDay();
@@ -265,7 +266,7 @@ public class ReportService {
         Long sid = scope.resolveStoreId(storeId);
         Long brandId = UserContext.require().getBrandId();
         LocalDateTime day = (date == null ? LocalDate.now() : date).atStartOfDay();
-        List<Map<String, Object>> rows = mapper.hourlyOrders(brandId, sid, day);
+        List<Map<String, Object>> rows = mapper.hourlyOrders(brandId, sid, day, day.plusDays(1L));
         Map<Integer, Map<String, Object>> byHour = new LinkedHashMap<>();
         if (rows != null) {
             for (Map<String, Object> r : rows) {
@@ -293,7 +294,7 @@ public class ReportService {
         String m = "amount".equalsIgnoreCase(metric) ? "amount" : "qty";
         LocalDateTime since = LocalDate.now().minusDays(span - 1L).atStartOfDay();
         return mapOf("metric", m,
-                "list", mapper.categoryRank(brandId, sid, since, m,
+                "list", mapper.categoryRank(brandId, sid, since, null, m,
                         limit <= 0 ? 10 : Math.min(limit, 50)));
     }
 
@@ -304,9 +305,11 @@ public class ReportService {
         Long brandId = UserContext.require().getBrandId();
         int span = days == null || days <= 0 ? 30 : Math.min(days, 365);
         LocalDateTime since = LocalDate.now().minusDays(span - 1L).atStartOfDay();
+        // 一次查询分别取销量与销售额，避免重复执行同一条 SQL
+        List<Map<String, Object>> rows = mapper.productTrend(brandId, sid, since);
         return mapOf("days", span,
-                "trend", fillDays(mapper.productTrend(brandId, sid, since), span, "qty"),
-                "trendAmount", fillDays(mapper.productTrend(brandId, sid, since), span, "amount"));
+                "trend", fillDays(rows, span, "qty"),
+                "trendAmount", fillDays(rows, span, "amount"));
     }
     // ==================== 营销分析 ====================
 

@@ -61,7 +61,12 @@
               <el-tag size="small" :type="tagTypeByStatus(row.status)">{{ statusLabel(row.status) }}</el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="usedBy" label="生效场景" min-width="220" show-overflow-tooltip />
+          <el-table-column prop="usedBy" label="生效场景" min-width="200" show-overflow-tooltip />
+          <el-table-column label="操作" width="90" fixed="right">
+            <template #default="{ row }">
+              <el-button link type="primary" size="small" @click="openEdit(row)">编辑</el-button>
+            </template>
+          </el-table-column>
         </el-table>
 
         <!-- 积分流水业务类型字典 -->
@@ -80,6 +85,49 @@
           </el-table-column>
         </el-table>
       </template>
+
+      <!-- 编辑规则弹窗 -->
+      <el-dialog v-model="dialogVisible" title="编辑积分规则" width="520px" :close-on-click-modal="false">
+        <el-form :model="form" label-width="150px" size="small">
+          <el-form-item label="规则编码">
+            <el-input :model-value="form.ruleCode" disabled />
+          </el-form-item>
+          <el-form-item label="规则名称">
+            <el-input :model-value="form.ruleName" disabled />
+          </el-form-item>
+          <el-form-item label="消费积分比例">
+            <el-input-number v-model="form.amountPerPoint" :min="1" :step="100" style="width: 160px" />
+            <span class="unit">分 = {{ fenToYuan(form.amountPerPoint) }} 元得 1 积分</span>
+          </el-form-item>
+          <el-form-item label="签到基础积分">
+            <el-input-number v-model="form.signInPoints" :min="0" :step="1" style="width: 160px" />
+            <span class="unit">分</span>
+          </el-form-item>
+          <el-form-item label="连续签到上限">
+            <el-input-number v-model="form.signInContinuousMax" :min="0" :step="1" style="width: 160px" />
+            <span class="unit">天</span>
+          </el-form-item>
+          <el-form-item label="连续签到加成">
+            <el-input-number v-model="form.signInBonus" :min="0" :step="1" style="width: 160px" />
+            <span class="unit">分 / 天</span>
+          </el-form-item>
+          <el-form-item label="积分有效期">
+            <el-input-number v-model="form.expireDays" :min="0" :step="30" style="width: 160px" />
+            <span class="unit">天（0 = 永不过期）</span>
+          </el-form-item>
+          <el-form-item label="状态">
+            <el-select v-model="form.status" style="width: 160px">
+              <el-option label="已启用" value="ENABLED" />
+              <el-option label="已停用" value="DISABLED" />
+            </el-select>
+          </el-form-item>
+        </el-form>
+        <div class="dialog-tip">保存后立即生效，下一个订单/签到时按新规则计算积分。</div>
+        <template #footer>
+          <el-button @click="dialogVisible = false">取消</el-button>
+          <el-button type="primary" :loading="saving" @click="save">保存</el-button>
+        </template>
+      </el-dialog>
     </div>
   </div>
 </template>
@@ -87,8 +135,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { Refresh } from '@element-plus/icons-vue'
-import { getPointsRules, type PointsRuleVO } from '@/api/marketing'
+import { getPointsRules, updatePointsRule, type PointsRuleVO } from '@/api/marketing'
 import { fenToYuan, tagTypeByStatus } from '@/utils/format'
+import { ElMessage } from 'element-plus'
 
 const rules = ref<PointsRuleVO[]>([])
 const loading = ref(false)
@@ -110,6 +159,51 @@ const bizTypes = [
   { code: 'EXPIRE', label: '积分过期', bizNo: '批次号', direction: '扣减' },
   { code: 'ADJUST', label: '人工调整', bizNo: '操作单号', direction: '增加 / 扣减' },
 ]
+
+const dialogVisible = ref(false)
+const saving = ref(false)
+const form = ref<PointsRuleVO & { id?: number }>({
+  id: 0,
+  ruleCode: '',
+  ruleName: '',
+  amountPerPoint: 100,
+  signInPoints: 0,
+  signInContinuousMax: 0,
+  signInBonus: 0,
+  expireDays: 0,
+  status: 'ENABLED',
+  usedBy: '',
+})
+
+function openEdit(row: PointsRuleVO) {
+  form.value = { ...row }
+  dialogVisible.value = true
+}
+
+async function save() {
+  if (!form.value.id) {
+    ElMessage.warning('规则 ID 缺失，无法保存')
+    return
+  }
+  saving.value = true
+  try {
+    await updatePointsRule(form.value.id, {
+      amountPerPoint: form.value.amountPerPoint,
+      signInPoints: form.value.signInPoints,
+      signInContinuousMax: form.value.signInContinuousMax,
+      signInBonus: form.value.signInBonus,
+      expireDays: form.value.expireDays,
+      status: form.value.status,
+    })
+    ElMessage.success('积分规则已更新')
+    dialogVisible.value = false
+    await load()
+  } catch (e) {
+    ElMessage.error(e instanceof Error ? e.message : '保存失败')
+  } finally {
+    saving.value = false
+  }
+}
 
 async function load() {
   loading.value = true
@@ -184,6 +278,19 @@ onMounted(load)
   margin: -4px 0 10px;
   font-size: 12px;
   color: #909399;
+}
+.unit {
+  margin-left: 10px;
+  color: #909399;
+  font-size: 12px;
+}
+.dialog-tip {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: #f0fdf4;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #15803d;
 }
 .mono {
   font-family: 'SFMono-Regular', Consolas, monospace;

@@ -19,7 +19,7 @@
         </el-select>
         <el-button type="primary" :icon="Search" @click="search">查询</el-button>
         <el-button :icon="Refresh" @click="load">刷新</el-button>
-        <el-button :icon="CircleCheck" @click="runReconcile">对账</el-button>
+        <el-button v-if="userStore.hasPerm('payment:reconcile')" :icon="CircleCheck" @click="runReconcile">对账</el-button>
         <div class="toolbar-spacer" />
         <span class="text-muted">共 {{ total }} 个钱包账户</span>
       </div>
@@ -59,6 +59,15 @@
         <el-table-column label="开通时间" width="170">
           <template #default="{ row }">{{ formatDateTime(row.createTime) }}</template>
         </el-table-column>
+        <el-table-column label="操作" width="120" fixed="right">
+          <template #default="{ row }">
+            <el-button
+              v-if="userStore.hasPerm('wallet:adjust')"
+              link type="warning"
+              @click="openAdjust(row)"
+            >调整余额</el-button>
+          </template>
+        </el-table-column>
       </el-table>
 
       <div class="pager">
@@ -95,18 +104,49 @@
       </el-table>
       <div v-if="reconcileError" class="text-muted">{{ reconcileError.message }}</div>
     </el-dialog>
+
+    <el-dialog v-model="adjustVisible" title="余额人工调整" width="480px">
+      <el-alert type="warning" :closable="false" show-icon style="margin-bottom: 12px"
+        title="高敏感操作：调整会直接改变会员钱包余额并生成资金流水，请确认已完成线下审批。" />
+      <el-form :model="adjustForm" label-width="110px" size="small">
+        <el-form-item label="会员">
+          <span>{{ adjustForm.memberName }}（ID {{ adjustForm.memberId }}）</span>
+        </el-form-item>
+        <el-form-item label="审批单号" required>
+          <el-input v-model="adjustForm.approvalNo" placeholder="线下审批单号（幂等键）" />
+        </el-form-item>
+        <el-form-item label="实付余额调整">
+          <el-input-number v-model="adjustForm.principalYuan" :step="1" :precision="2" style="width: 200px" />
+          <span class="text-muted" style="margin-left: 8px">元，负数=扣减</span>
+        </el-form-item>
+        <el-form-item label="赠送余额调整">
+          <el-input-number v-model="adjustForm.giftYuan" :step="1" :precision="2" style="width: 200px" />
+          <span class="text-muted" style="margin-left: 8px">元，负数=扣减</span>
+        </el-form-item>
+        <el-form-item label="调整原因" required>
+          <el-input v-model="adjustForm.remark" type="textarea" :rows="2" placeholder="必填，留痕" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="adjustVisible = false">取消</el-button>
+        <el-button type="warning" :loading="adjusting" @click="submitAdjust">确认调整</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import { CircleCheck, Refresh, Search } from '@element-plus/icons-vue'
-import { getReconcile, getWalletPage } from '@/api/wallet'
+import { adjustWallet, getReconcile, getWalletPage } from '@/api/wallet'
 import { ApiError, isApiError } from '@/api/request'
 import ApiPending from '@/components/ApiPending.vue'
-import { fenToYuan, formatDateTime, MEMBER_STATUS_LABEL } from '@/utils/format'
+import { useUserStore } from '@/stores/user'
+import { fenToYuan, formatDateTime, MEMBER_STATUS_LABEL, yuanToFen } from '@/utils/format'
 import type { WalletVO } from '@/api/types'
 
+const userStore = useUserStore()
 const loading = ref(false)
 const records = ref<WalletVO[]>([])
 const total = ref(0)
@@ -168,6 +208,61 @@ async function runReconcile(): Promise<void> {
     reconcile.value = await getReconcile()
   } catch (error) {
     reconcileError.value = toApiError(error)
+  }
+}
+
+const adjustVisible = ref(false)
+const adjusting = ref(false)
+const adjustForm = reactive({
+  memberId: 0,
+  memberName: '',
+  approvalNo: '',
+  principalYuan: 0,
+  giftYuan: 0,
+  remark: '',
+})
+
+function openAdjust(row: WalletVO): void {
+  adjustForm.memberId = row.memberId ?? 0
+  adjustForm.memberName = row.memberName || row.memberNickname || row.memberNo || ''
+  adjustForm.approvalNo = ''
+  adjustForm.principalYuan = 0
+  adjustForm.giftYuan = 0
+  adjustForm.remark = ''
+  adjustVisible.value = true
+}
+
+async function submitAdjust(): Promise<void> {
+  if (!adjustForm.approvalNo.trim()) {
+    ElMessage.warning('请填写审批单号')
+    return
+  }
+  const principal = yuanToFen(String(adjustForm.principalYuan))
+  const gift = yuanToFen(String(adjustForm.giftYuan))
+  if (principal === 0 && gift === 0) {
+    ElMessage.warning('实付与赠送调整不能同时为 0')
+    return
+  }
+  if (!adjustForm.remark.trim()) {
+    ElMessage.warning('请填写调整原因')
+    return
+  }
+  adjusting.value = true
+  try {
+    const r = await adjustWallet({
+      memberId: adjustForm.memberId,
+      approvalNo: adjustForm.approvalNo.trim(),
+      principalChange: principal,
+      giftChange: gift,
+      remark: adjustForm.remark.trim(),
+    })
+    ElMessage.success(r.idempotentHit ? '该审批单已处理（幂等），未重复调整' : '余额调整成功，已生成流水')
+    adjustVisible.value = false
+    await load()
+  } catch (error) {
+    ElMessage.error(toApiError(error).message || '调整失败')
+  } finally {
+    adjusting.value = false
   }
 }
 

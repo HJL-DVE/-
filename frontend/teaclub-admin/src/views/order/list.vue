@@ -59,9 +59,9 @@
         <el-table-column label="操作" width="170" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" @click="openDetail(row)">详情</el-button>
-            <el-button v-if="row.status === 'UNPAID'" link type="warning" @click="onCancel(row)">取消</el-button>
+            <el-button v-if="row.status === 'UNPAID' && userStore.hasPerm('order:cancel')" link type="warning" @click="onCancel(row)">取消</el-button>
             <el-button
-              v-if="['PAID', 'COMPLETED', 'REFUNDING'].includes(row.status) && row.refundedAmount < row.paidAmount"
+              v-if="userStore.hasPerm('order:refund') && ['PAID', 'COMPLETED', 'REFUNDING'].includes(row.status) && row.refundedAmount < row.paidAmount"
               link
               type="danger"
               @click="openRefund(row)"
@@ -152,6 +152,7 @@ import { Refresh, Search } from '@element-plus/icons-vue'
 import { cancelOrder, getOrderDetail, getOrderPage } from '@/api/order'
 import { applyRefund } from '@/api/payment'
 import { useAppStore } from '@/stores/app'
+import { useUserStore } from '@/stores/user'
 import {
   ORDER_STATUS_LABEL,
   ORDER_STATUS_TAG,
@@ -171,6 +172,7 @@ const ORDER_SOURCE_LABEL: Record<string, string> = {
 }
 
 const appStore = useAppStore()
+const userStore = useUserStore()
 
 const loading = ref(false)
 const records = ref<OrderVO[]>([])

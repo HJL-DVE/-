@@ -94,6 +94,12 @@
       }
     },
     {
+      "path": "pages/member/card-refund",
+      "style": {
+        "navigationBarTitleText": "退卡申请"
+      }
+    },
+    {
       "path": "pages/member/points",
       "style": {
         "navigationBarTitleText": "我的积分"

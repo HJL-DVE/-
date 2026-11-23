@@ -59,6 +59,9 @@ public interface PointsService {
     /** 管理端：读取当前品牌生效的积分规则（真实表数据）。 */
     List<PointsRuleVO> listRules();
 
+    /** 更新积分规则（只允许改数值与状态，ruleCode 不可改）。 */
+    PointsRuleVO updateRule(Long id, com.teaclub.cloud.marketing.dto.PointsRuleUpdateRequest request);
+
     /** 人工调整（管理端）。正数增加，负数扣减。 */
     boolean adjust(Long memberId, long points, String bizNo, String remark);
 
