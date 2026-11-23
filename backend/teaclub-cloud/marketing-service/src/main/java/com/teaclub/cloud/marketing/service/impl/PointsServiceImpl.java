@@ -504,6 +504,30 @@ public class PointsServiceImpl implements PointsService {
         }).toList();
     }
 
+    /**
+     * 校验会员存在（防止为不存在的会员创建积分账户与流水）。
+     *
+     * <p>不校验的后果：给不存在的 memberId 调整积分会"成功"，
+     * 并凭空创建积分账户与流水（脏数据），运营侧难以察觉。
+     */
+    private void requireMemberExists(Long memberId) {
+        if (memberId == null) {
+            throw new BizException(ResultCode.PARAM_INVALID, "会员 ID 不能为空");
+        }
+        try {
+            var brief = memberSnapshotClient.memberBrief(memberId);
+            if (brief == null || brief.getCode() != 0 || brief.getData() == null) {
+                throw new BizException(ResultCode.NOT_FOUND, "会员不存在: " + memberId);
+            }
+        } catch (BizException be) {
+            throw be;
+        } catch (Exception e) {
+            // member-service 不可用时不放行：宁可拒绝一次人工调整，也不写入脏账户
+            throw new BizException(ResultCode.NOT_FOUND,
+                    "会员不存在或会员服务暂不可用: " + memberId);
+        }
+    }
+
     // ==================== 人工调整 ====================
 
     @Override
@@ -513,6 +537,9 @@ public class PointsServiceImpl implements PointsService {
             throw new BizException(ResultCode.PARAM_INVALID, "调整积分不能为 0");
         }
         Long brandId = brandId();
+        // 会员存在性校验：否则会给不存在的会员创建积分账户与流水（脏数据），
+        // 且运营无法察觉"调整成功了但会员根本不存在"。
+        requireMemberExists(memberId);
         String key = bizNo == null || bizNo.isBlank() ? BizNoGenerator.of("ADJ") : bizNo;
         if (points > 0) {
             return doEarn(brandId, memberId, null, PointsBizType.ADJUST, key, points,

@@ -1,6 +1,8 @@
 package com.teaclub.cloud.report.controller;
 
 import com.teaclub.cloud.core.api.Result;
+import com.teaclub.cloud.core.api.ResultCode;
+import com.teaclub.cloud.core.exception.BizException;
 import com.teaclub.cloud.report.service.ReportService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -46,8 +48,9 @@ public class ReportController {
     @GetMapping("/dashboard/trend")
     @PreAuthorize("hasAuthority('report:view')")
     public Result<Map<String, Object>> dashboardTrend(
-            @RequestParam(required = false, defaultValue = "7") Integer days,
+            @RequestParam(required = false, defaultValue = "7") String daysRaw,
             @RequestParam(required = false) Long storeId) {
+                Integer days = parseDays(daysRaw, 7);
         return Result.ok(reportService.dashboardTrend(days, storeId));
     }
 
@@ -55,8 +58,9 @@ public class ReportController {
     @GetMapping("/store/ranking")
     @PreAuthorize("hasAuthority('report:view')")
     public Result<Map<String, Object>> storeRanking(
-            @RequestParam(required = false) Integer days,
+            @RequestParam(required = false) String daysRaw,
             @RequestParam(required = false) Long storeId) {
+                Integer days = parseDays(daysRaw, 30);
         int span = days == null || days <= 0 ? 30 : Math.min(days, 365);
         var since = java.time.LocalDate.now().minusDays(span - 1L).atStartOfDay();
         return Result.ok(reportService.storeRanking(
@@ -79,9 +83,10 @@ public class ReportController {
     @PreAuthorize("hasAuthority('report:view')")
     public Result<Map<String, Object>> productRanking(
             @RequestParam(required = false) Long storeId,
-            @RequestParam(required = false, defaultValue = "30") Integer days,
+            @RequestParam(required = false, defaultValue = "30") String daysRaw,
             @RequestParam(required = false, defaultValue = "qty") String metric,
             @RequestParam(required = false, defaultValue = "10") Integer limit) {
+                Integer days = parseDays(daysRaw, 30);
         return Result.ok(reportService.productRanking(storeId, days, metric, limit));
     }
 
@@ -89,7 +94,8 @@ public class ReportController {
     @GetMapping("/store/compare")
     @PreAuthorize("hasAuthority('report:view')")
     public Result<Map<String, Object>> storeCompare(
-            @RequestParam(required = false, defaultValue = "30") Integer days) {
+            @RequestParam(required = false, defaultValue = "30") String daysRaw) {
+                Integer days = parseDays(daysRaw, 30);
         return Result.ok(reportService.storeCompare(days));
     }
 
@@ -106,8 +112,9 @@ public class ReportController {
     @GetMapping("/member/growth")
     @PreAuthorize("hasAuthority('report:view')")
     public Result<Map<String, Object>> memberGrowth(
-            @RequestParam(required = false, defaultValue = "30") Integer days,
+            @RequestParam(required = false, defaultValue = "30") String daysRaw,
             @RequestParam(required = false) Long storeId) {
+                Integer days = parseDays(daysRaw, 30);
         return Result.ok(reportService.memberGrowth(days, storeId));
     }
 
@@ -118,7 +125,8 @@ public class ReportController {
     @PreAuthorize("hasAuthority('report:view')")
     public Result<Map<String, Object>> rechargeOverview(
             @RequestParam(required = false) Long storeId,
-            @RequestParam(required = false, defaultValue = "30") Integer days) {
+            @RequestParam(required = false, defaultValue = "30") String daysRaw) {
+                Integer days = parseDays(daysRaw, 30);
         return Result.ok(reportService.rechargeOverview(storeId, days));
     }
 
@@ -127,7 +135,8 @@ public class ReportController {
     @PreAuthorize("hasAuthority('report:view')")
     public Result<Map<String, Object>> paymentOverview(
             @RequestParam(required = false) Long storeId,
-            @RequestParam(required = false, defaultValue = "30") Integer days) {
+            @RequestParam(required = false, defaultValue = "30") String daysRaw) {
+                Integer days = parseDays(daysRaw, 30);
         return Result.ok(reportService.paymentOverview(storeId, days));
     }
 
@@ -136,7 +145,8 @@ public class ReportController {
     @PreAuthorize("hasAuthority('report:view')")
     public Result<Map<String, Object>> refundOverview(
             @RequestParam(required = false) Long storeId,
-            @RequestParam(required = false, defaultValue = "30") Integer days) {
+            @RequestParam(required = false, defaultValue = "30") String daysRaw) {
+                Integer days = parseDays(daysRaw, 30);
         return Result.ok(reportService.refundOverview(storeId, days));
     }
 
@@ -156,9 +166,10 @@ public class ReportController {
     @PreAuthorize("hasAuthority('report:view')")
     public Result<Map<String, Object>> categoryRanking(
             @RequestParam(required = false) Long storeId,
-            @RequestParam(required = false, defaultValue = "30") Integer days,
+            @RequestParam(required = false, defaultValue = "30") String daysRaw,
             @RequestParam(required = false, defaultValue = "qty") String metric,
             @RequestParam(required = false, defaultValue = "10") Integer limit) {
+                Integer days = parseDays(daysRaw, 30);
         return Result.ok(reportService.categoryRanking(storeId, days, metric, limit));
     }
 
@@ -167,7 +178,8 @@ public class ReportController {
     @PreAuthorize("hasAuthority('report:view')")
     public Result<Map<String, Object>> productTrend(
             @RequestParam(required = false) Long storeId,
-            @RequestParam(required = false, defaultValue = "30") Integer days) {
+            @RequestParam(required = false, defaultValue = "30") String daysRaw) {
+                Integer days = parseDays(daysRaw, 30);
         return Result.ok(reportService.productTrend(storeId, days));
     }
     // ==================== 营销分析 ====================
@@ -176,7 +188,8 @@ public class ReportController {
     @GetMapping("/marketing/overview")
     @PreAuthorize("hasAuthority('report:view')")
     public Result<Map<String, Object>> marketingOverview(
-            @RequestParam(required = false, defaultValue = "30") Integer days) {
+            @RequestParam(required = false, defaultValue = "30") String daysRaw) {
+                Integer days = parseDays(daysRaw, 30);
         return Result.ok(reportService.marketingOverview(days));
     }
 
@@ -185,5 +198,31 @@ public class ReportController {
         static Long resolve(Long requested) {
             return com.teaclub.cloud.report.security.ReportScope.current().resolveStoreId(requested);
         }
+    }
+
+    /**
+     * 校验并归一化 days 参数。
+     *
+     * <p>Spring 把 "abc" 转 Integer 时抛 NumberFormatException，
+     * 默认被全局异常处理器转成 50000（系统内部错误）——既不符合错误码语义，
+     * 也会把"用户传错参数"伪装成"服务端故障"。这里显式拦截，返回 10001。
+     *
+     * @param raw         原始字符串
+     * @param defaultDays 缺省天数
+     */
+    private Integer parseDays(String raw, int defaultDays) {
+        if (raw == null || raw.isBlank()) {
+            return defaultDays;
+        }
+        int v;
+        try {
+            v = Integer.parseInt(raw.trim());
+        } catch (NumberFormatException e) {
+            throw new BizException(ResultCode.PARAM_INVALID, "days 必须是整数: " + raw);
+        }
+        if (v <= 0) {
+            return defaultDays;
+        }
+        return Math.min(v, 365);
     }
 }

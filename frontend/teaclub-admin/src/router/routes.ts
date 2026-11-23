@@ -34,6 +34,9 @@ export const viewRegistry: Record<string, LazyView> = {
   'payment/notify': () => import('@/views/payment/notify.vue'),
   'cashier/index': () => import('@/views/cashier/index.vue'),
   // ===== 阶段八：经营报表 =====
+  // 经营报表是菜单分组节点，其自身没有独立页面；指向经营驾驶舱，
+  // 避免展开该目录时落到 common/placeholder.vue 占位页
+  'report/index': () => import('@/views/report/dashboard.vue'),
   'report/dashboard': () => import('@/views/report/dashboard.vue'),
   'report/store': () => import('@/views/report/store.vue'),
   'report/sales': () => import('@/views/report/sales.vue'),
