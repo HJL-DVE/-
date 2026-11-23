@@ -96,6 +96,12 @@ public class JwtAuthGlobalFilter implements GlobalFilter, Ordered {
         String token = auth.substring(7).trim();
         try {
             Claims claims = jwtProvider.parseAdminToken(token);
+            log.warn("[DIAG_GW] path={} permClaimType={} permClaimLen={} permHeaderLen={} rolesClaimType={}",
+                    path,
+                    claims.get("permissions") == null ? "null" : claims.get("permissions").getClass().getName(),
+                    claims.get("permissions") == null ? -1 : (claims.get("permissions") instanceof java.util.Collection ? ((java.util.Collection<?>) claims.get("permissions")).size() : -2),
+                    join(claims.get("permissions")).length(),
+                    claims.get("roles") == null ? "null" : claims.get("roles").getClass().getName());
             ServerHttpRequest mutated = exchange.getRequest().mutate()
                     // 保留原始 Authorization：下游服务从令牌里取权限/角色（令牌经签名，是权威来源），
                     // X-Roles / X-Permissions 头仅作为兜底

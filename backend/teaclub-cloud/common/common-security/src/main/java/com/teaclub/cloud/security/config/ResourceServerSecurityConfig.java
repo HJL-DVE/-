@@ -121,12 +121,26 @@ public class ResourceServerSecurityConfig {
                 return;
             }
             if (userId != null && !userId.isBlank()) {
+                // 若 JWT 过滤器已解析出完整上下文（含令牌里的权限），不要用请求头覆盖：
+                // 请求头可能缺失权限点，覆盖会把已解析出的权限清空。
+                LoginUser existing = UserContext.get();
+                if (existing != null && !existing.getPermissions().isEmpty()) {
+                    try {
+                        chain.doFilter(request, response);
+                    } finally {
+                        UserContext.clear();
+                    }
+                    return;
+                }
                 LoginUser user = LoginUser.builder()
                         .userId(Long.valueOf(userId))
                         .username(request.getHeader(InternalHeaders.USERNAME))
                         .brandId(parseLong(request.getHeader(InternalHeaders.BRAND_ID)))
                         .userType(request.getHeader(InternalHeaders.USER_TYPE))
                         .roles(splitToSet(request.getHeader(InternalHeaders.ROLES)))
+                        // 权限点也要透传：漏掉会导致「有角色无权限」——
+                        // 登录时能拿到权限，刷新后却全空
+                        .permissions(splitToSet(request.getHeader(InternalHeaders.PERMISSIONS)))
                         .allStoreAccess(Boolean.parseBoolean(request.getHeader(InternalHeaders.ALL_STORE_ACCESS)))
                         .storeIds(splitToLongSet(request.getHeader(InternalHeaders.STORE_IDS)))
                         .build();
