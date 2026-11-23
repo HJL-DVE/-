@@ -124,7 +124,11 @@ public class ResourceServerSecurityConfig {
                 // 若 JWT 过滤器已解析出完整上下文（含令牌里的权限），不要用请求头覆盖：
                 // 请求头可能缺失权限点，覆盖会把已解析出的权限清空。
                 LoginUser existing = UserContext.get();
-                if (existing != null && !existing.getPermissions().isEmpty()) {
+                // 只要 JWT 过滤器已经解析出完整上下文，就不要用请求头覆盖。
+                // 判断依据不能只看 permissions 是否为空：令牌里可能只有角色没有权限点
+                // （或反之），此时用请求头覆盖会把已解析出的部分清空，
+                // 造成「有角色无权限」「登录有权限刷新后为空」这类诡异现象。
+                if (existing != null && existing.getUserId() != null) {
                     try {
                         chain.doFilter(request, response);
                     } finally {
