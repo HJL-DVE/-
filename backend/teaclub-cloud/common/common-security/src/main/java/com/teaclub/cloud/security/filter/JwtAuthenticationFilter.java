@@ -101,11 +101,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 } else {
                 Long userId = Long.valueOf(claims.getSubject());
 
-                // 优先使用 Gateway 透传的权限上下文；直连时回落到令牌内的声明
-                Set<String> roles = splitToSet(firstNonBlank(
-                        request.getHeader(InternalHeaders.ROLES), claims.get("roles")));
-                Set<String> permissions = splitToSet(firstNonBlank(
-                        request.getHeader(InternalHeaders.PERMISSIONS), claims.get("permissions")));
+                // 权限/角色一律以令牌内的声明为准：token 经签名，是权威来源。
+                // 不再优先使用 Gateway 透传的 X-Roles / X-Permissions 头——
+                // 历史上这个头在跨服务转发时可能丢失或被覆盖，导致下游解析出空权限
+                // （表现：登录时有权限，刷新后 /me 返回的 permissions 为空）。
+                Set<String> roles = toSet(claims.get("roles"));
+                Set<String> permissions = toSet(claims.get("permissions"));
 
                 LoginUser user = LoginUser.builder()
                         .userId(userId)

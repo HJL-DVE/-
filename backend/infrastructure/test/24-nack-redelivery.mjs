@@ -4,6 +4,27 @@ const ROOT='H:\\奶茶店会员与储值营销系统';
 const t=fs.readFileSync(ROOT+'\\backend\\infrastructure\\docker\\.env.docker','utf8');
 const E={}; t.split(/\r?\n/).forEach(l=>{const m=l.match(/^([A-Z_]+)=(.*)$/);if(m)E[m[1]]=m[2];});
 const D='C:\\Program Files\\Docker\\Docker\\resources\\bin\\docker.exe';
+// 安全网：本测试会 RENAME mem_member 表制造业务失败；
+// 无论中途成功、失败还是崩溃退出，都必须把表名恢复，否则整个会员域瘫痪。
+let __memberTableRestored = false;
+function restoreMemberTable() {
+  if (__memberTableRestored) return;
+  try {
+    const t = sql('member_db', "SHOW TABLES LIKE 'mem_member'")[0];
+    if (!t || t === '') {
+      sql('member_db', 'RENAME TABLE mem_member_bak TO mem_member');
+      console.log('  [安全网] mem_member 表已从 bak 恢复');
+    }
+    __memberTableRestored = true;
+  } catch (e) {
+    console.error('  [安全网] 恢复失败，请手工执行: RENAME TABLE member_db.mem_member_bak TO mem_member', e.message);
+  }
+}
+process.on('exit', restoreMemberTable);
+process.on('SIGINT', () => { restoreMemberTable(); process.exit(1); });
+process.on('uncaughtException', (e) => { console.error('未捕获异常:', e.message); restoreMemberTable(); process.exit(1); });
+process.on('unhandledRejection', (e) => { console.error('未处理的 Promise 拒绝:', e); restoreMemberTable(); process.exit(1); });
+
 const sql=(db,s)=>{try{return execFileSync(D,['exec','teaclub-mysql','mysql','-uroot','-p'+E.MYSQL_ROOT_PASSWORD,db,'-N','-B','-e',s],{encoding:'utf8',stdio:['pipe','pipe','ignore']}).split('\n').filter(l=>l.trim());}catch(e){return ['ERR'];}};
 const sleep=(ms)=>new Promise(x=>setTimeout(x,ms));
 const GW='http://127.0.0.1:9000';
@@ -59,6 +80,7 @@ console.log('  此时会员档案未更新（符合预期）');
 console.log('');
 console.log('=== 阶段2: 恢复业务 → 补偿重放应自动消费 ===');
 sql('member_db',"RENAME TABLE mem_member_bak TO mem_member");
+__memberTableRestored = true;
 console.log('  表已恢复，等待 DLQ-REPLAY 任务（15 秒一轮）...');
 
 let ok=false, amt=null, cnt=null;

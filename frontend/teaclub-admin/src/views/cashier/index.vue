@@ -212,7 +212,7 @@
             <el-button :disabled="!member" @click="openCouponPicker">
               使用优惠券{{ selectedCoupon ? '（已选）' : '' }}
             </el-button>
-            <el-button :disabled="!member || pointsBalance <= 0" @click="openPointsDialog">
+            <el-button :disabled="!member" @click="openPointsDialog">
               积分抵扣{{ usePoints > 0 ? '（' + usePoints + '分）' : '' }}
             </el-button>
             <div class="toolbar-spacer" />
@@ -636,6 +636,7 @@ async function searchMember(): Promise<void> {
     }
     if (member.value) {
       await loadWallet(member.value.id)
+      await loadPoints()
       scheduleQuote()
     }
   } catch (error) {

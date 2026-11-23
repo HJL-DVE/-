@@ -13,7 +13,6 @@ export const viewRegistry: Record<string, LazyView> = {
   'brand/detail': () => import('@/views/store/brand.vue'),
   'system/user': () => import('@/views/system/user.vue'),
   'system/role': () => import('@/views/system/role.vue'),
-  'system/permission': () => import('@/views/system/permission.vue'),
   'system/log': () => import('@/views/system/log.vue'),
   'member/list': () => import('@/views/member/list.vue'),
   'member/level': () => import('@/views/member/level.vue'),

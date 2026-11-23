@@ -98,7 +98,7 @@ export function deleteRole(id: number) {
 export function grantRolePermissions(id: number, permissionIds: number[]) {
   return http.put<void>('/api/admin/system/roles/' + id + '/permissions', { permissionIds })
 }
-// ===== 权限（阶段九：system/permission 页面）=====
+// ===== 权限树（供角色管理授权使用；菜单维护页面已移除）=====
 
 export interface PermissionNode {
   id: number
@@ -117,28 +117,6 @@ export function getPermissionTree() {
   return http.get<PermissionNode[]>('/api/admin/system/permissions/tree')
 }
 
-export interface PermissionSave {
-  permCode: string
-  permName: string
-  permType: string
-  parentId: number
-  routePath?: string | null
-  component?: string | null
-  sort?: number | null
-  status?: string
-}
-
-export function createPermission(data: PermissionSave) {
-  return http.post<number>('/api/admin/system/permissions', data)
-}
-
-export function updatePermission(id: number, data: PermissionSave) {
-  return http.put<void>('/api/admin/system/permissions/' + id, data)
-}
-
-export function deletePermission(id: number) {
-  return http.del<void>('/api/admin/system/permissions/' + id)
-}
 
 // ===== 操作日志（阶段九：system/log 页面）=====
 

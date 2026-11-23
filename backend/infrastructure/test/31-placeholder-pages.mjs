@@ -62,16 +62,16 @@ if(rid){
   chk('删除角色',r.code===0,'code='+r.code);
 }
 
-console.log('=== 5. system/permission 权限点维护 ===');
-r=await send('POST','/api/admin/system/permissions',{permCode:'p9:'+Date.now().toString(36),permName:'P9临时权限',permType:'BUTTON',parentId:0,sort:999,status:'ENABLED'});
-chk('新增权限点',r.code===0,'id='+r.data+' '+(r.message||''));
-const permId=r.data;
-if(permId){
-  r=await send('PUT','/api/admin/system/permissions/'+permId,{permCode:'p9:'+Date.now().toString(36),permName:'P9临时权限(改)',permType:'BUTTON',parentId:0,sort:999,status:'ENABLED'});
-  chk('编辑权限点',r.code===0,'code='+r.code);
-  r=await send('DELETE','/api/admin/system/permissions/'+permId);
-  chk('删除权限点',r.code===0,'code='+r.code);
-}
+console.log('=== 5. system/permission 权限树（维护接口已按设计移除）===');
+// 权限编码被 @PreAuthorize 与前端按钮引用，运行时增删改会破坏鉴权，已按设计移除；
+// 只保留角色授权所需的全量权限树查询（system:role:grant）。
+r=await get('/api/admin/system/permissions/tree');
+chk('权限树查询',r.code===0,'top='+(Array.isArray(r.data)?r.data.length:'?'));
+const allPerms=[];
+(function walk(nodes){(nodes||[]).forEach(n=>{allPerms.push(n);walk(n.children)})})(r.data);
+chk('权限树节点完整',allPerms.length>0,'共 '+allPerms.length+' 个节点');
+const hasPoints = allPerms.some(n=>n.permCode==='marketing:points:rule');
+chk('新权限点(积分规则编辑)已在树中',hasPoints,'marketing:points:rule 存在=' + hasPoints);
 
 console.log('=== 6. system/log 操作日志 ===');
 r=await get('/api/admin/system/logs?pageNo=1&pageSize=5');
