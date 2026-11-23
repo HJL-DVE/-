@@ -80,6 +80,12 @@ teaclub:
     issuer: teaclub
   security:
     internal-token: ${INTERNAL_TOKEN:teaclub-internal-default-token}
+  # 营销服务本地直连地址（留空=走 Nacos 服务发现）。
+  # 混合部署（营销服务在容器、订单服务在宿主机）时设为 http://127.0.0.1:9007。
+  client:
+    marketing-url: ${TEACLUB_MARKETING_URL:}
+  # 营销服务本地直连地址（留空=走 Nacos 服务发现）。
+  # 混合部署（营销服务在容器、订单服务在宿主机）时设为 http://127.0.0.1:9007。
 
 feign:
   client:
@@ -118,8 +124,3 @@ logging:
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{traceId:-}] %logger{36} - %msg%n"
 
-# 营销服务本地直连地址（留空=走 Nacos 服务发现）。
-# 混合部署（营销服务在容器、订单服务在宿主机）时设为 http://127.0.0.1:9007。
-teaclub:
-  client:
-    marketing-url: ${TEACLUB_MARKETING_URL:}

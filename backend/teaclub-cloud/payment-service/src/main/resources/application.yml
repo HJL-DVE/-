@@ -1,4 +1,4 @@
-﻿server:
+server:
   port: ${SERVER_PORT:9006}
 
 spring:
@@ -122,3 +122,10 @@ logging:
     com.teaclub.cloud: DEBUG
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{traceId:-}] %logger{36} - %msg%n"
+
+# 跨服务本地直连地址（留空=走 Nacos 服务发现）。
+# 混合部署（被调服务在容器、本服务在宿主机）时设为 http://127.0.0.1:9005 等。
+teaclub:
+  client:
+    order-url: ${ORDER_SERVICE_URL:}
+    wallet-url: ${WALLET_SERVICE_URL:}

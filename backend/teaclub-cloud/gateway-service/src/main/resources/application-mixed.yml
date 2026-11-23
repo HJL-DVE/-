@@ -1,0 +1,54 @@
+# ============================================================
+# TeaClub Gateway —— 混合部署 profile（mixed）
+#
+# 用途：Gateway 跑在 Docker 容器、部分业务服务跑在宿主机（IDEA）时使用。
+#   容器注册的 Docker 内网 IP（172.18.x.x）宿主机不可达，
+#   因此本 profile 用静态路由直连宿主映射端口。
+#
+# 启用：SPRING_PROFILES_ACTIVE=mixed
+#       GATEWAY_LOCAL_BASE=http://host.docker.internal   （容器内访问宿主）
+#
+# 全容器 / 全宿主机部署请用默认 profile（走 Nacos 服务发现），无需本文件。
+# ============================================================
+
+spring:
+  cloud:
+    gateway:
+      discovery:
+        locator:
+          enabled: false
+      routes:
+        - id: local-auth
+          uri: ${GATEWAY_LOCAL_BASE:http://127.0.0.1}:9001
+          predicates:
+            - Path=/api/auth/**,/api/admin/auth/**,/api/admin/system/**,/api/admin/store/**
+        - id: local-member
+          uri: ${GATEWAY_LOCAL_BASE:http://127.0.0.1}:9002
+          predicates:
+            - Path=/api/member/**,/api/admin/member/**
+        - id: local-product
+          uri: ${GATEWAY_LOCAL_BASE:http://127.0.0.1}:9003
+          predicates:
+            - Path=/api/product/**,/api/admin/product/**
+        - id: local-wallet
+          uri: ${GATEWAY_LOCAL_BASE:http://127.0.0.1}:9004
+          predicates:
+            - Path=/api/wallet/**,/api/admin/wallet/**
+        - id: local-order
+          uri: ${GATEWAY_LOCAL_BASE:http://127.0.0.1}:9005
+          predicates:
+            - Path=/api/order/**,/api/admin/order/**
+        - id: local-payment
+          uri: ${GATEWAY_LOCAL_BASE:http://127.0.0.1}:9006
+          predicates:
+            - Path=/api/payment/**,/api/admin/payment/**
+        - id: local-marketing
+          uri: ${GATEWAY_LOCAL_BASE:http://127.0.0.1}:9007
+          predicates:
+            - Path=/api/marketing/**,/api/admin/marketing/**
+        - id: local-report
+          uri: ${GATEWAY_LOCAL_BASE:http://127.0.0.1}:9008
+          predicates:
+            - Path=/api/report/**,/api/admin/report/**
+      default-filters:
+        - AddRequestHeader=X-Gateway, teaclub-gateway

@@ -16,7 +16,10 @@ import java.util.Map;
  * <p><b>关键约束</b>：退款回冲是<b>有副作用</b>的操作，本客户端<b>不启用自动重试</b>。
  * 幂等由退款单号保证 —— wallet 侧 `uk_txn_biz(biz_type, biz_no)` 唯一索引兜底。
  */
-@FeignClient(name = "wallet-service", path = "/api/wallet/internal", contextId = "paymentWalletInternalClient")
+@FeignClient(name = "wallet-service", path = "/api/wallet/internal", contextId = "paymentWalletInternalClient",
+        // 支持本地直连：混合部署（部分服务在容器、部分在宿主机）时，
+        // 容器内网 IP 宿主机不可达，改走宿主映射端口。留空=走 Nacos 服务发现。
+        url = "${teaclub.client.wallet-url:}")
 public interface WalletInternalClient {
 
     /** 查询充值订单（发起充值支付时校验金额与状态）。 */

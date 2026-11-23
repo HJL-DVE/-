@@ -55,20 +55,30 @@ chk('管理员登录', adm.code === 0, adm.code === 0 ? '' : adm.message);
 
 const cases = [
   ['GET', '/api/admin/member/members?pageNo=abc', {}, '非法分页参数'],
-  ['GET', '/api/admin/member/members?pageNo=1&pageSize=99999', {}, '超大 pageSize'],
   ['GET', '/api/admin/member/members/999999999', {}, '不存在的会员 ID'],
   ['POST', '/api/admin/system/roles', { body: {} }, '缺少必填字段的角色'],
   ['GET', '/api/admin/wallet/accounts/member/999999999', {}, '不存在的钱包'],
-  ['GET', '/api/report/dashboard/overview?days=abc', {}, '非法日期参数'],
   ['GET', '/api/order/orders/nonexistent', {}, '不存在的订单'],
   ['POST', '/api/marketing/coupons/receive?templateId=999999&qty=1', {}, '领取不存在的券模板'],
-  ['POST', '/api/marketing/points/adjust?memberId=999999&points=100', {}, '调整不存在会员积分'],
 ];
 for (const [m, p, opt, label] of cases) {
   const r = await req(m, p, { token: tok, ...opt });
   const handled = r.code !== 0 && r.code !== 50000 && r.code !== undefined;
   chk(label + ' 返回业务错误码', handled, `code=${r.code} msg=${(r.message || '').slice(0, 60)}`);
 }
+
+// 分页上限：超大 pageSize 必须被限制（不是报错，而是返回上限条数）
+const big = await req('GET', '/api/admin/member/members?pageNo=1&pageSize=99999', { token: tok });
+const bigCount = (big?.data?.records || []).length;
+chk('超大 pageSize 被限制到 100', big?.code === 0 && bigCount <= 100, `返回 ${bigCount} 条`);
+
+// 非法日期参数必须返回参数错误码，而不是 50000 系统内部错误
+const badDays = await req('GET', '/api/report/dashboard/trend?days=abc', { token: tok });
+chk('非法 days 返回 10001 而非 50000', badDays?.code === 10001, `code=${badDays?.code} msg=${(badDays?.message || '').slice(0, 40)}`);
+
+// 调整不存在的会员积分必须被拒（不能写脏数据）
+const badAdj = await req('POST', '/api/admin/marketing/points/adjust?memberId=999999999&points=100', { token: tok });
+chk('调整不存在会员积分被拒', badAdj?.code !== 0 && badAdj?.code !== 50000, `code=${badAdj?.code} msg=${(badAdj?.message || '').slice(0, 40)}`);
 
 // ============ D. 幂等性 ============
 console.log('');

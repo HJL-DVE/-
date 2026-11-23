@@ -14,7 +14,10 @@ import java.util.Map;
  *
  * <p>order_db 归 order-service 独占，payment-service 不得直接访问。
  */
-@FeignClient(name = "order-service", path = "/api/order/internal", contextId = "paymentOrderInternalClient")
+@FeignClient(name = "order-service", path = "/api/order/internal", contextId = "paymentOrderInternalClient",
+        // 支持本地直连：混合部署（部分服务在容器、部分在宿主机）时，
+        // 容器内网 IP 宿主机不可达，改走宿主映射端口。留空=走 Nacos 服务发现。
+        url = "${teaclub.client.order-url:}")
 public interface OrderInternalClient {
 
     /** 按订单号查询订单（校验金额与状态）。 */
