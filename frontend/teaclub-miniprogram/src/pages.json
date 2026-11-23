@@ -105,7 +105,6 @@
         "navigationBarTitleText": "我的积分"
       }
     },
-
     {
       "path": "pages/member/level",
       "style": {
@@ -128,6 +127,12 @@
       "path": "pages/coupon/center",
       "style": {
         "navigationBarTitleText": "优惠券中心"
+      }
+    },
+    {
+      "path": "pages/activity/list",
+      "style": {
+        "navigationBarTitleText": "营销活动"
       }
     },
     {

@@ -65,6 +65,7 @@ const menus = [
   { label: '消费记录', url: '/pages/member/transactions' },
   { label: '我的积分', url: '/pages/member/points' },
   { label: '我的优惠券', url: '/pages/member/coupons' },
+  { label: '营销活动', url: '/pages/activity/list' },
   { label: '退卡申请', url: '/pages/member/card-refund' },
   { label: '门店列表', url: '/pages/store/list' },
   { label: '个人资料', url: '/pages/user/profile' },

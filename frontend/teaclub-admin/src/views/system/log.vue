@@ -2,7 +2,7 @@
   <div class="page">
     <div class="toolbar">
       <h2 class="page-title">操作日志</h2>
-      <span class="text-muted">历史操作留痕（只读）；微服务化后新操作暂未接入写日志</span>
+      <span class="text-muted">操作留痕：写操作自动记录（模块 / 操作人 / 结果 / 耗时 / IP）</span>
       <div class="toolbar-spacer" />
       <el-select v-model="success" placeholder="全部结果" clearable size="small" style="width: 130px" @change="load">
         <el-option label="成功" :value="true" />
