@@ -91,7 +91,7 @@
     </div>
 
     <!-- 商品管理弹窗：可从总部选品上架，也可现场新建商品（含图片） -->
-    <el-dialog v-model="addVisible" title="商品管理" width="820px" destroy-on-close>
+    <el-dialog v-model="addVisible" title="商品管理" width="820px" destroy-on-close body-class="store-product-dialog">
       <el-alert
         type="info"
         :closable="false"
@@ -116,7 +116,7 @@
             v-loading="addLoading"
             border
             size="small"
-            max-height="380"
+            max-height="300"
             row-key="id"
             @selection-change="onCandidateSelect"
           >
@@ -141,17 +141,25 @@
                 <el-tag v-else size="small" type="success">可添加</el-tag>
               </template>
             </el-table-column>
+            <el-table-column label="操作" width="90" align="center" fixed="right">
+              <template #default="{ row }">
+                <el-button v-if="!row.added" link type="primary" size="small" @click="addOne(row)">添加</el-button>
+                <span v-else class="text-muted">-</span>
+              </template>
+            </el-table-column>
           </el-table>
 
-          <template #footer>
-            <span style="float: left; line-height: 32px; color: #909399">
-              已选 {{ selectedCandidates.length }} 个商品
-            </span>
-            <el-button @click="addVisible = false">取消</el-button>
-            <el-button type="primary" :loading="addSubmitting" :disabled="!selectedCandidates.length" @click="submitAdd">
-              添加到本门店
-            </el-button>
-          </template>
+          <!-- 操作区：必须用普通 div，不能用 el-dialog 的 #footer slot
+               （放在 tab-pane 内时 dialog 不会渲染 footer，按钮会消失） -->
+          <div class="dialog-actions">
+            <span class="text-muted">已选 {{ selectedCandidates.length }} 个商品</span>
+            <div>
+              <el-button @click="addVisible = false">取消</el-button>
+              <el-button type="primary" :loading="addSubmitting" :disabled="!selectedCandidates.length" @click="submitAdd">
+                添加到本门店({{ selectedCandidates.length }})
+              </el-button>
+            </div>
+          </div>
         </el-tab-pane>
 
         <!-- ============ 新建商品 ============ -->
@@ -235,12 +243,15 @@
             </el-form-item>
           </el-form>
 
-          <template #footer>
-            <el-button @click="addVisible = false">取消</el-button>
-            <el-button type="primary" :loading="creating" @click="submitCreate">
-              创建并上架到本店
-            </el-button>
-          </template>
+          <div class="dialog-actions">
+            <span class="text-muted">新商品将直接创建并上架到当前门店</span>
+            <div>
+              <el-button @click="addVisible = false">取消</el-button>
+              <el-button type="primary" :loading="creating" @click="submitCreate">
+                创建并上架
+              </el-button>
+            </div>
+          </div>
         </el-tab-pane>
       </el-tabs>
     </el-dialog>
@@ -490,6 +501,22 @@ function onCandidateSelect(rows: (SpuVO & { added?: boolean })[]): void {
   selectedCandidates.value = rows
 }
 
+/** 单行直接添加（无需勾选复选框）。 */
+async function addOne(row: SpuVO & { added?: boolean }): Promise<void> {
+  if (!appStore.currentStoreId || row.added) return
+  addSubmitting.value = true
+  try {
+    await shelfStoreSpu(appStore.currentStoreId, row.id, 1)
+    ElMessage.success('已添加「' + row.spuName + '」到本门店')
+    await loadCandidates()
+    await load()
+  } catch (e) {
+    ElMessage.error('添加失败，请重试')
+  } finally {
+    addSubmitting.value = false
+  }
+}
+
 async function submitAdd(): Promise<void> {
   if (!appStore.currentStoreId || !selectedCandidates.value.length) return
   addSubmitting.value = true
@@ -600,3 +627,46 @@ function onRemove(row: StoreSpuVO): void {
 onMounted(load)
 watch(() => appStore.currentStoreId, load)
 </script>
+
+<!-- 弹窗内操作区 */
+<style>
+.store-product-dialog {
+  max-height: 82vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.store-product-dialog .el-dialog__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.dialog-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #ebeef5;
+}
+</style>
+
+<!-- 商品管理弹窗：内容区可滚动，底部「添加到本门店」按钮始终可见 -->
+<style>
+.store-product-dialog {
+  max-height: 82vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.store-product-dialog .el-dialog__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.store-product-dialog .el-dialog__footer {
+  flex-shrink: 0;
+  border-top: 1px solid #ebeef5;
+  padding-top: 12px;
+}
+</style>

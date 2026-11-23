@@ -167,6 +167,21 @@ public class PrdStoreProductServiceImpl implements PrdStoreProductService {
                 .eq(PrdStoreSpu::getSpuId, spuId));
 
         if (rel == null) {
+            // 表上有唯一键 uk_store_spu(store_id, spu_id)，但该唯一索引**不包含逻辑删除列**。
+            // 因此「曾被逻辑删除」的同键记录仍在表里，直接 insert 会撞唯一键（500）。
+            // 这里先找已删除的同键记录，有则恢复（deleted=0）并更新状态。
+            PrdStoreSpu deleted = storeSpuMapper.selectDeletedRel(storeId, spuId);
+            if (deleted != null) {
+                PrdStoreSpu restore = new PrdStoreSpu();
+                restore.setId(deleted.getId());
+                restore.setDeleted(0);
+                restore.setIsOnSale(request.getIsOnSale());
+                if (request.getSort() != null) {
+                    restore.setSort(request.getSort());
+                }
+                storeSpuMapper.updateById(restore);
+                return;
+            }
             rel = new PrdStoreSpu();
             rel.setBrandId(spu.getBrandId());
             rel.setStoreId(storeId);
