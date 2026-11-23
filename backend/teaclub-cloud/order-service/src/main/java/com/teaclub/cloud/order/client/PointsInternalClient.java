@@ -15,7 +15,10 @@ import org.springframework.web.bind.annotation.RequestParam;
  * <p>简化方案：试算只查余额不扣，支付成功按订单号幂等扣一次，取消订单不扣。
  */
 @FeignClient(name = "marketing-service", path = "/api/marketing/internal/points",
-        contextId = "orderMarketingPointsClient")
+        contextId = "orderMarketingPointsClient",
+        // 支持本地直连：混合部署（部分服务在容器、部分在宿主机）时，
+        // 容器内网 IP 宿主机不可达，改走宿主映射端口。留空=走 Nacos 服务发现。
+        url = "${teaclub.client.marketing-url:}")
 public interface PointsInternalClient {
 
     /** 查询会员可用积分（仅查询，不扣减）。 */

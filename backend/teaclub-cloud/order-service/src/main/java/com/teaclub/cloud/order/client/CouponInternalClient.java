@@ -14,7 +14,10 @@ import java.util.Map;
  * 内部令牌由 FeignRequestInterceptor 统一注入。
  */
 @FeignClient(name = "marketing-service", path = "/api/marketing/internal/coupons",
-        contextId = "orderMarketingCouponClient")
+        contextId = "orderMarketingCouponClient",
+        // 支持本地直连：混合部署（部分服务在容器、部分在宿主机）时，
+        // 容器内网 IP 宿主机不可达，改走宿主映射端口。留空=走 Nacos 服务发现。
+        url = "${teaclub.client.marketing-url:}")
 public interface CouponInternalClient {
 
     /** 试算抵扣金额（不修改券状态）。按券实例 ID。 */
