@@ -489,4 +489,25 @@ public class ActivityServiceImpl implements ActivityService {
         Long b = UserContext.currentBrandIdOrNull();
         return b == null ? 1L : b;
     }
+
+    /**
+     * 监听签到完成事件，触发「连续签到」类活动发奖。
+     *
+     * <p>用事件解耦：PointsServiceImpl 不直接依赖 ActivityService，避免循环依赖。
+     * 发奖失败只记日志，不影响签到本身（签到积分已在本事务外提交）。
+     */
+    @org.springframework.context.event.EventListener
+    public void onSignInCompleted(com.teaclub.cloud.marketing.event.SignInCompletedEvent event) {
+        try {
+            int granted = triggerContinuousSign(event.getBrandId(), event.getMemberId(),
+                    event.getContinuousDays());
+            if (granted > 0) {
+                log.info("[SIGN-IN-EVENT] 连续签到活动发奖 memberId={} continuous={} count={}",
+                        event.getMemberId(), event.getContinuousDays(), granted);
+            }
+        } catch (Exception e) {
+            log.warn("[SIGN-IN-EVENT] 连续签到活动发奖失败 memberId={} err={}",
+                    event.getMemberId(), e.getMessage());
+        }
+    }
 }

@@ -39,6 +39,7 @@ const SUITE = [
   { file: '34-order-coupon.mjs',              tag: 'coupon',   desc: '下单使用优惠券：试算抵扣→下单锁券→支付核销' },
   { file: '35-marketing-activities.mjs',      tag: 'actseed',  desc: '8类营销活动创建与列表可见' },
   { file: '36-activity-effect.mjs',           tag: 'acteff',   desc: '种子活动真实生效：列表/参与/积分到账/统计' },
+  { file: '37-new-features.mjs',              tag: 'newfeat',  desc: '操作日志AOP/积分规则编辑/8类活动触发' },
 ];
 
 const filters = process.argv.slice(2).filter((a) => !a.startsWith('-'));

@@ -9,7 +9,6 @@ import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.reflect.MethodSignature;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
@@ -30,7 +29,6 @@ import java.time.LocalDateTime;
  */
 @Slf4j
 @Aspect
-@Component
 public class AuditLogAspect {
 
     private static final int MAX_PARAM_LEN = 2000;

@@ -1,1 +1,2 @@
 com.teaclub.cloud.web.config.TeaClubWebAutoConfiguration
+com.teaclub.cloud.web.audit.AuditLogAutoConfiguration

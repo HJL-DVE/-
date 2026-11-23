@@ -135,6 +135,20 @@ public class ReportService {
         out.put("rechargeGiftAmount", money(recharge.get("gift")));
         out.put("refundAmount", money(refund.get("amount")));
         out.put("todayNewMembers", mapper.countMembers(brandId, todayStart, sid));
+
+        // 近 30 天热销商品 Top5（销量口径），供门店驾驶舱直接展示
+        LocalDateTime since30 = todayStart.minusDays(30);
+        var hotRows = mapper.productRank(brandId, sid, since30, null, "qty", 5);
+        java.util.List<java.util.Map<String, Object>> hot = new java.util.ArrayList<>();
+        for (var row : hotRows) {
+            java.util.Map<String, Object> item = new java.util.LinkedHashMap<>();
+            item.put("spuId", num(row.get("spuId")));
+            item.put("name", row.get("name"));
+            item.put("qty", num(row.get("qty")));
+            item.put("amount", money(row.get("amount")));
+            hot.add(item);
+        }
+        out.put("hotProducts", hot);
         return out;
     }
 

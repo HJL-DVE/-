@@ -56,7 +56,7 @@ public class PointsServiceImpl implements PointsService {
 
     private final MktPointsAccountMapper accountMapper;
     private final com.teaclub.cloud.marketing.service.LevelBenefitService levelBenefitService;
-    private final com.teaclub.cloud.marketing.service.ActivityService activityService;
+    private final org.springframework.context.ApplicationEventPublisher eventPublisher;
     private final MktPointsTransactionMapper txnMapper;
     private final MktPointsBatchMapper batchMapper;
     private final MktPointsRuleMapper ruleMapper;
@@ -449,16 +449,10 @@ public class PointsServiceImpl implements PointsService {
         vo.setTotalPoints(newTotal);
         vo.setBonusRemark(bonusDays > 1 ? "连续 " + continuous + " 天，额外加成 " + (bonusDays - 1) + " 天" : null);
 
-        // 连续签到活动：达到活动配置的 continuousDays 即发奖（唯一键保证同一业务只发一次）
-        try {
-            int granted = activityService.triggerContinuousSign(brandId, memberId, continuous);
-            if (granted > 0) {
-                log.info("[SIGN-IN] 触发连续签到活动发奖 memberId={} continuous={} count={}",
-                        memberId, continuous, granted);
-            }
-        } catch (Exception e) {
-            log.warn("[SIGN-IN] 触发连续签到活动失败 memberId={} err={}", memberId, e.getMessage());
-        }
+        // 连续签到活动：发布事件由 ActivityServiceImpl 监听发奖
+        // （用事件而非直接注入，避免 PointsService ↔ ActivityService 循环依赖）
+        eventPublisher.publishEvent(
+                new com.teaclub.cloud.marketing.event.SignInCompletedEvent(brandId, memberId, continuous));
         return vo;
     }
 
