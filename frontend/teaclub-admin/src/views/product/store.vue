@@ -141,12 +141,6 @@
                 <el-tag v-else size="small" type="success">可添加</el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="90" align="center" fixed="right">
-              <template #default="{ row }">
-                <el-button v-if="!row.added" link type="primary" size="small" @click="addOne(row)">添加</el-button>
-                <span v-else class="text-muted">-</span>
-              </template>
-            </el-table-column>
           </el-table>
 
           <!-- 操作区：必须用普通 div，不能用 el-dialog 的 #footer slot
@@ -499,22 +493,6 @@ function isCandidateSelectable(row: SpuVO & { added?: boolean }): boolean {
 
 function onCandidateSelect(rows: (SpuVO & { added?: boolean })[]): void {
   selectedCandidates.value = rows
-}
-
-/** 单行直接添加（无需勾选复选框）。 */
-async function addOne(row: SpuVO & { added?: boolean }): Promise<void> {
-  if (!appStore.currentStoreId || row.added) return
-  addSubmitting.value = true
-  try {
-    await shelfStoreSpu(appStore.currentStoreId, row.id, 1)
-    ElMessage.success('已添加「' + row.spuName + '」到本门店')
-    await loadCandidates()
-    await load()
-  } catch (e) {
-    ElMessage.error('添加失败，请重试')
-  } finally {
-    addSubmitting.value = false
-  }
 }
 
 async function submitAdd(): Promise<void> {
