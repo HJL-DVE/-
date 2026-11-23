@@ -172,14 +172,9 @@ public class PrdStoreProductServiceImpl implements PrdStoreProductService {
             // 这里先找已删除的同键记录，有则恢复（deleted=0）并更新状态。
             PrdStoreSpu deleted = storeSpuMapper.selectDeletedRel(storeId, spuId);
             if (deleted != null) {
-                PrdStoreSpu restore = new PrdStoreSpu();
-                restore.setId(deleted.getId());
-                restore.setDeleted(0);
-                restore.setIsOnSale(request.getIsOnSale());
-                if (request.getSort() != null) {
-                    restore.setSort(request.getSort());
-                }
-                storeSpuMapper.updateById(restore);
+                // 用自定义 UPDATE 恢复：updateById 会被 @TableLogic 过滤（影响 0 行）
+                storeSpuMapper.restoreDeletedRel(storeId, spuId,
+                        request.getIsOnSale(), request.getSort() == null ? 0 : request.getSort());
                 return;
             }
             rel = new PrdStoreSpu();
