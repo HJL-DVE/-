@@ -68,6 +68,15 @@ export function getCouponTemplate(id: number) {
   return http.get<CouponTemplateVO>('/api/admin/marketing/coupons/templates/' + id)
 }
 
+/** 收银台：查询会员可用于本单的优惠券 */
+export function getUsableCouponsForOrder(params: {
+  memberId: number
+  orderAmount?: number
+  storeId?: number
+}) {
+  return http.get<CouponVO[]>('/api/admin/marketing/coupons/usable-for-order', params)
+}
+
 export function createCouponTemplate(data: Partial<CouponTemplateVO>) {
   return http.post<number>('/api/admin/marketing/coupons/templates', data)
 }

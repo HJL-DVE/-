@@ -177,7 +177,7 @@ public interface MemMemberMapper extends BaseMapper<MemMember> {
             FROM mem_member m
             WHERE m.brand_id = #{brandId}
               AND m.deleted = 0
-              AND m.status = 'ACTIVE'
+              AND m.status = 'NORMAL'
               AND m.birthday IS NOT NULL
               AND MONTH(m.birthday) = #{month}
             """)
@@ -194,7 +194,7 @@ public interface MemMemberMapper extends BaseMapper<MemMember> {
             FROM mem_member m
             WHERE m.brand_id = #{brandId}
               AND m.deleted = 0
-              AND m.status = 'ACTIVE'
+              AND m.status = 'NORMAL'
               AND (m.last_consume_time IS NULL OR m.last_consume_time < #{cutoff})
             """)
     List<Long> selectSleepingIds(@Param("brandId") Long brandId,

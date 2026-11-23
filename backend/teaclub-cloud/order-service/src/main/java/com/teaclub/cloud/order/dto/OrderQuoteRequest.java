@@ -18,6 +18,9 @@ public class OrderQuoteRequest {
     private Long memberId;
     private Long memberCouponId;
 
+    @Schema(description = "使用积分数（1 积分=1 分钱；可为空=不用）")
+    private Long usePoints;
+
     @NotEmpty(message = "商品不能为空")
     @Valid
     private List<OrderItemRequest> items;

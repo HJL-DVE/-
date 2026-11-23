@@ -28,6 +28,7 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.DeadlockLoserDataAccessException;
 import org.springframework.util.StringUtils;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import com.teaclub.cloud.member.service.support.MemberVisibilityResolver;
 import com.teaclub.cloud.member.vo.MemberStatsVO;
@@ -408,14 +409,20 @@ public class MemMemberServiceImpl implements MemMemberService {
         if (request.getNickname() != null) {
             patch.setNickname(request.getNickname());
         }
-        if (request.getAvatarUrl() != null) {
-            patch.setAvatarUrl(request.getAvatarUrl());
-        }
-        if (request.getGender() != null) {
-            patch.setGender(request.getGender());
+        // 生日：仅首次设置生效。生日福利（生日券/生日积分）按生日月发放，
+        // 允许反复修改会被反复薅，故设置后会员端不可再改
+        if (request.getBirthday() != null && !request.getBirthday().isBlank()) {
+            if (existing.getBirthday() != null) {
+                throw new BizException(ResultCode.PARAM_INVALID, "生日已设置，如需变更请联系门店");
+            }
+            try {
+                patch.setBirthday(LocalDate.parse(request.getBirthday()));
+            } catch (java.time.format.DateTimeParseException e) {
+                throw new BizException(ResultCode.PARAM_INVALID, "生日格式不正确");
+            }
         }
         memberMapper.updateById(patch);
-        log.info("会员自助修改资料: memberId={}", memberId);
+        log.info("会员自助修改资料: memberId={} setBirthday={}", memberId, patch.getBirthday() != null);
     }
 
     // ==================== 内部工具 ====================

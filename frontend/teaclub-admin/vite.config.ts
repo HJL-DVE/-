@@ -14,6 +14,7 @@ export default defineConfig(({ mode }) => {
       },
     },
     server: {
+      host: '0.0.0.0',
       port: 5173,
       proxy: {
         // 兜底：若把 VITE_API_BASE_URL 配成相对路径，开发服务器转发到网关

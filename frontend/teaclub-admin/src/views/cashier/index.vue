@@ -199,6 +199,7 @@
               </el-descriptions-item>
               <el-descriptions-item label="活动优惠">-{{ fenToYuan(quote.activityDiscountAmount) }} 元</el-descriptions-item>
               <el-descriptions-item label="券优惠">-{{ fenToYuan(quote.couponAmount) }} 元</el-descriptions-item>
+              <el-descriptions-item v-if="quote.pointsDiscountAmount" label="积分抵扣">-{{ fenToYuan(quote.pointsDiscountAmount) }} 元</el-descriptions-item>
               <el-descriptions-item label="优惠合计">-{{ fenToYuan(quote.discountAmount) }} 元</el-descriptions-item>
               <el-descriptions-item label="应付金额">
                 <span class="money payable">{{ fenToYuan(quote.payableAmount) }} 元</span>
@@ -208,16 +209,12 @@
           </div>
 
           <div class="pay-actions">
-            <el-tooltip content="营销服务未上线，优惠券功能预留" placement="top">
-              <span>
-                <el-button disabled>使用优惠券</el-button>
-              </span>
-            </el-tooltip>
-            <el-tooltip content="营销服务未上线，积分抵扣预留" placement="top">
-              <span>
-                <el-button disabled>积分抵扣</el-button>
-              </span>
-            </el-tooltip>
+            <el-button :disabled="!member" @click="openCouponPicker">
+              使用优惠券{{ selectedCoupon ? '（已选）' : '' }}
+            </el-button>
+            <el-button :disabled="!member || pointsBalance <= 0" @click="openPointsDialog">
+              积分抵扣{{ usePoints > 0 ? '（' + usePoints + '分）' : '' }}
+            </el-button>
             <div class="toolbar-spacer" />
             <el-button type="success" :loading="payingWallet" :disabled="!canPay" @click="payWithWallet">
               钱包支付
@@ -276,6 +273,52 @@
         </el-table-column>
       </el-table>
     </el-card>
+
+    <!-- 优惠券选择 -->
+    <el-dialog v-model="couponPickerVisible" title="选择优惠券" width="640px">
+      <div v-if="couponsLoading" class="state">加载中…</div>
+      <div v-else-if="coupons.length === 0" class="state">该会员暂无可用优惠券</div>
+      <el-table v-else :data="coupons" size="small" border>
+        <el-table-column label="选择" width="60">
+          <template #default="{ row }">
+            <el-radio v-model="selectedCouponId" :value="row.id">&nbsp;</el-radio>
+          </template>
+        </el-table-column>
+        <el-table-column prop="couponName" label="券名称" min-width="140" />
+        <el-table-column label="类型" width="100">
+          <template #default="{ row }">{{ row.couponTypeLabel || row.couponType }}</template>
+        </el-table-column>
+        <el-table-column label="面额" width="100" align="right">
+          <template #default="{ row }">
+            {{ row.couponType === 'DISCOUNT' ? ((row.discountRate || 10000) / 1000).toFixed(1) + '折' : '¥' + fenToYuan(row.faceValue || 0) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="门槛" width="100" align="right">
+          <template #default="{ row }">{{ row.thresholdAmount ? '¥' + fenToYuan(row.thresholdAmount) : '无门槛' }}</template>
+        </el-table-column>
+      </el-table>
+      <template #footer>
+        <el-button @click="clearCoupon">不使用优惠券</el-button>
+        <el-button type="primary" @click="confirmCoupon">确定</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 积分抵扣 -->
+    <el-dialog v-model="pointsDialogVisible" title="积分抵扣" width="440px">
+      <div class="points-info">可用积分：<strong>{{ pointsBalance }}</strong> 分（100 积分抵 1 元）</div>
+      <el-form label-width="90px" style="margin-top: 16px">
+        <el-form-item label="使用积分">
+          <el-input-number v-model="usePoints" :min="0" :max="pointsBalance" :step="100" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="可抵扣">
+          <span class="money">¥{{ fenToYuan(usePoints) }}</span>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="clearPoints">不使用积分</el-button>
+        <el-button type="primary" @click="confirmPoints">确定</el-button>
+      </template>
+    </el-dialog>
 
     <el-dialog v-model="skuVisible" title="选择规格" width="460px">
       <el-table :data="skuOptions" size="small" border @row-click="chooseSku">
@@ -351,6 +394,7 @@ import { getWalletByMember } from '@/api/wallet'
 import { createOrder, getOrderPage, payByBalance, quoteOrder } from '@/api/order'
 import { createPayment, queryPayment } from '@/api/payment'
 import { applyRefund } from '@/api/payment'
+import { getUsableCouponsForOrder, getPointsAccount, type CouponVO } from '@/api/marketing'
 import { ApiError, isApiError } from '@/api/request'
 import ApiPending from '@/components/ApiPending.vue'
 import {
@@ -613,12 +657,90 @@ async function loadWallet(memberId: number): Promise<void> {
   }
 }
 
+// ---------- 优惠券 / 积分抵扣 ----------
+const couponPickerVisible = ref(false)
+const coupons = ref<CouponVO[]>([])
+const couponsLoading = ref(false)
+const selectedCouponId = ref<number | null>(null)
+const selectedCoupon = computed(() => coupons.value.find((c) => c.id === selectedCouponId.value) || null)
+
+const pointsDialogVisible = ref(false)
+const pointsBalance = ref(0)
+const usePoints = ref(0)
+
+async function loadCoupons(): Promise<void> {
+  if (!member.value) return
+  couponsLoading.value = true
+  try {
+    const amount = quote.value && typeof quote.value.totalAmount === 'number' ? quote.value.totalAmount : undefined
+    coupons.value = await getUsableCouponsForOrder({
+      memberId: member.value.id,
+      orderAmount: amount,
+      storeId: appStore.currentStoreId || undefined,
+    }) || []
+  } catch (error) {
+    console.error('[coupons]', error)
+    coupons.value = []
+  } finally {
+    couponsLoading.value = false
+  }
+}
+
+function openCouponPicker(): void {
+  couponPickerVisible.value = true
+  void loadCoupons()
+}
+
+function confirmCoupon(): void {
+  couponPickerVisible.value = false
+  scheduleQuote()
+}
+
+function clearCoupon(): void {
+  selectedCouponId.value = null
+  couponPickerVisible.value = false
+  scheduleQuote()
+}
+
+async function loadPoints(): Promise<void> {
+  if (!member.value) return
+  try {
+    const acc = await getPointsAccount(member.value.id)
+    pointsBalance.value = acc?.totalPoints || 0
+    if (usePoints.value > pointsBalance.value) usePoints.value = pointsBalance.value
+  } catch (error) {
+    console.error('[points]', error)
+    pointsBalance.value = 0
+  }
+}
+
+function openPointsDialog(): void {
+  pointsDialogVisible.value = true
+  void loadPoints()
+}
+
+function confirmPoints(): void {
+  if (usePoints.value > pointsBalance.value) usePoints.value = pointsBalance.value
+  pointsDialogVisible.value = false
+  scheduleQuote()
+}
+
+function clearPoints(): void {
+  usePoints.value = 0
+  pointsDialogVisible.value = false
+  scheduleQuote()
+}
+
 function clearMember(): void {
   member.value = null
   memberQuery.value = ''
   memberError.value = null
   wallet.value = null
   walletError.value = null
+  selectedCouponId.value = null
+  coupons.value = []
+  usePoints.value = 0
+  pointsBalance.value = 0
   scheduleQuote()
 }
 
@@ -646,6 +768,8 @@ async function runQuote(): Promise<void> {
     quote.value = await quoteOrder({
       storeId: appStore.currentStoreId,
       memberId: member.value?.id,
+      memberCouponId: selectedCouponId.value || undefined,
+      usePoints: usePoints.value > 0 ? usePoints.value : undefined,
       items: cart.value.map((item) => ({ skuId: item.skuId, quantity: item.quantity })),
     })
     quoteError.value = null
@@ -674,6 +798,8 @@ async function buildOrder(): Promise<OrderVO | null> {
     storeId: appStore.currentStoreId,
     memberId: member.value?.id ?? null,
     orderSource: 'POS',
+    memberCouponId: selectedCouponId.value || undefined,
+    usePoints: usePoints.value > 0 ? usePoints.value : undefined,
     items: cart.value.map((item) => ({ skuId: item.skuId, quantity: item.quantity })),
   })
   return created
@@ -684,6 +810,7 @@ function afterPaid(): void {
   clearMember()
   loadOrders()
 }
+
 
 async function payWithWallet(): Promise<void> {
   if (!member.value) {

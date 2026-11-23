@@ -36,7 +36,8 @@ import java.util.Set;
  *   totalAmount      = Σ(门店现价 × 数量)
  *   levelDiscount    = round((total - activity) × (10000 - discountRate) / 10000)
  *   couponDiscount   = min(券面额, total - activity - level)
- *   payableAmount    = total - activity - level - coupon
+ *   pointsDiscount   = min(积分抵扣额, total - activity - level - coupon)  // 1 积分 = 1 分钱
+ *   payableAmount    = total - activity - level - coupon - points
  *   断言 payableAmount >= 0，否则截断为 0
  * </pre>
  *
@@ -59,10 +60,12 @@ public class OrderAmountCalculator {
      * @param storeId        门店 ID
      * @param memberId       会员 ID（可为空 = 散客，无折扣）
      * @param items          商品项（只含 skuId + quantity）
-     * @param couponDiscount 券可抵扣金额（由 CouponService 校验后传入，本期传 0）
+     * @param couponDiscount 券可抵扣金额（由 CouponService 校验后传入）
+     * @param pointsDiscount 积分可抵扣金额，单位分（1 积分 = 1 分钱；由积分余额校验后传入）
      */
     public OrderQuoteVO calculate(Long brandId, Long storeId, Long memberId,
-                                  List<OrderItemRequest> items, long couponDiscount) {
+                                  List<OrderItemRequest> items, long couponDiscount,
+                                  long pointsDiscount) {
         if (items == null || items.isEmpty()) {
             throw new BizException(ResultCode.PARAM_INVALID, "订单商品不能为空");
         }
@@ -183,14 +186,21 @@ public class OrderAmountCalculator {
             actualCoupon = 0;
         }
 
-        long payable = afterLevel - actualCoupon;
+        // ===== 积分抵扣（1 积分 = 1 分钱；不得超过券后剩余应付） =====
+        long afterCoupon = afterLevel - actualCoupon;
+        long actualPoints = Math.min(pointsDiscount, afterCoupon);
+        if (actualPoints < 0) {
+            actualPoints = 0;
+        }
+
+        long payable = afterCoupon - actualPoints;
         if (payable < 0) {
-            log.warn("优惠叠加导致应付为负，已截断为 0: total={} level={} coupon={}",
-                    totalAmount, levelDiscount, actualCoupon);
+            log.warn("优惠叠加导致应付为负，已截断为 0: total={} level={} coupon={} points={}",
+                    totalAmount, levelDiscount, actualCoupon, actualPoints);
             payable = 0;
         }
 
-        long totalDiscount = activityDiscount + levelDiscount + actualCoupon;
+        long totalDiscount = activityDiscount + levelDiscount + actualCoupon + actualPoints;
 
         // 分摊到行（用于行实付展示）
         allocateDiscount(itemVOs, totalDiscount, totalAmount);
@@ -200,6 +210,7 @@ public class OrderAmountCalculator {
         vo.setActivityDiscountAmount(activityDiscount);
         vo.setLevelDiscountAmount(levelDiscount);
         vo.setCouponAmount(actualCoupon);
+        vo.setPointsDiscountAmount(actualPoints);
         vo.setDiscountAmount(totalDiscount);
         vo.setPayableAmount(payable);
         vo.setMemberId(memberId);

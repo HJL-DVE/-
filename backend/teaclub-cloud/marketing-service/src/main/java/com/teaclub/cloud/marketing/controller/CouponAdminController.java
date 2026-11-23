@@ -137,6 +137,15 @@ public class CouponAdminController {
         return Result.ok(couponService.listMine(memberId, status, limit == null ? 50 : limit));
     }
 
+    @Operation(summary = "收银台：查询会员可用于本单的优惠券")
+    @GetMapping("/usable-for-order")
+    @PreAuthorize("hasAuthority('marketing:coupon:list')")
+    public Result<List<CouponVO>> usableForOrder(@RequestParam Long memberId,
+                                                 @RequestParam(required = false) Long orderAmount,
+                                                 @RequestParam(required = false) Long storeId) {
+        return Result.ok(couponService.listUsable(memberId, orderAmount, storeId));
+    }
+
     @Operation(summary = "后台发放优惠券给会员")
     @PostMapping("/templates/{templateId}/grant")
     @PreAuthorize("hasAuthority('marketing:coupon:grant')")

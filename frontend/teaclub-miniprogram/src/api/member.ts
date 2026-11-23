@@ -7,7 +7,7 @@ export function getProfile() {
 }
 
 /** PUT /api/member/profile —— 仅 nickname / avatarUrl / gender */
-export function updateProfile(payload: { nickname?: string; avatarUrl?: string; gender?: string }) {
+export function updateProfile(payload: { nickname?: string; birthday?: string }) {
   return http.put<MemberProfile>('/api/member/profile', payload)
 }
 

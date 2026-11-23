@@ -280,6 +280,7 @@ export interface OrderQuoteVO {
   levelDiscountAmount: number
   activityDiscountAmount: number
   couponAmount: number
+  pointsDiscountAmount?: number
   discountAmount: number
   payableAmount: number
   memberId?: number | null
@@ -339,6 +340,7 @@ export interface OrderCreateRequest {
   memberId?: number | null
   orderSource?: string
   memberCouponId?: number | null
+  usePoints?: number | null
   remark?: string
   payWithBalance?: boolean
   items: OrderItemRequest[]

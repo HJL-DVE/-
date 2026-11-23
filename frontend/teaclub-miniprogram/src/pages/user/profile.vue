@@ -38,14 +38,20 @@
           <input v-model="form.nickname" class="input" placeholder="请输入昵称" />
         </view>
         <view class="form-row">
-          <text class="label">性别</text>
-          <picker mode="selector" :range="genderLabels" :value="genderIndex" @change="onGenderChange">
-            <view class="picker">{{ genderLabels[genderIndex] }}</view>
+          <text class="label">生日</text>
+          <picker
+            mode="date"
+            :value="form.birthday"
+            :start="'1920-01-01'"
+            :end="today"
+            :disabled="birthdayLocked"
+            @change="onBirthdayChange"
+          >
+            <view class="picker" :class="{ locked: birthdayLocked }">
+              {{ form.birthday || '请选择生日（填写后可享生日福利）' }}
+            </view>
           </picker>
-        </view>
-        <view class="form-row">
-          <text class="label">头像地址</text>
-          <input v-model="form.avatarUrl" class="input" placeholder="https://…" />
+          <text v-if="birthdayLocked" class="lock-tip">已设置，不可修改</text>
         </view>
 
         <button class="btn-primary save" :loading="saving" @tap="save">保存</button>
@@ -69,13 +75,10 @@ const loading = ref(false)
 const error = ref('')
 const saving = ref(false)
 
-const genderLabels = ['未知', '男', '女']
-const form = reactive({ nickname: '', avatarUrl: '', gender: 'UNKNOWN' })
-
-const genderIndex = computed(() => {
-  const map: Record<string, number> = { UNKNOWN: 0, MALE: 1, FEMALE: 2 }
-  return map[form.gender] ?? 0
-})
+const today = new Date().toISOString().slice(0, 10)
+// 生日一旦设置后不可再改（防止反复修改薅生日福利），后端也会二次校验
+const birthdayLocked = computed(() => !!profile.value?.birthday)
+const form = reactive({ nickname: '', birthday: '' })
 
 async function load() {
   loading.value = true
@@ -84,8 +87,7 @@ async function load() {
     const data = await memberApi.getProfile()
     profile.value = data || {}
     form.nickname = data?.nickname || ''
-    form.avatarUrl = data?.avatarUrl || ''
-    form.gender = data?.gender || 'UNKNOWN'
+    form.birthday = data?.birthday || ''
   } catch (e) {
     error.value = e instanceof Error ? e.message : '资料加载失败'
   } finally {
@@ -97,9 +99,8 @@ onShow(() => {
   if (authStore.isLoggedIn) load()
 })
 
-function onGenderChange(e: { detail: { value: number | string } }) {
-  const idx = Number(e.detail.value)
-  form.gender = ['UNKNOWN', 'MALE', 'FEMALE'][idx] || 'UNKNOWN'
+function onBirthdayChange(e: { detail: { value: string } }) {
+  form.birthday = e.detail.value || ''
 }
 
 async function save() {
@@ -107,10 +108,9 @@ async function save() {
   try {
     await memberApi.updateProfile({
       nickname: form.nickname,
-      avatarUrl: form.avatarUrl,
-      gender: form.gender,
+      birthday: form.birthday || undefined,
     })
-    toast('保存成功')
+    toast(form.birthday && !birthdayLocked.value ? '保存成功，生日福利将在生日当月自动发放' : '保存成功')
     load()
   } catch (e) {
     console.error('[member/profile PUT]', e)
@@ -145,6 +145,15 @@ function goLogin() {
   border: 1rpx solid #e5e7eb;
   border-radius: 10rpx;
   padding: 12rpx 16rpx;
+}
+.lock-tip {
+  margin-left: 12rpx;
+  font-size: 20rpx;
+  color: #9ca3af;
+}
+.picker.locked {
+  color: #9ca3af;
+  background: #f9fafb;
 }
 .picker {
   font-size: 28rpx;

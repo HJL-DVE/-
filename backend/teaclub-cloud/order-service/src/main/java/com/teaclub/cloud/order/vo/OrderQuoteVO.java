@@ -22,6 +22,8 @@ public class OrderQuoteVO {
     private Long activityDiscountAmount;
     @Schema(description = "券优惠（分）")
     private Long couponAmount;
+    @Schema(description = "积分抵扣金额（分），1 积分=1 分钱")
+    private Long pointsDiscountAmount;
     @Schema(description = "优惠合计（分）")
     private Long discountAmount;
     @Schema(description = "应付金额（分）")

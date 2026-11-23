@@ -29,6 +29,8 @@ public class OmsOrder {
     private String payChannel;
     private String paymentNo;
     private Long memberCouponId;
+    /** 本单实际使用积分（1 积分=1 分钱），支付成功时按订单号幂等扣减 */
+    private Long usePoints;
     private Long pointsEarned;
     private String pickupNo;
     private LocalDateTime payTime;

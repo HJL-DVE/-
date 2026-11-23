@@ -13,6 +13,7 @@ export function quoteOrder(data: {
   storeId: number
   memberId?: number | null
   memberCouponId?: number | null
+  usePoints?: number | null
   items: OrderItemRequest[]
 }): Promise<OrderQuoteVO> {
   return http.post<OrderQuoteVO>('/api/admin/order/quote', data)

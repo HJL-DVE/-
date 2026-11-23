@@ -41,6 +41,8 @@ public class OrderInternalController {
     private final OmsOrderMapper orderMapper;
     private final com.teaclub.cloud.messaging.outbox.OutboxService outboxService;
     private final com.teaclub.cloud.order.service.OrderWalletReconciliationService reconciliationService;
+    private final com.teaclub.cloud.order.client.PointsInternalClient pointsClient;
+    private final com.teaclub.cloud.order.client.CouponInternalClient couponClient;
 
     @Operation(summary = "按订单号查询订单（内部调用）")
     @GetMapping("/order/{orderNo}")
@@ -115,6 +117,40 @@ public class OrderInternalController {
         paidEvent.put("paymentNo", str(body.get("paymentNo")));
         outboxService.enqueue(
                 com.teaclub.cloud.messaging.event.DomainEvents.ORDER_PAID, orderNo, paidEvent);
+
+        // 券核销：支付成功后把 LOCKED 券置 USED（按订单号幂等；失败只记日志）
+        if (existing.getMemberCouponId() != null && existing.getCouponAmount() != null
+                && existing.getCouponAmount() > 0) {
+            try {
+                var resp = couponClient.useByCouponId(existing.getMemberCouponId(),
+                        orderNo, existing.getCouponAmount());
+                if (resp == null || resp.getCode() != 0) {
+                    log.warn("券核销失败 orderNo={} couponId={} code={}", orderNo,
+                            existing.getMemberCouponId(), resp == null ? null : resp.getCode());
+                }
+            } catch (Exception e) {
+                log.error("券核销异常 orderNo={} couponId={}", orderNo,
+                        existing.getMemberCouponId(), e);
+            }
+        }
+
+        // 积分抵扣：支付成功后按订单号幂等扣减（失败只记日志，不影响支付确认）
+        Long usePoints = existing.getUsePoints();
+        if (usePoints != null && usePoints > 0 && existing.getMemberId() != null) {
+            try {
+                var resp = pointsClient.deduct(existing.getMemberId(), usePoints, orderNo);
+                if (resp == null || resp.getCode() != 0) {
+                    log.warn("积分扣减失败 orderNo={} memberId={} points={} code={}", orderNo,
+                            existing.getMemberId(), usePoints, resp == null ? null : resp.getCode());
+                } else {
+                    log.info("积分已扣减 orderNo={} memberId={} points={}", orderNo,
+                            existing.getMemberId(), usePoints);
+                }
+            } catch (Exception e) {
+                log.error("积分扣减异常 orderNo={} memberId={} points={}", orderNo,
+                        existing.getMemberId(), usePoints, e);
+            }
+        }
 
         log.info("内部调用标记订单已支付: orderNo={}", orderNo);
         return Result.ok();

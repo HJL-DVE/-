@@ -24,6 +24,9 @@ public class OrderCreateRequest {
     @Schema(description = "使用的会员优惠券 ID")
     private Long memberCouponId;
 
+    @Schema(description = "使用积分数（1 积分=1 分钱；可为空=不用）")
+    private Long usePoints;
+
     @Schema(description = "备注")
     private String remark;
 

@@ -53,6 +53,7 @@ public class OrderServiceImpl implements OrderService {
     private final com.teaclub.cloud.order.saga.PaymentSagaService sagaService;
     private final com.teaclub.cloud.messaging.outbox.OutboxService outboxService;
     private final com.teaclub.cloud.order.client.CouponInternalClient couponClient;
+    private final com.teaclub.cloud.order.client.PointsInternalClient pointsClient;
 
     @Override
     public OrderQuoteVO quote(OrderQuoteRequest request) {
@@ -60,8 +61,9 @@ public class OrderServiceImpl implements OrderService {
         assertStoreAccessible(request.getStoreId());
         long couponDiscount = resolveCouponDiscount(request.getMemberCouponId(),
                 request.getMemberId(), request.getStoreId(), request.getItems());
+        long pointsDiscount = resolvePointsDiscount(request.getUsePoints(), request.getMemberId());
         return calculator.calculate(current.getBrandId(), request.getStoreId(), request.getMemberId(),
-                request.getItems(), couponDiscount);
+                request.getItems(), couponDiscount, pointsDiscount);
     }
 
     /**
@@ -77,7 +79,7 @@ public class OrderServiceImpl implements OrderService {
         }
         try {
             long baseAmount = calculator.calculate(
-                    UserContext.require().getBrandId(), storeId, memberId, items, 0L).getTotalAmount();
+                    UserContext.require().getBrandId(), storeId, memberId, items, 0L, 0L).getTotalAmount();
             var resp = couponClient.quoteById(memberCouponId, memberId, storeId, baseAmount);
             if (resp == null || resp.getCode() != 0 || resp.getData() == null) {
                 log.warn("券试算失败，按无券处理 memberCouponId={} code={}", memberCouponId,
@@ -96,6 +98,88 @@ public class OrderServiceImpl implements OrderService {
         } catch (Exception e) {
             log.warn("调用券试算异常，按无券处理 memberCouponId={} err={}", memberCouponId, e.getMessage());
             return 0L;
+        }
+    }
+
+    /**
+     * 解析积分抵扣金额（分）：调 marketing-service 查可用积分余额，取 min(申请积分, 余额)。
+     *
+     * <p>1 积分 = 1 分钱，所以积分余额数值即为可抵扣的分值。试算只查余额<b>不扣</b>，
+     * 真正扣减发生在支付成功。未传积分、散客、或营销服务不可用一律返回 0 ——
+     * 不让积分抵扣失败阻断整笔交易。
+     */
+    private long resolvePointsDiscount(Long usePoints, Long memberId) {
+        if (usePoints == null || usePoints <= 0 || memberId == null) {
+            return 0L;
+        }
+        try {
+            var resp = pointsClient.balance(memberId);
+            if (resp == null || resp.getCode() != 0 || resp.getData() == null) {
+                log.warn("积分余额查询失败，按不使用积分处理 memberId={} code={}", memberId,
+                        resp == null ? null : resp.getCode());
+                return 0L;
+            }
+            long balance = resp.getData();
+            if (balance <= 0) {
+                return 0L;
+            }
+            long applied = Math.min(usePoints, balance);
+            log.info("积分试算 memberId={} 申请={} 可用={} 实际抵扣={}分",
+                    memberId, usePoints, balance, applied);
+            return applied;
+        } catch (Exception e) {
+            log.warn("调用积分余额查询异常，按不使用积分处理 memberId={} err={}",
+                    memberId, e.getMessage());
+            return 0L;
+        }
+    }
+
+    /**
+     * 支付成功后扣减本单实际使用的积分（按订单号幂等；失败只记日志，不影响支付主流程）。
+     *
+     * <p>试算只查余额不扣，因此取消订单无需退积分；只有走到支付成功才真正扣。
+     */
+    private void deductPointsOnPaySuccess(OmsOrder order, String orderNo) {
+        Long usePoints = order.getUsePoints();
+        if (usePoints == null || usePoints <= 0 || order.getMemberId() == null) {
+            return;
+        }
+        try {
+            var resp = pointsClient.deduct(order.getMemberId(), usePoints, orderNo);
+            if (resp == null || resp.getCode() != 0) {
+                log.warn("积分扣减失败 orderNo={} memberId={} points={} code={}", orderNo,
+                        order.getMemberId(), usePoints, resp == null ? null : resp.getCode());
+            } else {
+                log.info("积分已扣减 orderNo={} memberId={} points={}", orderNo,
+                        order.getMemberId(), usePoints);
+            }
+        } catch (Exception e) {
+            log.error("积分扣减异常 orderNo={} memberId={} points={}", orderNo,
+                    order.getMemberId(), usePoints, e);
+        }
+    }
+
+    /**
+     * 支付成功后核销本单使用的优惠券（按订单号幂等；失败只记日志，不影响支付主流程）。
+     * 余额支付与微信/Mock 支付两条路径都会走这里，避免券一直停在 LOCKED。
+     */
+    private void useCouponOnPaySuccess(OmsOrder order, String orderNo) {
+        if (order.getMemberCouponId() == null || order.getCouponAmount() == null
+                || order.getCouponAmount() <= 0) {
+            return;
+        }
+        try {
+            var resp = couponClient.useByCouponId(order.getMemberCouponId(),
+                    orderNo, order.getCouponAmount());
+            if (resp == null || resp.getCode() != 0) {
+                log.warn("券核销失败 orderNo={} couponId={} code={}", orderNo,
+                        order.getMemberCouponId(), resp == null ? null : resp.getCode());
+            } else {
+                log.info("券已核销 orderNo={} couponId={} 抵扣={}分",
+                        orderNo, order.getMemberCouponId(), order.getCouponAmount());
+            }
+        } catch (Exception e) {
+            log.error("券核销异常 orderNo={} couponId={}", orderNo, order.getMemberCouponId(), e);
         }
     }
 
@@ -120,9 +204,10 @@ public class OrderServiceImpl implements OrderService {
         // 券抵扣金额由 marketing-service 试算（券的真伪/归属/门槛/有效期全由营销服务判定）
         long couponDiscount = resolveCouponDiscount(request.getMemberCouponId(),
                 request.getMemberId(), request.getStoreId(), request.getItems());
+        long pointsDiscount = resolvePointsDiscount(request.getUsePoints(), request.getMemberId());
         OrderQuoteVO quote = calculator.calculate(
                 current.getBrandId(), request.getStoreId(), request.getMemberId(),
-                request.getItems(), couponDiscount);
+                request.getItems(), couponDiscount, pointsDiscount);
 
         String orderNo = BizNoGenerator.orderNo();
         OmsOrder order = new OmsOrder();
@@ -144,6 +229,9 @@ public class OrderServiceImpl implements OrderService {
         order.setBalanceGiftAmount(0L);
         order.setStatus(OrderStatus.UNPAID.name());
         order.setMemberCouponId(request.getMemberCouponId());
+        // 实际使用的积分（已按余额/应付截断）：支付成功时按订单号幂等扣减
+        long usePoints = quote.getPointsDiscountAmount() == null ? 0L : quote.getPointsDiscountAmount();
+        order.setUsePoints(usePoints);
         order.setPointsEarned(0L);
         order.setPickupNo(generatePickupNo());
         order.setRemark(request.getRemark());
@@ -186,7 +274,8 @@ public class OrderServiceImpl implements OrderService {
             itemMapper.insert(entity);
         }
 
-        logStatus(order, null, OrderStatus.UNPAID, current.getUserId(), "STAFF", "创建订单");
+        logStatus(order, null, OrderStatus.UNPAID, current.getUserId(), "STAFF",
+                "创建订单" + (usePoints > 0 ? "（积分抵扣 " + usePoints + " 分）" : ""));
 
         // 可选：立即余额支付
         if (Boolean.TRUE.equals(request.getPayWithBalance())) {
@@ -273,23 +362,9 @@ public class OrderServiceImpl implements OrderService {
             // 订单已更新，Saga 完成
             sagaService.markCompleted(saga.getId());
 
-            // 券核销：订单支付成功后把 LOCKED 券置 USED（幂等；失败只记日志，不回滚支付）
-            if (order.getMemberCouponId() != null && order.getCouponAmount() != null
-                    && order.getCouponAmount() > 0) {
-                try {
-                    var useResp = couponClient.useByCouponId(order.getMemberCouponId(),
-                            orderNo, order.getCouponAmount());
-                    if (useResp == null || useResp.getCode() != 0) {
-                        log.warn("券核销失败 orderNo={} couponId={} code={}", orderNo,
-                                order.getMemberCouponId(), useResp == null ? null : useResp.getCode());
-                    } else {
-                        log.info("券已核销 orderNo={} couponId={} 抵扣={}分",
-                                orderNo, order.getMemberCouponId(), order.getCouponAmount());
-                    }
-                } catch (Exception e) {
-                    log.error("券核销异常 orderNo={} couponId={}", orderNo, order.getMemberCouponId(), e);
-                }
-            }
+            // 券核销 + 积分扣减：支付成功后处理（均按订单号幂等；失败只记日志，不回滚支付）
+            useCouponOnPaySuccess(order, orderNo);
+            deductPointsOnPaySuccess(order, orderNo);
 
             // 领域事件：订单已支付（与订单状态同一本地事务）
             Map<String, Object> paidEvent = new java.util.HashMap<>();
@@ -390,6 +465,9 @@ public class OrderServiceImpl implements OrderService {
 
         logStatus(order, OrderStatus.UNPAID, OrderStatus.PAID,
                 null, "SYSTEM", "微信支付成功确认 paymentNo=" + paymentNo);
+        // 券核销 + 积分扣减：支付成功后处理（均按订单号幂等；失败只记日志，不影响支付确认）
+        useCouponOnPaySuccess(order, orderNo);
+        deductPointsOnPaySuccess(order, orderNo);
         // 会员消费档案改由 ORDER_PAID 事件驱动（member-service 侧消费）
     }
 
