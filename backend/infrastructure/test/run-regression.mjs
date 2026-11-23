@@ -42,6 +42,8 @@ const SUITE = [
   { file: '37-new-features.mjs',              tag: 'newfeat',  desc: '操作日志AOP/积分规则编辑/8类活动触发' },
   { file: '38-profile-birthday.mjs',            tag: 'bday',     desc: '会员自助填写生日（首次可设/防薅/扫描识别）' },
   { file: '39-auth-permission.mjs',             tag: 'authperm', desc: 'JWT权限解析修复：/me权限完整/三角色差异/越权防护' },
+  { file: '40-fullstack-audit.mjs',             tag: 'audit',    desc: '全链路审计：健康/鉴权/参数校验/权限矩阵/数据范围' },
+  { file: '41-e2e-business-flow.mjs',          tag: 'e2e',     desc: '核心业务全链路：注册→领券→充值→下单→支付→积分→报表四方一致' }
 ];
 
 const filters = process.argv.slice(2).filter((a) => !a.startsWith('-'));

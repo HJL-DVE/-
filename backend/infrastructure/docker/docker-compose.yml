@@ -30,6 +30,8 @@ x-common-env: &common-env
   JWT_MEMBER_SECRET: ${JWT_MEMBER_SECRET}
   # 仅开发环境：开启本地联调令牌端点（生产环境请移除此变量）
   DEV_TOKEN_ENDPOINT: ${DEV_TOKEN_ENDPOINT:-false}
+  # 混合部署用：容器内服务注册为宿主机可达 IP（默认空=容器内网地址，全容器部署时正确）
+  DISCOVERY_IP: ${DISCOVERY_IP:-}
 
 services:
   # ==================== 数据层 ====================

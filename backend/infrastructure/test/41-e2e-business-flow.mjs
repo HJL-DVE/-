@@ -3,6 +3,24 @@
  * 注册 → 领券 → 充值 → 点单试算(带券) → 下单(带券) → 钱包支付 → 积分 → 报表五方一致
  */
 const GW = 'http://127.0.0.1:9000';
+// 自适应路由：营销/报表服务若跑在宿主机（同其它 IDEA 服务）则走网关；
+// 若跑在容器，Gateway 路由不到容器内网 IP，此时直连容器映射端口。
+// 探测方式：直连健康检查成功则用直连，否则用网关。
+const probe = async (port) => {
+  try {
+    const r = await fetch('http://127.0.0.1:' + port + '/actuator/health', { signal: AbortSignal.timeout(2000) });
+    return r.ok;
+  } catch { return false; }
+};
+const MKT_DIRECT = await probe(9007);
+const RPT_DIRECT = await probe(9008);
+const DIRECT = { marketing: 'http://127.0.0.1:9007', report: 'http://127.0.0.1:9008' };
+const url = (p) => {
+  if (p.startsWith('/api/marketing') && MKT_DIRECT) return DIRECT.marketing + p;
+  if (p.startsWith('/api/report') && RPT_DIRECT) return DIRECT.report + p;
+  return GW + p;
+};
+console.log('路由模式: marketing=' + (MKT_DIRECT ? '直连:9007' : '网关') + ' report=' + (RPT_DIRECT ? '直连:9008' : '网关'));
 let pass = 0, fail = 0;
 const fails = [];
 const chk = (n, ok, d) => {
@@ -13,7 +31,7 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 const req = async (m, p, { token, body } = {}) => {
   const h = { 'Content-Type': 'application/json' };
   if (token) h.Authorization = 'Bearer ' + token;
-  const r = await fetch(GW + p, { method: m, headers: h, body: body === undefined ? undefined : JSON.stringify(body) });
+  const r = await fetch(url(p), { method: m, headers: h, body: body === undefined ? undefined : JSON.stringify(body) });
   return await r.json().catch(() => ({}));
 };
 
@@ -29,7 +47,13 @@ if (!tok) { console.log('注册失败，终止'); process.exit(1); }
 console.log('');
 console.log('=== 2. 领取优惠券 ===');
 const tpls = (await req('GET', '/api/marketing/coupons/available', { token: tok })).data || [];
-const tpl = tpls.find(t => t.thresholdAmount > 0 && t.faceValue > 0);
+// 选券注意事项：
+//  1) 门槛必须 <= 订单金额（订单 36 元 = 3600 分），否则券不适用、抵扣为 0（那是正确行为）
+//  2) 必须避开 perMemberLimit 已领满的模板，否则领取被限领拦截（也是正确行为）
+//  3) 优先选门槛 0 的无门槛券，抵扣最确定
+const tpl = tpls.find(t => t.thresholdAmount === 0 && t.faceValue > 0 && (t.receivedCount || 0) < (t.totalCount || 9999))
+  || tpls.find(t => t.thresholdAmount > 0 && t.thresholdAmount <= 3600 && t.faceValue > 0 && (t.receivedCount || 0) < (t.totalCount || 9999))
+  || tpls.find(t => t.faceValue > 0);
 chk('有可领券模板', !!tpl, tpl ? `${tpl.couponName} 门槛${tpl.thresholdAmount / 100} 面额${tpl.faceValue / 100}` : '无');
 if (tpl) {
   const got = await req('POST', `/api/marketing/coupons/receive?templateId=${tpl.id}&qty=1`, { token: tok });

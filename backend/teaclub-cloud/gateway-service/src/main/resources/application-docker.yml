@@ -7,6 +7,10 @@ spring:
     nacos:
       discovery:
         server-addr: ${NACOS_ADDR:nacos:8848}
+        # 混合部署（部分服务跑在宿主机、部分在容器）时用：注册为宿主机可达 IP，
+        # 否则容器注册 172.x 内网地址，宿主机上的 Gateway 路由不到。
+        # 用法：docker compose 时给该服务加 DISCOVERY_IP=<宿主机IP> 即可（默认不设置）。
+        ip: ${DISCOVERY_IP:}
         group: ${NACOS_GROUP:TEACLUB}
       config:
         enabled: true
